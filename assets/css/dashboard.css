@@ -1,0 +1,9 @@
+.dashboard-topbar {
+  height: 74px;
+}
+
+@media (min-width: 992px) {
+  .dashboard-topbar {
+    height: 93px;
+  }
+}

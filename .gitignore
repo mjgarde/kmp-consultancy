@@ -1,0 +1,31 @@
+# =========================================================
+# KMP ConsultHub - .gitignore
+# =========================================================
+
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Logs
+*.log
+error_log
+logs/
+
+
+# Cache / temp files
+*.cache
+*.tmp
+tmp/
+
+
+# Others
+stucture.md
+index.php

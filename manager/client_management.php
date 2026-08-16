@@ -1,0 +1,572 @@
+<?php
+session_name('MANAGER_SESSION');
+session_start();
+require_once __DIR__ . '/../config/database.php';
+
+if (!isset($_SESSION['manager_id']) || ($_SESSION['role'] ?? '') !== 'manager') {
+    header('Location: login.php');
+    exit;
+}
+
+$pdo = getConnection();
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+    $action = $_POST['action'] ?? '';
+
+    if ($action === 'add_client') {
+
+        $companyName   = trim($_POST['company_name'] ?? '');
+        $contactPerson = trim($_POST['contact_person'] ?? '');
+        $email         = trim($_POST['email'] ?? '');
+        $contactNumber = trim($_POST['contact_number'] ?? '');
+        $address       = trim($_POST['address'] ?? '');
+        $industry      = trim($_POST['industry'] ?? '');
+
+        $errors = [];
+
+        if ($companyName === '') $errors[] = 'Company name is required.';
+        if ($contactPerson === '') $errors[] = 'Contact person is required.';
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'A valid email address is required.';
+        if ($contactNumber === '') {
+            $errors[] = 'Contact number is required.';
+        } elseif (!ctype_digit($contactNumber)) {
+            $errors[] = 'Contact number must contain numbers only.';
+        }
+        if ($address === '') $errors[] = 'Address is required.';
+
+        if (empty($errors)) {
+            $stmt = $pdo->prepare(
+                'INSERT INTO clients (company_name, contact_person, email, contact_number, address, industry)
+                 VALUES (?, ?, ?, ?, ?, ?)'
+            );
+            $stmt->execute([$companyName, $contactPerson, $email, $contactNumber, $address, $industry]);
+            $_SESSION['alert_type'] = 'success';
+            $_SESSION['alert_message'] = 'Client profile added successfully.';
+        } else {
+            $_SESSION['alert_type'] = 'error';
+            $_SESSION['alert_message'] = implode(' ', $errors);
+        }
+
+        header('Location: client_management.php?tab=clients');
+        exit;
+
+    } elseif ($action === 'add_request') {
+
+        $clientId       = $_POST['client_id'] ?? '';
+        $requestTitle   = trim($_POST['request_title'] ?? '');
+        $requestDetails = trim($_POST['request_details'] ?? '');
+
+        $errors = [];
+        if ($clientId === '') $errors[] = 'Please select a client.';
+        if ($requestTitle === '') $errors[] = 'Request title is required.';
+
+        if (empty($errors)) {
+            $stmt = $pdo->prepare(
+                'INSERT INTO service_requests (client_id, request_title, request_details, status) VALUES (?, ?, ?, ?)'
+            );
+            $stmt->execute([$clientId, $requestTitle, $requestDetails, 'New']);
+            $_SESSION['alert_type'] = 'success';
+            $_SESSION['alert_message'] = 'Service request recorded successfully.';
+        } else {
+            $_SESSION['alert_type'] = 'error';
+            $_SESSION['alert_message'] = implode(' ', $errors);
+        }
+
+        header('Location: client_management.php?tab=requests');
+        exit;
+
+    } elseif ($action === 'assign_request') {
+
+        $requestId  = $_POST['request_id'] ?? null;
+        $assignedTo = $_POST['assigned_to'] ?? null;
+        $assignedTo = $assignedTo === '' ? null : $assignedTo;
+
+        $newStatus = $assignedTo ? 'In Progress' : 'New';
+
+        $stmt = $pdo->prepare('UPDATE service_requests SET assigned_to = ?, status = ? WHERE request_id = ?');
+        $stmt->execute([$assignedTo, $newStatus, $requestId]);
+
+        $_SESSION['alert_type'] = 'success';
+        $_SESSION['alert_message'] = 'Service request assigned successfully.';
+        header('Location: client_management.php?tab=requests');
+        exit;
+    }
+}
+
+$alertType    = $_SESSION['alert_type'] ?? null;
+$alertMessage = $_SESSION['alert_message'] ?? null;
+unset($_SESSION['alert_type'], $_SESSION['alert_message']);
+
+$activeTab = $_GET['tab'] ?? 'clients';
+
+$clients = $pdo->query('SELECT * FROM clients ORDER BY created_at DESC')->fetchAll();
+
+$requests = $pdo->query(
+    'SELECT sr.*, c.company_name, u.firstname, u.lastname
+     FROM service_requests sr
+     JOIN clients c ON c.client_id = sr.client_id
+     LEFT JOIN users u ON u.user_id = sr.assigned_to
+     ORDER BY sr.created_at DESC'
+)->fetchAll();
+
+$staffList = $pdo->query("SELECT user_id, firstname, lastname, role FROM users WHERE status = 'Active' AND role IN ('Supervisor', 'Staff') ORDER BY firstname")->fetchAll();
+
+$totalClients       = count($clients);
+$totalRequests      = count($requests);
+$newRequests        = count(array_filter($requests, fn($r) => $r['status'] === 'New'));
+$inProgressRequests = count(array_filter($requests, fn($r) => $r['status'] === 'In Progress'));
+$completedRequests  = count(array_filter($requests, fn($r) => $r['status'] === 'Completed'));
+
+function statusBadgeColor(string $status): string
+{
+    return match ($status) {
+        'New' => '#2F4858',
+        'In Progress' => '#E89C5A',
+        'Completed' => '#3AA394',
+        'Cancelled' => '#DF6E4F',
+        default => '#2F4858',
+    };
+}
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Client Management</title>
+<link rel="stylesheet" href="../assets/vendor/bootstrap-5.3.8/css/bootstrap.min.css">
+<link rel="stylesheet" href="../assets/vendor/fontawesome-free-7.3.1/css/all.min.css">
+<link rel="stylesheet" href="../assets/css/dashboard.css">
+<style>
+.form-control:focus, .form-select:focus, .form-control:hover, .form-select:hover {
+  border-color:#2F4858;
+  box-shadow:0 0 0 .2rem rgba(47,72,88,.15);
+  outline:none;
+}
+</style>
+</head>
+<body class="bg-light">
+
+<div class="dashboard-layout d-flex">
+
+<?php require __DIR__ . '/../includes/manager/sidebar.php'; ?>
+
+  <div class="dashboard-main flex-grow-1" style="min-width:0;">
+
+    <header class="dashboard-topbar bg-white border-bottom d-flex align-items-center justify-content-between px-3 px-md-4">
+      <div class="d-flex align-items-center gap-3">
+        <button type="button" class="btn btn-link text-dark p-0 d-lg-none" data-bs-toggle="offcanvas" data-bs-target="#sidebarOffcanvas" aria-controls="sidebarOffcanvas" aria-label="Open menu">
+          <i class="fa-solid fa-bars fs-5"></i>
+        </button>
+        <div>
+          <h1 class="dashboard-title h6 h5-md fw-bold mb-0">Client Management</h1>
+          <p class="dashboard-subtitle text-secondary small mb-0 d-none d-sm-block">Assign service requests and monitor client progress.</p>
+        </div>
+      </div>
+      <div class="dashboard-topbar-actions d-flex align-items-center gap-3 gap-md-4">
+        <button type="button" class="btn btn-link text-secondary p-0">
+          <i class="fa-regular fa-bell fs-5"></i>
+        </button>
+        <div class="dropdown">
+          <button type="button" class="btn btn-link p-0 border-0" data-bs-toggle="dropdown" aria-expanded="false">
+            <span class="dashboard-user-icon d-flex align-items-center justify-content-center rounded-circle bg-secondary bg-opacity-10 flex-shrink-0" style="width:36px; height:36px;">
+              <i class="fa-solid fa-user text-secondary"></i>
+            </span>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+            <li>
+              <a href="../config/logout.php?role=manager" class="dropdown-item d-flex align-items-center gap-2 text-danger">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </header>
+
+    <main class="dashboard-content p-3 p-md-4">
+
+      <nav class="client-management-tabs mb-3">
+        <ul class="nav gap-2">
+          <li class="nav-item">
+            <a href="?tab=clients" class="nav-link rounded-3 fw-semibold" style="background-color:#2F4858; color:#fff; <?= $activeTab === 'clients' ? 'box-shadow:0 2px 6px rgba(47,72,88,.4);' : '' ?>">
+              <i class="fa-solid fa-building me-1"></i> Clients
+            </a>
+          </li>
+          <li class="nav-item">
+            <a href="?tab=requests" class="nav-link rounded-3 fw-semibold" style="background-color:#E89C5A; color:#fff; <?= $activeTab === 'requests' ? 'box-shadow:0 2px 6px rgba(232,156,90,.5);' : '' ?>">
+              <i class="fa-solid fa-clipboard-list me-1"></i> Service Requests
+            </a>
+          </li>
+          <li class="nav-item">
+            <a href="?tab=reports" class="nav-link rounded-3 fw-semibold" style="background-color:#3AA394; color:#fff; <?= $activeTab === 'reports' ? 'box-shadow:0 2px 6px rgba(58,163,148,.5);' : '' ?>">
+              <i class="fa-solid fa-chart-simple me-1"></i> Reports
+            </a>
+          </li>
+        </ul>
+      </nav>
+
+      <?php if ($activeTab === 'clients'): ?>
+
+        <section class="client-management-toolbar card border-0 shadow-sm mb-3">
+          <div class="card-body p-2 p-md-3 d-flex justify-content-end">
+            <button type="button" class="btn" style="background-color:#2F4858; color:#fff;" data-bs-toggle="modal" data-bs-target="#addClientModal">
+              <i class="fa-solid fa-plus"></i> Add Client
+            </button>
+          </div>
+        </section>
+
+        <section class="client-management-table card border-0 shadow-sm">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th scope="col" class="small text-uppercase text-secondary">Company</th>
+                  <th scope="col" class="small text-uppercase text-secondary d-none d-md-table-cell">Contact Person</th>
+                  <th scope="col" class="small text-uppercase text-secondary d-none d-lg-table-cell">Email</th>
+                  <th scope="col" class="small text-uppercase text-secondary d-none d-lg-table-cell">Contact Number</th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php if (empty($clients)): ?>
+                  <tr><td colspan="4" class="text-center text-secondary py-4">No clients found.</td></tr>
+                <?php else: ?>
+                  <?php foreach ($clients as $client): ?>
+                    <tr class="client-management-row" role="button" style="cursor:pointer;"
+                      data-bs-toggle="modal" data-bs-target="#viewClientModal"
+                      data-company="<?= htmlspecialchars($client['company_name']) ?>"
+                      data-contact="<?= htmlspecialchars($client['contact_person']) ?>"
+                      data-email="<?= htmlspecialchars($client['email']) ?>"
+                      data-number="<?= htmlspecialchars($client['contact_number']) ?>"
+                      data-address="<?= htmlspecialchars($client['address']) ?>"
+                      data-industry="<?= htmlspecialchars($client['industry'] ?? '') ?>">
+                      <td>
+                        <div class="fw-semibold small"><?= htmlspecialchars($client['company_name']) ?></div>
+                        <div class="text-secondary d-md-none" style="font-size:.72rem;"><?= htmlspecialchars($client['contact_person']) ?></div>
+                      </td>
+                      <td class="text-secondary small d-none d-md-table-cell"><?= htmlspecialchars($client['contact_person']) ?></td>
+                      <td class="text-secondary small d-none d-lg-table-cell"><?= htmlspecialchars($client['email']) ?></td>
+                      <td class="text-secondary small d-none d-lg-table-cell"><?= htmlspecialchars($client['contact_number']) ?></td>
+                    </tr>
+                  <?php endforeach; ?>
+                <?php endif; ?>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+      <?php elseif ($activeTab === 'requests'): ?>
+
+        <section class="client-management-toolbar card border-0 shadow-sm mb-3">
+          <div class="card-body p-2 p-md-3 d-flex justify-content-end">
+            <button type="button" class="btn" style="background-color:#2F4858; color:#fff;" data-bs-toggle="modal" data-bs-target="#addRequestModal">
+              <i class="fa-solid fa-plus"></i> Add Request
+            </button>
+          </div>
+        </section>
+
+        <section class="client-management-table card border-0 shadow-sm">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th scope="col" class="small text-uppercase text-secondary">Request</th>
+                  <th scope="col" class="small text-uppercase text-secondary d-none d-md-table-cell">Client</th>
+                  <th scope="col" class="small text-uppercase text-secondary d-none d-lg-table-cell">Assigned To</th>
+                  <th scope="col" class="small text-uppercase text-secondary">Status</th>
+                  <th scope="col" class="small text-uppercase text-secondary text-end">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php if (empty($requests)): ?>
+                  <tr><td colspan="5" class="text-center text-secondary py-4">No service requests found.</td></tr>
+                <?php else: ?>
+                  <?php foreach ($requests as $request): ?>
+                    <tr>
+                      <td>
+                        <div class="fw-semibold small"><?= htmlspecialchars($request['request_title']) ?></div>
+                        <div class="text-secondary d-md-none" style="font-size:.72rem;"><?= htmlspecialchars($request['company_name']) ?></div>
+                      </td>
+                      <td class="text-secondary small d-none d-md-table-cell"><?= htmlspecialchars($request['company_name']) ?></td>
+                      <td class="text-secondary small d-none d-lg-table-cell">
+                        <?= $request['firstname'] ? htmlspecialchars($request['firstname'] . ' ' . $request['lastname']) : '—' ?>
+                      </td>
+                      <td>
+                        <span class="badge rounded-pill" style="background-color:<?= statusBadgeColor($request['status']) ?>; color:#fff;"><?= htmlspecialchars($request['status']) ?></span>
+                      </td>
+                      <td class="text-end">
+                        <button type="button" class="btn btn-sm" style="background-color:#2F4858; color:#fff;" title="Assign"
+                          data-bs-toggle="modal" data-bs-target="#assignRequestModal"
+                          data-id="<?= $request['request_id'] ?>"
+                          data-title="<?= htmlspecialchars($request['request_title']) ?>"
+                          data-details="<?= htmlspecialchars($request['request_details'] ?? '') ?>"
+                          data-assigned="<?= $request['assigned_to'] ?? '' ?>">
+                          <i class="fa-solid fa-user-plus"></i> Assign
+                        </button>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                <?php endif; ?>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+      <?php else: ?>
+
+        <section class="client-management-reports row g-3 mb-3">
+          <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-body p-3">
+                <div class="text-secondary small mb-1">Total Clients</div>
+                <div class="fs-4 fw-bold"><?= $totalClients ?></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-body p-3">
+                <div class="text-secondary small mb-1">Total Requests</div>
+                <div class="fs-4 fw-bold"><?= $totalRequests ?></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-body p-3">
+                <div class="text-secondary small mb-1">In Progress</div>
+                <div class="fs-4 fw-bold"><?= $inProgressRequests ?></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-body p-3">
+                <div class="text-secondary small mb-1">Completed</div>
+                <div class="fs-4 fw-bold"><?= $completedRequests ?></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="client-management-table card border-0 shadow-sm">
+          <div class="table-responsive">
+            <table class="table align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th scope="col" class="small text-uppercase text-secondary">Client</th>
+                  <th scope="col" class="small text-uppercase text-secondary">Total Requests</th>
+                  <th scope="col" class="small text-uppercase text-secondary">Completed</th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php foreach ($clients as $client): ?>
+                  <?php
+                    $clientRequests = array_filter($requests, fn($r) => $r['client_id'] == $client['client_id']);
+                    $clientCompleted = count(array_filter($clientRequests, fn($r) => $r['status'] === 'Completed'));
+                  ?>
+                  <tr>
+                    <td class="fw-semibold small"><?= htmlspecialchars($client['company_name']) ?></td>
+                    <td class="small text-secondary"><?= count($clientRequests) ?></td>
+                    <td class="small text-secondary"><?= $clientCompleted ?></td>
+                  </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+      <?php endif; ?>
+
+    </main>
+
+  </div>
+
+</div>
+
+<div class="modal fade" id="addClientModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <form method="POST" novalidate>
+        <input type="hidden" name="action" value="add_client">
+        <div class="modal-header">
+          <h2 class="modal-title h5 fw-bold">Add Client</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Company Name</label>
+              <input type="text" name="company_name" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Contact Person</label>
+              <input type="text" name="contact_person" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Email Address</label>
+              <input type="email" name="email" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Contact Number</label>
+              <input type="tel" name="contact_number" class="form-control" inputmode="numeric" pattern="[0-9]*" maxlength="11" oninput="this.value=this.value.replace(/[^0-9]/g,'')" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Industry</label>
+              <input type="text" name="industry" class="form-control" placeholder="Optional">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Address</label>
+              <input type="text" name="address" class="form-control" required>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn" style="background-color:#2F4858; color:#fff;">Save Client</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="viewClientModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title h5 fw-bold">Client Details</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="text-secondary small">Company Name</div>
+            <div class="fw-semibold" id="view_company"></div>
+          </div>
+          <div class="col-md-6">
+            <div class="text-secondary small">Contact Person</div>
+            <div class="fw-semibold" id="view_contact"></div>
+          </div>
+          <div class="col-md-6">
+            <div class="text-secondary small">Email Address</div>
+            <div class="fw-semibold" id="view_email"></div>
+          </div>
+          <div class="col-md-6">
+            <div class="text-secondary small">Contact Number</div>
+            <div class="fw-semibold" id="view_number"></div>
+          </div>
+          <div class="col-md-6">
+            <div class="text-secondary small">Industry</div>
+            <div class="fw-semibold" id="view_industry"></div>
+          </div>
+          <div class="col-md-6">
+            <div class="text-secondary small">Address</div>
+            <div class="fw-semibold" id="view_address"></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="addRequestModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <form method="POST" novalidate>
+        <input type="hidden" name="action" value="add_request">
+        <div class="modal-header">
+          <h2 class="modal-title h5 fw-bold">Add Service Request</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label fw-semibold">Client</label>
+              <select name="client_id" class="form-select" required>
+                <option value="" selected disabled>Select client</option>
+                <?php foreach ($clients as $client): ?>
+                  <option value="<?= $client['client_id'] ?>"><?= htmlspecialchars($client['company_name']) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Request Title</label>
+              <input type="text" name="request_title" class="form-control" required>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Details</label>
+              <textarea name="request_details" class="form-control" rows="4"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn" style="background-color:#2F4858; color:#fff;">Save Request</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="assignRequestModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <form method="POST" novalidate>
+        <input type="hidden" name="action" value="assign_request">
+        <input type="hidden" name="request_id" id="assign_request_id">
+        <div class="modal-header">
+          <h2 class="modal-title h5 fw-bold" id="assign_request_title">Assign Request</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-secondary small" id="assign_request_details"></p>
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label fw-semibold">Assign To</label>
+              <select name="assigned_to" id="assign_assigned" class="form-select">
+                <option value="">Unassigned</option>
+                <?php foreach ($staffList as $staffMember): ?>
+                  <option value="<?= $staffMember['user_id'] ?>"><?= htmlspecialchars($staffMember['firstname'] . ' ' . $staffMember['lastname'] . ' (' . $staffMember['role'] . ')') ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn" style="background-color:#2F4858; color:#fff;">Save Assignment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/vendor/bootstrap-5.3.8/js/bootstrap.bundle.min.js"></script>
+<script>
+document.getElementById('viewClientModal').addEventListener('show.bs.modal', function (event) {
+  const btn = event.relatedTarget;
+  document.getElementById('view_company').textContent = btn.dataset.company;
+  document.getElementById('view_contact').textContent = btn.dataset.contact;
+  document.getElementById('view_email').textContent = btn.dataset.email;
+  document.getElementById('view_number').textContent = btn.dataset.number;
+  document.getElementById('view_industry').textContent = btn.dataset.industry || '-';
+  document.getElementById('view_address').textContent = btn.dataset.address;
+});
+
+document.getElementById('assignRequestModal').addEventListener('show.bs.modal', function (event) {
+  const btn = event.relatedTarget;
+  document.getElementById('assign_request_id').value = btn.dataset.id;
+  document.getElementById('assign_request_title').textContent = btn.dataset.title;
+  document.getElementById('assign_request_details').textContent = btn.dataset.details;
+  document.getElementById('assign_assigned').value = btn.dataset.assigned;
+});
+
+<?php if ($alertType && $alertMessage): ?>
+window.addEventListener('DOMContentLoaded', function () {
+  alert(<?= json_encode($alertMessage) ?>);
+});
+<?php endif; ?>
+</script>
+
+</body>
+</html>
