@@ -27,7 +27,7 @@ function navActive(string $page, string $currentPage): string
     return $page === $currentPage ? 'active fw-semibold' : 'text-dark';
 }
 ?>
-<aside class="dashboard-sidebar offcanvas-lg offcanvas-start bg-white border-end d-flex flex-column min-vh-100" style="width:264px;" tabindex="-1" id="sidebarOffcanvas">
+<aside class="dashboard-sidebar offcanvas-lg offcanvas-start bg-white border-end d-flex flex-column min-vh-100" style="width:264px; min-width:264px; max-width:264px; flex-shrink:0;" tabindex="-1" id="sidebarOffcanvas">
 
   <div class="dashboard-sidebar-brand d-flex align-items-center justify-content-between gap-2 border-bottom px-3 py-3">
     <div class="d-flex align-items-center gap-2">
@@ -61,7 +61,7 @@ function navActive(string $page, string $currentPage): string
       </li>
       <li class="nav-item mb-1">
         <a href="knowledge_repository.php" class="nav-link <?= navActive('knowledge_repository.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
-          <i class="fa-solid fa-book" style="width:18px;"></i> Knowledge Repository
+          <i class="fa-solid fa-book" style="width:18px;"></i> Repository
         </a>
       </li>
       <li class="nav-item mb-1">

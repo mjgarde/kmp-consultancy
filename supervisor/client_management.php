@@ -1,9 +1,9 @@
 <?php
-session_name('ADMIN_SESSION');
+session_name('SUPERVISOR_SESSION');
 session_start();
 require_once __DIR__ . '/../config/database.php';
 
-if (!isset($_SESSION['admin_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
+if (!isset($_SESSION['supervisor_id']) || ($_SESSION['role'] ?? '') !== 'supervisor') {
     header('Location: login.php');
     exit;
 }
@@ -14,9 +14,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $action = $_POST['action'] ?? '';
 
-    if ($action === 'add_client' || $action === 'edit_client') {
+    if ($action === 'add_client') {
 
-        $clientId      = $_POST['client_id'] ?? null;
         $companyName   = trim($_POST['company_name'] ?? '');
         $contactPerson = trim($_POST['contact_person'] ?? '');
         $email         = trim($_POST['email'] ?? '');
@@ -37,22 +36,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($address === '') $errors[] = 'Address is required.';
 
         if (empty($errors)) {
-            if ($action === 'add_client') {
-                $stmt = $pdo->prepare(
-                    'INSERT INTO clients (company_name, contact_person, email, contact_number, address, industry)
-                     VALUES (?, ?, ?, ?, ?, ?)'
-                );
-                $stmt->execute([$companyName, $contactPerson, $email, $contactNumber, $address, $industry]);
-                $_SESSION['alert_type'] = 'success';
-                $_SESSION['alert_message'] = 'Client profile added successfully.';
-            } else {
-                $stmt = $pdo->prepare(
-                    'UPDATE clients SET company_name = ?, contact_person = ?, email = ?, contact_number = ?, address = ?, industry = ? WHERE client_id = ?'
-                );
-                $stmt->execute([$companyName, $contactPerson, $email, $contactNumber, $address, $industry, $clientId]);
-                $_SESSION['alert_type'] = 'success';
-                $_SESSION['alert_message'] = 'Client profile updated successfully.';
-            }
+            $stmt = $pdo->prepare(
+                'INSERT INTO clients (company_name, contact_person, email, contact_number, address, industry)
+                 VALUES (?, ?, ?, ?, ?, ?)'
+            );
+            $stmt->execute([$companyName, $contactPerson, $email, $contactNumber, $address, $industry]);
+            $_SESSION['alert_type'] = 'success';
+            $_SESSION['alert_message'] = 'Client profile added successfully.';
         } else {
             $_SESSION['alert_type'] = 'error';
             $_SESSION['alert_message'] = implode(' ', $errors);
@@ -61,21 +51,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: client_management.php?tab=clients');
         exit;
 
-    } elseif ($action === 'delete_client') {
-
-        $clientId = $_POST['client_id'] ?? null;
-        $stmt = $pdo->prepare('DELETE FROM clients WHERE client_id = ?');
-        $stmt->execute([$clientId]);
-        $_SESSION['alert_type'] = 'success';
-        $_SESSION['alert_message'] = 'Client profile deleted successfully.';
-        header('Location: client_management.php?tab=clients');
-        exit;
-
     } elseif ($action === 'add_request') {
 
         $clientId       = $_POST['client_id'] ?? '';
         $requestTitle   = trim($_POST['request_title'] ?? '');
         $requestDetails = trim($_POST['request_details'] ?? '');
+        $requiredSkill  = trim($_POST['required_skill'] ?? '');
 
         $errors = [];
         if ($clientId === '') $errors[] = 'Please select a client.';
@@ -83,9 +64,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (empty($errors)) {
             $stmt = $pdo->prepare(
-                'INSERT INTO service_requests (client_id, request_title, request_details, status) VALUES (?, ?, ?, ?)'
+                'INSERT INTO service_requests (client_id, request_title, request_details, required_skill, status) VALUES (?, ?, ?, ?, ?)'
             );
-            $stmt->execute([$clientId, $requestTitle, $requestDetails, 'New']);
+            $stmt->execute([$clientId, $requestTitle, $requestDetails, $requiredSkill !== '' ? $requiredSkill : null, 'New']);
             $_SESSION['alert_type'] = 'success';
             $_SESSION['alert_message'] = 'Service request recorded successfully.';
         } else {
@@ -95,31 +76,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         header('Location: client_management.php?tab=requests');
         exit;
-
-    } elseif ($action === 'update_request') {
-
-        $requestId  = $_POST['request_id'] ?? null;
-        $status     = $_POST['status'] ?? 'New';
-        $assignedTo = $_POST['assigned_to'] ?? null;
-        $assignedTo = $assignedTo === '' ? null : $assignedTo;
-
-        $stmt = $pdo->prepare('UPDATE service_requests SET status = ?, assigned_to = ? WHERE request_id = ?');
-        $stmt->execute([$status, $assignedTo, $requestId]);
-
-        $_SESSION['alert_type'] = 'success';
-        $_SESSION['alert_message'] = 'Service request updated successfully.';
-        header('Location: client_management.php?tab=requests');
-        exit;
-
-    } elseif ($action === 'delete_request') {
-
-        $requestId = $_POST['request_id'] ?? null;
-        $stmt = $pdo->prepare('DELETE FROM service_requests WHERE request_id = ?');
-        $stmt->execute([$requestId]);
-        $_SESSION['alert_type'] = 'success';
-        $_SESSION['alert_message'] = 'Service request deleted successfully.';
-        header('Location: client_management.php?tab=requests');
-        exit;
     }
 }
 
@@ -127,16 +83,16 @@ $alertType    = $_SESSION['alert_type'] ?? null;
 $alertMessage = $_SESSION['alert_message'] ?? null;
 unset($_SESSION['alert_type'], $_SESSION['alert_message']);
 
-$activeTab   = $_GET['tab'] ?? 'clients';
-$sortOrder   = $_GET['sort'] ?? 'newest';
-$sortSql     = $sortOrder === 'oldest' ? 'ASC' : 'DESC';
-$searchTerm  = trim($_GET['search'] ?? '');
+$activeTab    = $_GET['tab'] ?? 'clients';
+$sortOrder    = $_GET['sort'] ?? 'newest';
+$sortSql      = $sortOrder === 'oldest' ? 'ASC' : 'DESC';
+$searchTerm   = trim($_GET['search'] ?? '');
 $statusFilter = $_GET['status'] ?? '';
-$perPage     = 8;
-$page        = max(1, (int)($_GET['page'] ?? 1));
-$offset      = ($page - 1) * $perPage;
+$perPage      = 8;
+$page         = max(1, (int)($_GET['page'] ?? 1));
+$offset       = ($page - 1) * $perPage;
 
-$totalClientsAll = (int) $pdo->query('SELECT COUNT(*) FROM clients')->fetchColumn();
+$totalClientsAll  = (int) $pdo->query('SELECT COUNT(*) FROM clients')->fetchColumn();
 $totalRequestsAll = (int) $pdo->query('SELECT COUNT(*) FROM service_requests')->fetchColumn();
 
 if ($activeTab === 'clients') {
@@ -209,8 +165,10 @@ if ($activeTab === 'requests') {
     )->fetchAll();
 }
 
-$staffList = $pdo->query("SELECT user_id, firstname, lastname, role FROM users WHERE status = 'Active' ORDER BY firstname")->fetchAll();
 $allClientsForModal = $pdo->query('SELECT client_id, company_name FROM clients ORDER BY company_name ASC')->fetchAll();
+
+$existingSkillsStmt = $pdo->query('SELECT DISTINCT skill_name FROM staff_skills ORDER BY skill_name ASC');
+$existingSkills = $existingSkillsStmt->fetchAll(PDO::FETCH_COLUMN);
 
 $newRequests        = (int) $pdo->query("SELECT COUNT(*) FROM service_requests WHERE status = 'New'")->fetchColumn();
 $inProgressRequests = (int) $pdo->query("SELECT COUNT(*) FROM service_requests WHERE status = 'In Progress'")->fetchColumn();
@@ -292,14 +250,6 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
   padding:.4rem .55rem;
 }
 
-@media (min-width:576px) {
-  .client-stat-body { padding:.85rem; }
-  .client-stat-icon { width:40px; height:40px; font-size:.95rem; }
-  .client-stat-label { font-size:.72rem; }
-  .client-stat-value { font-size:1.25rem; }
-  .client-management-tabs .nav-link { font-size:.85rem; padding:.5rem .9rem; }
-}
-
 .client-management-toolbar .btn {
   font-size:.75rem;
   padding:.4rem .6rem;
@@ -311,14 +261,32 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
 .client-management-table td, .client-management-table th {
   font-size:.72rem;
 }
+.skill-tag-static {
+  background-color:#3AA39422;
+  color:#2F4858;
+  font-size:.68rem;
+  padding:.2rem .5rem;
+  border-radius:999px;
+  display:inline-block;
+}
 
 @media (min-width:576px) {
+  .client-stat-body { padding:.85rem; }
+  .client-stat-icon { width:40px; height:40px; font-size:.95rem; }
+  .client-stat-label { font-size:.72rem; }
+  .client-stat-value { font-size:1.25rem; }
+  .client-management-tabs .nav-link { font-size:.85rem; padding:.5rem .9rem; }
   .client-management-toolbar .btn { font-size:.85rem; padding:.45rem .8rem; }
   .client-management-table .btn-sm { font-size:.75rem; padding:.3rem .55rem; }
   .client-management-table td, .client-management-table th { font-size:.8rem; }
 }
 
 @media (min-width:768px) {
+  .client-stat-body { padding:1rem; }
+  .client-stat-icon { width:44px; height:44px; font-size:1.05rem; }
+  .client-stat-label { font-size:.8rem; }
+  .client-stat-value { font-size:1.5rem; }
+  .client-management-tabs .nav-link { font-size:.95rem; padding:.55rem 1rem; }
   .client-management-toolbar .btn { font-size:.9rem; padding:.5rem 1rem; }
   .client-management-table .btn-sm { font-size:.8rem; padding:.35rem .65rem; }
   .client-management-table td, .client-management-table th { font-size:.85rem; }
@@ -329,7 +297,7 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
 
 <div class="dashboard-layout d-flex">
 
-<?php require __DIR__ . '/../includes/admin/sidebar.php'; ?>
+<?php require __DIR__ . '/../includes/supervisor/sidebar.php'; ?>
 
   <div class="dashboard-main flex-grow-1" style="min-width:0;">
 
@@ -340,7 +308,7 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
         </button>
         <div>
           <h1 class="dashboard-title h6 h5-md fw-bold mb-0">Client Management</h1>
-          <p class="dashboard-subtitle text-secondary small mb-0 d-none d-sm-block">Manage client profiles, service requests, and reports.</p>
+          <p class="dashboard-subtitle text-secondary small mb-0 d-none d-sm-block">Manage client profiles and record service requests.</p>
         </div>
       </div>
       <div class="dashboard-topbar-actions d-flex align-items-center gap-3 gap-md-4">
@@ -355,7 +323,7 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
           </button>
           <ul class="dropdown-menu dropdown-menu-end shadow-sm">
             <li>
-              <a href="../config/logout.php?role=admin" class="dropdown-item d-flex align-items-center gap-2 text-danger">
+              <a href="../config/logout.php?role=supervisor" class="dropdown-item d-flex align-items-center gap-2 text-danger">
                 <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout
               </a>
             </li>
@@ -447,7 +415,7 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
           <div class="card-body p-2 p-md-3">
             <form class="row g-2 align-items-center" method="GET">
               <input type="hidden" name="tab" value="clients">
-              <div class="col-12 col-md-5">
+              <div class="col-12 col-md-6">
                 <div class="input-group">
                   <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass text-secondary"></i></span>
                   <input type="text" name="search" class="form-control" placeholder="Search by company or contact person" value="<?= htmlspecialchars($searchTerm) ?>">
@@ -459,12 +427,7 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
                   <option value="oldest" <?= $sortOrder === 'oldest' ? 'selected' : '' ?>>Oldest to Newest</option>
                 </select>
               </div>
-              <div class="col-6 col-md-2">
-                <button type="submit" class="btn w-100" style="background-color:#E0C06A; color:#2F4858;">
-                  <i class="fa-solid fa-filter"></i> <span class="d-none d-sm-inline">Filter</span>
-                </button>
-              </div>
-              <div class="col-12 col-md-2 text-md-end">
+              <div class="col-6 col-md-3 text-md-end">
                 <button type="button" class="btn w-100" style="background-color:#2F4858; color:#fff;" data-bs-toggle="modal" data-bs-target="#addClientModal">
                   <i class="fa-solid fa-plus"></i> Add Client
                 </button>
@@ -482,13 +445,12 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
                   <th scope="col" class="small text-uppercase text-secondary d-none d-md-table-cell">Contact Person</th>
                   <th scope="col" class="small text-uppercase text-secondary d-none d-lg-table-cell">Email</th>
                   <th scope="col" class="small text-uppercase text-secondary d-none d-lg-table-cell">Contact Number</th>
-                  <th scope="col" class="small text-uppercase text-secondary text-end">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 <?php if (empty($clients)): ?>
                   <tr>
-                    <td colspan="5" class="text-center text-secondary py-5">
+                    <td colspan="4" class="text-center text-secondary py-5">
                       <i class="fa-regular fa-folder-open fs-3 d-block mb-2"></i>
                       No clients found.
                     </td>
@@ -510,25 +472,6 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
                       <td class="text-secondary small d-none d-md-table-cell"><?= htmlspecialchars($client['contact_person']) ?></td>
                       <td class="text-secondary small d-none d-lg-table-cell"><?= htmlspecialchars($client['email']) ?></td>
                       <td class="text-secondary small d-none d-lg-table-cell"><?= htmlspecialchars($client['contact_number']) ?></td>
-                      <td class="text-end" onclick="event.stopPropagation();">
-                        <button type="button" class="btn btn-sm" style="background-color:#2F4858; color:#fff;" title="Edit"
-                          data-bs-toggle="modal" data-bs-target="#editClientModal"
-                          data-id="<?= $client['client_id'] ?>"
-                          data-company="<?= htmlspecialchars($client['company_name']) ?>"
-                          data-contact="<?= htmlspecialchars($client['contact_person']) ?>"
-                          data-email="<?= htmlspecialchars($client['email']) ?>"
-                          data-number="<?= htmlspecialchars($client['contact_number']) ?>"
-                          data-address="<?= htmlspecialchars($client['address']) ?>"
-                          data-industry="<?= htmlspecialchars($client['industry'] ?? '') ?>">
-                          <i class="fa-regular fa-pen-to-square"></i>
-                        </button>
-                        <button type="button" class="btn btn-sm" style="background-color:#DF6E4F; color:#fff;" title="Delete"
-                          data-bs-toggle="modal" data-bs-target="#deleteClientModal"
-                          data-id="<?= $client['client_id'] ?>"
-                          data-name="<?= htmlspecialchars($client['company_name']) ?>">
-                          <i class="fa-regular fa-trash-can"></i>
-                        </button>
-                      </td>
                     </tr>
                   <?php endforeach; ?>
                 <?php endif; ?>
@@ -600,9 +543,9 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
                 <tr>
                   <th scope="col" class="small text-uppercase text-secondary">Request</th>
                   <th scope="col" class="small text-uppercase text-secondary d-none d-md-table-cell">Client</th>
+                  <th scope="col" class="small text-uppercase text-secondary d-none d-lg-table-cell">Required Skill</th>
                   <th scope="col" class="small text-uppercase text-secondary d-none d-lg-table-cell">Assigned To</th>
                   <th scope="col" class="small text-uppercase text-secondary">Status</th>
-                  <th scope="col" class="small text-uppercase text-secondary text-end">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -621,28 +564,18 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
                         <div class="text-secondary d-md-none" style="font-size:.72rem;"><?= htmlspecialchars($request['company_name']) ?></div>
                       </td>
                       <td class="text-secondary small d-none d-md-table-cell"><?= htmlspecialchars($request['company_name']) ?></td>
+                      <td class="d-none d-lg-table-cell">
+                        <?php if (!empty($request['required_skill'])): ?>
+                          <span class="skill-tag-static"><?= htmlspecialchars($request['required_skill']) ?></span>
+                        <?php else: ?>
+                          <span class="text-secondary small">—</span>
+                        <?php endif; ?>
+                      </td>
                       <td class="text-secondary small d-none d-lg-table-cell">
                         <?= $request['firstname'] ? htmlspecialchars($request['firstname'] . ' ' . $request['lastname']) : '—' ?>
                       </td>
                       <td>
                         <span class="badge rounded-pill" style="background-color:<?= statusBadgeColor($request['status']) ?>; color:#fff;"><?= htmlspecialchars($request['status']) ?></span>
-                      </td>
-                      <td class="text-end">
-                        <button type="button" class="btn btn-sm" style="background-color:#2F4858; color:#fff;" title="Manage"
-                          data-bs-toggle="modal" data-bs-target="#manageRequestModal"
-                          data-id="<?= $request['request_id'] ?>"
-                          data-title="<?= htmlspecialchars($request['request_title']) ?>"
-                          data-details="<?= htmlspecialchars($request['request_details'] ?? '') ?>"
-                          data-status="<?= htmlspecialchars($request['status']) ?>"
-                          data-assigned="<?= $request['assigned_to'] ?? '' ?>">
-                          <i class="fa-regular fa-pen-to-square"></i>
-                        </button>
-                        <button type="button" class="btn btn-sm" style="background-color:#DF6E4F; color:#fff;" title="Delete"
-                          data-bs-toggle="modal" data-bs-target="#deleteRequestModal"
-                          data-id="<?= $request['request_id'] ?>"
-                          data-title="<?= htmlspecialchars($request['request_title']) ?>">
-                          <i class="fa-regular fa-trash-can"></i>
-                        </button>
                       </td>
                     </tr>
                   <?php endforeach; ?>
@@ -673,41 +606,6 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
         </section>
 
       <?php else: ?>
-
-        <section class="client-management-reports row g-3 mb-3">
-          <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm h-100">
-              <div class="card-body p-3">
-                <div class="text-secondary small mb-1">Total Clients</div>
-                <div class="fs-4 fw-bold"><?= $totalClientsAll ?></div>
-              </div>
-            </div>
-          </div>
-          <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm h-100">
-              <div class="card-body p-3">
-                <div class="text-secondary small mb-1">Total Requests</div>
-                <div class="fs-4 fw-bold"><?= $totalRequestsAll ?></div>
-              </div>
-            </div>
-          </div>
-          <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm h-100">
-              <div class="card-body p-3">
-                <div class="text-secondary small mb-1">In Progress</div>
-                <div class="fs-4 fw-bold"><?= $inProgressRequests ?></div>
-              </div>
-            </div>
-          </div>
-          <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm h-100">
-              <div class="card-body p-3">
-                <div class="text-secondary small mb-1">Completed</div>
-                <div class="fs-4 fw-bold"><?= $completedRequests ?></div>
-              </div>
-            </div>
-          </div>
-        </section>
 
         <section class="client-management-table card border-0 shadow-sm">
           <div class="table-responsive">
@@ -789,52 +687,6 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
   </div>
 </div>
 
-<div class="modal fade" id="editClientModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
-    <div class="modal-content">
-      <form method="POST" novalidate>
-        <input type="hidden" name="action" value="edit_client">
-        <input type="hidden" name="client_id" id="edit_client_id">
-        <div class="modal-header">
-          <h2 class="modal-title h5 fw-bold">Edit Client</h2>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <div class="row g-3">
-            <div class="col-md-6">
-              <label class="form-label fw-semibold">Company Name</label>
-              <input type="text" name="company_name" id="edit_company_name" class="form-control" required>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label fw-semibold">Contact Person</label>
-              <input type="text" name="contact_person" id="edit_contact_person" class="form-control" required>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label fw-semibold">Email Address</label>
-              <input type="email" name="email" id="edit_email" class="form-control" required>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label fw-semibold">Contact Number</label>
-              <input type="tel" name="contact_number" id="edit_contact_number" class="form-control" inputmode="numeric" pattern="[0-9]*" maxlength="11" oninput="this.value=this.value.replace(/[^0-9]/g,'')" required>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label fw-semibold">Industry</label>
-              <input type="text" name="industry" id="edit_industry" class="form-control">
-            </div>
-            <div class="col-md-6">
-              <label class="form-label fw-semibold">Address</label>
-              <input type="text" name="address" id="edit_address" class="form-control" required>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="submit" class="btn" style="background-color:#2F4858; color:#fff;">Update Client</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
 <div class="modal fade" id="viewClientModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content">
@@ -876,28 +728,6 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
   </div>
 </div>
 
-<div class="modal fade" id="deleteClientModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <form method="POST">
-        <input type="hidden" name="action" value="delete_client">
-        <input type="hidden" name="client_id" id="delete_client_id">
-        <div class="modal-header">
-          <h2 class="modal-title h5 fw-bold">Delete Client</h2>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <p class="mb-0">Are you sure you want to delete <strong id="delete_client_name"></strong>? This will also remove all related service requests.</p>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-danger">Delete Client</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
 <div class="modal fade" id="addRequestModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content">
@@ -923,6 +753,16 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
               <input type="text" name="request_title" class="form-control" required>
             </div>
             <div class="col-12">
+              <label class="form-label fw-semibold">Required Skill</label>
+              <select name="required_skill" class="form-select">
+                <option value="">Not specified / any skill</option>
+                <?php foreach ($existingSkills as $existingSkill): ?>
+                  <option value="<?= htmlspecialchars($existingSkill) ?>"><?= htmlspecialchars($existingSkill) ?></option>
+                <?php endforeach; ?>
+              </select>
+              <div class="form-text">This determines which staff will be recommended in Resource Matching.</div>
+            </div>
+            <div class="col-12">
               <label class="form-label fw-semibold">Details</label>
               <textarea name="request_details" class="form-control" rows="4"></textarea>
             </div>
@@ -936,82 +776,8 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
   </div>
 </div>
 
-<div class="modal fade" id="manageRequestModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
-    <div class="modal-content">
-      <form method="POST" novalidate>
-        <input type="hidden" name="action" value="update_request">
-        <input type="hidden" name="request_id" id="manage_request_id">
-        <div class="modal-header">
-          <h2 class="modal-title h5 fw-bold" id="manage_request_title">Manage Request</h2>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <p class="text-secondary small" id="manage_request_details"></p>
-          <div class="row g-3">
-            <div class="col-md-6">
-              <label class="form-label fw-semibold">Status</label>
-              <select name="status" id="manage_status" class="form-select">
-                <option value="New">New</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Completed">Completed</option>
-                <option value="Cancelled">Cancelled</option>
-              </select>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label fw-semibold">Assign To</label>
-              <select name="assigned_to" id="manage_assigned" class="form-select">
-                <option value="">Unassigned</option>
-                <?php foreach ($staffList as $staffMember): ?>
-                  <option value="<?= $staffMember['user_id'] ?>"><?= htmlspecialchars($staffMember['firstname'] . ' ' . $staffMember['lastname'] . ' (' . $staffMember['role'] . ')') ?></option>
-                <?php endforeach; ?>
-              </select>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="submit" class="btn" style="background-color:#2F4858; color:#fff;">Update Request</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
-<div class="modal fade" id="deleteRequestModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <form method="POST">
-        <input type="hidden" name="action" value="delete_request">
-        <input type="hidden" name="request_id" id="delete_request_id">
-        <div class="modal-header">
-          <h2 class="modal-title h5 fw-bold">Delete Request</h2>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <p class="mb-0">Are you sure you want to delete <strong id="delete_request_title"></strong>?</p>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-danger">Delete Request</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
 <script src="../assets/vendor/bootstrap-5.3.8/js/bootstrap.bundle.min.js"></script>
 <script>
-document.getElementById('editClientModal').addEventListener('show.bs.modal', function (event) {
-  const btn = event.relatedTarget;
-  document.getElementById('edit_client_id').value = btn.dataset.id;
-  document.getElementById('edit_company_name').value = btn.dataset.company;
-  document.getElementById('edit_contact_person').value = btn.dataset.contact;
-  document.getElementById('edit_email').value = btn.dataset.email;
-  document.getElementById('edit_contact_number').value = btn.dataset.number;
-  document.getElementById('edit_industry').value = btn.dataset.industry;
-  document.getElementById('edit_address').value = btn.dataset.address;
-});
-
 document.getElementById('viewClientModal').addEventListener('show.bs.modal', function (event) {
   const btn = event.relatedTarget;
   document.getElementById('view_company').textContent = btn.dataset.company;
@@ -1020,27 +786,6 @@ document.getElementById('viewClientModal').addEventListener('show.bs.modal', fun
   document.getElementById('view_number').textContent = btn.dataset.number;
   document.getElementById('view_industry').textContent = btn.dataset.industry || '-';
   document.getElementById('view_address').textContent = btn.dataset.address;
-});
-
-document.getElementById('deleteClientModal').addEventListener('show.bs.modal', function (event) {
-  const btn = event.relatedTarget;
-  document.getElementById('delete_client_id').value = btn.dataset.id;
-  document.getElementById('delete_client_name').textContent = btn.dataset.name;
-});
-
-document.getElementById('manageRequestModal').addEventListener('show.bs.modal', function (event) {
-  const btn = event.relatedTarget;
-  document.getElementById('manage_request_id').value = btn.dataset.id;
-  document.getElementById('manage_request_title').textContent = btn.dataset.title;
-  document.getElementById('manage_request_details').textContent = btn.dataset.details;
-  document.getElementById('manage_status').value = btn.dataset.status;
-  document.getElementById('manage_assigned').value = btn.dataset.assigned;
-});
-
-document.getElementById('deleteRequestModal').addEventListener('show.bs.modal', function (event) {
-  const btn = event.relatedTarget;
-  document.getElementById('delete_request_id').value = btn.dataset.id;
-  document.getElementById('delete_request_title').textContent = btn.dataset.title;
 });
 
 <?php if ($alertType && $alertMessage): ?>
