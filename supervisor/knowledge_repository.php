@@ -10,6 +10,7 @@ if (!isset($_SESSION['supervisor_id']) || ($_SESSION['role'] ?? '') !== 'supervi
 }
 
 $pdo = getConnection();
+$currentUserId = $_SESSION['supervisor_id'];
 
 $uploadDir = __DIR__ . '/../uploads/knowledge_documents/';
 if (!is_dir($uploadDir)) {
@@ -18,6 +19,7 @@ if (!is_dir($uploadDir)) {
 
 $allowedExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt'];
 $maxFileSize = 20 * 1024 * 1024;
+$validCategories = ['SOW Template', 'Contract Template', 'Best Practice', 'Proposal Template', 'Reference Material', 'Other'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
@@ -30,7 +32,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $description = trim($_POST['description'] ?? '');
 
         $errors = [];
-        $validCategories = ['SOW Template', 'Contract Template', 'Best Practice', 'Proposal Template', 'Reference Material', 'Other'];
 
         if ($title === '') $errors[] = 'Document title is required.';
         if (!in_array($category, $validCategories)) $errors[] = 'Please select a valid category.';
@@ -69,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'uploads/knowledge_documents/' . $storedName,
                     $_FILES['document_file']['size'],
                     $fileExt,
-                    $_SESSION['supervisor_id'],
+                    $currentUserId,
                     'supervisor',
                 ]);
 
@@ -94,8 +95,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $category    = $_POST['category'] ?? 'Other';
         $description = trim($_POST['description'] ?? '');
 
+        $ownerStmt = $pdo->prepare('SELECT uploaded_by, uploaded_by_role FROM knowledge_documents WHERE document_id = ?');
+        $ownerStmt->execute([$documentId]);
+        $doc = $ownerStmt->fetch();
+
+        if (!$doc || $doc['uploaded_by_role'] !== 'supervisor' || (int) $doc['uploaded_by'] !== (int) $currentUserId) {
+            $_SESSION['alert_type'] = 'error';
+            $_SESSION['alert_message'] = 'You can only edit documents you uploaded yourself.';
+            header('Location: knowledge_repository.php');
+            exit;
+        }
+
         $errors = [];
-        $validCategories = ['SOW Template', 'Contract Template', 'Best Practice', 'Proposal Template', 'Reference Material', 'Other'];
 
         if ($title === '') $errors[] = 'Document title is required.';
         if (!in_array($category, $validCategories)) $errors[] = 'Please select a valid category.';
@@ -120,22 +131,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $documentId = $_POST['document_id'] ?? null;
 
-        $stmt = $pdo->prepare('SELECT file_path FROM knowledge_documents WHERE document_id = ?');
+        $stmt = $pdo->prepare('SELECT file_path, uploaded_by, uploaded_by_role FROM knowledge_documents WHERE document_id = ?');
         $stmt->execute([$documentId]);
         $doc = $stmt->fetch();
 
-        if ($doc) {
-            $fullPath = __DIR__ . '/../' . $doc['file_path'];
-            if (file_exists($fullPath)) {
-                unlink($fullPath);
-            }
-
-            $delStmt = $pdo->prepare('DELETE FROM knowledge_documents WHERE document_id = ?');
-            $delStmt->execute([$documentId]);
-
-            $_SESSION['alert_type'] = 'success';
-            $_SESSION['alert_message'] = 'Document deleted successfully.';
+        if (!$doc || $doc['uploaded_by_role'] !== 'supervisor' || (int) $doc['uploaded_by'] !== (int) $currentUserId) {
+            $_SESSION['alert_type'] = 'error';
+            $_SESSION['alert_message'] = 'You can only delete documents you uploaded yourself.';
+            header('Location: knowledge_repository.php');
+            exit;
         }
+
+        $fullPath = __DIR__ . '/../' . $doc['file_path'];
+        if (file_exists($fullPath)) {
+            unlink($fullPath);
+        }
+
+        $delStmt = $pdo->prepare('DELETE FROM knowledge_documents WHERE document_id = ?');
+        $delStmt->execute([$documentId]);
+
+        $_SESSION['alert_type'] = 'success';
+        $_SESSION['alert_message'] = 'Document deleted successfully.';
 
         header('Location: knowledge_repository.php');
         exit;
@@ -163,7 +179,6 @@ if ($searchTerm !== '') {
     $params[] = $like;
 }
 
-$validCategories = ['SOW Template', 'Contract Template', 'Best Practice', 'Proposal Template', 'Reference Material', 'Other'];
 if (in_array($categoryFilter, $validCategories)) {
     $query .= ' AND kd.category = ?';
     $params[] = $categoryFilter;
@@ -269,20 +284,6 @@ function categoryPalette(string $category): array
         <button type="button" class="btn btn-link text-secondary p-0">
           <i class="fa-regular fa-bell fs-5"></i>
         </button>
-        <div class="dropdown">
-          <button type="button" class="btn btn-link p-0 border-0" data-bs-toggle="dropdown" aria-expanded="false">
-            <span class="dashboard-user-icon d-flex align-items-center justify-content-center rounded-circle bg-secondary bg-opacity-10 flex-shrink-0" style="width:36px; height:36px;">
-              <i class="fa-solid fa-user text-secondary"></i>
-            </span>
-          </button>
-          <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-            <li>
-              <a href="../config/logout.php?role=supervisor" class="dropdown-item d-flex align-items-center gap-2 text-danger">
-                <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout
-              </a>
-            </li>
-          </ul>
-        </div>
       </div>
     </header>
 
@@ -390,6 +391,7 @@ function categoryPalette(string $category): array
                     : trim(($doc['uploader_firstname'] ?? '') . ' ' . ($doc['uploader_lastname'] ?? ''));
                 $thumbColors = fileTypePalette($doc['file_type']);
                 $catColors = categoryPalette($doc['category']);
+                $isOwner = $doc['uploaded_by_role'] === 'supervisor' && (int) $doc['uploaded_by'] === (int) $currentUserId;
               ?>
               <li class="document-row">
                 <span class="document-thumb" style="background-color:<?= $thumbColors['bg'] ?>; color:<?= $thumbColors['fg'] ?>;" aria-hidden="true">
@@ -411,20 +413,22 @@ function categoryPalette(string $category): array
                   <a href="../<?= htmlspecialchars($doc['file_path']) ?>" download="<?= htmlspecialchars($doc['file_name']) ?>" class="btn btn-repo btn-repo-success" title="Download">
                     <i class="fa-solid fa-download"></i>
                   </a>
-                  <button type="button" class="btn btn-repo btn-repo-primary" title="Edit"
-                    data-bs-toggle="modal" data-bs-target="#editDocumentModal"
-                    data-id="<?= $doc['document_id'] ?>"
-                    data-title="<?= htmlspecialchars($doc['title']) ?>"
-                    data-category="<?= htmlspecialchars($doc['category']) ?>"
-                    data-description="<?= htmlspecialchars($doc['description'] ?? '') ?>">
-                    <i class="fa-regular fa-pen-to-square"></i>
-                  </button>
-                  <button type="button" class="btn btn-repo btn-repo-danger" title="Delete"
-                    data-bs-toggle="modal" data-bs-target="#deleteDocumentModal"
-                    data-id="<?= $doc['document_id'] ?>"
-                    data-title="<?= htmlspecialchars($doc['title']) ?>">
-                    <i class="fa-regular fa-trash-can"></i>
-                  </button>
+                  <?php if ($isOwner): ?>
+                    <button type="button" class="btn btn-repo btn-repo-primary" title="Edit"
+                      data-bs-toggle="modal" data-bs-target="#editDocumentModal"
+                      data-id="<?= $doc['document_id'] ?>"
+                      data-title="<?= htmlspecialchars($doc['title']) ?>"
+                      data-category="<?= htmlspecialchars($doc['category']) ?>"
+                      data-description="<?= htmlspecialchars($doc['description'] ?? '') ?>">
+                      <i class="fa-regular fa-pen-to-square"></i>
+                    </button>
+                    <button type="button" class="btn btn-repo btn-repo-danger" title="Delete"
+                      data-bs-toggle="modal" data-bs-target="#deleteDocumentModal"
+                      data-id="<?= $doc['document_id'] ?>"
+                      data-title="<?= htmlspecialchars($doc['title']) ?>">
+                      <i class="fa-regular fa-trash-can"></i>
+                    </button>
+                  <?php endif; ?>
                 </div>
               </li>
             <?php endforeach; ?>

@@ -506,7 +506,7 @@ body {
             </div>
             <div class="card-body">
               <?php if (empty($upcomingDeadlines)): ?>
-                <div class="empty-state text-center py-4"><i class="fa-regular fa-calendar fs-4 d-block mb-2"></i><p class="small mb-0">Walang malapit na deadline.</p></div>
+                <div class="empty-state text-center py-4"><i class="fa-regular fa-calendar fs-4 d-block mb-2"></i><p class="small mb-0">No upcoming deadlines.</p></div>
               <?php else: ?>
                 <?php foreach ($upcomingDeadlines as $d): ?>
                   <?php $badge = dueBadge($d['due_date']); $dt = new DateTime($d['due_date']); ?>
@@ -578,7 +578,7 @@ body {
             </div>
             <div class="card-body">
               <?php if (empty($recentActivities)): ?>
-                <div class="empty-state text-center py-4"><p class="small mb-0">Walang recent activity.</p></div>
+                <div class="empty-state text-center py-4"><p class="small mb-0">No recent activity.</p></div>
               <?php else: ?>
                 <?php foreach ($recentActivities as $a): ?>
                   <div class="activity-row">
@@ -601,7 +601,7 @@ body {
             </div>
             <div class="card-body">
               <?php if (empty($staffAssignments)): ?>
-                <div class="empty-state text-center py-4"><p class="small mb-0">Walang active assignments.</p></div>
+                <div class="empty-state text-center py-4"><p class="small mb-0">No active assignments.</p></div>
               <?php else: ?>
                 <?php foreach ($staffAssignments as $s): ?>
                   <div class="activity-row">

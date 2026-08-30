@@ -510,7 +510,7 @@ body {
             </div>
             <div class="card-body">
               <?php if (empty($requestsByIndustry)): ?>
-                <div class="empty-state text-center py-5"><i class="fa-regular fa-chart-bar fs-4 d-block mb-2"></i><p class="small mb-0">Walang service requests sa napiling date range.</p></div>
+                <div class="empty-state text-center py-5"><i class="fa-regular fa-chart-bar fs-4 d-block mb-2"></i><p class="small mb-0">No service requests in the selected date range.</p></div>
               <?php else: ?>
                 <div class="chart-wrap" style="height:260px;">
                   <canvas id="industryChart"></canvas>
@@ -536,7 +536,7 @@ body {
                 </thead>
                 <tbody>
                   <?php if (empty($topClients)): ?>
-                    <tr><td colspan="4"><div class="empty-state text-center py-4"><i class="fa-regular fa-folder-open fs-4 d-block mb-2"></i><p class="small mb-0">Walang approved contracts sa napiling date range.</p></div></td></tr>
+                    <tr><td colspan="4"><div class="empty-state text-center py-4"><i class="fa-regular fa-folder-open fs-4 d-block mb-2"></i><p class="small mb-0">No approved contracts in the selected date range.</p></div></td></tr>
                   <?php else: ?>
                     <?php foreach ($topClients as $c): ?>
                       <tr>
@@ -562,7 +562,7 @@ body {
             </div>
             <div class="card-body">
               <?php if (array_sum($requestStatusCounts) === 0): ?>
-                <div class="empty-state text-center py-4"><p class="small mb-0">Walang datos sa napiling range.</p></div>
+                <div class="empty-state text-center py-4"><p class="small mb-0">No data in the selected range.</p></div>
               <?php else: ?>
                 <div class="chart-wrap" style="height:220px;">
                   <canvas id="requestStatusChart"></canvas>
@@ -577,7 +577,7 @@ body {
             </div>
             <div class="card-body">
               <?php if ($totalQuotationsInRange === 0): ?>
-                <div class="empty-state text-center py-4"><p class="small mb-0">Walang datos sa napiling range.</p></div>
+                <div class="empty-state text-center py-4"><p class="small mb-0">No data in the selected range.</p></div>
               <?php else: ?>
                 <div class="chart-wrap" style="height:220px;">
                   <canvas id="quotationStatusChart"></canvas>
