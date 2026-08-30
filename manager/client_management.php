@@ -211,7 +211,14 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
 <link rel="stylesheet" href="../assets/vendor/bootstrap-5.3.8/css/bootstrap.min.css">
 <link rel="stylesheet" href="../assets/vendor/fontawesome-free-7.3.1/css/all.min.css">
 <link rel="stylesheet" href="../assets/css/dashboard.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lexend:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
+  body {
+  background-color: var(--canvas);
+  color: var(--ink);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
 .form-control:focus, .form-select:focus, .form-control:hover, .form-select:hover {
   border-color:#2F4858;
   box-shadow:0 0 0 .2rem rgba(47,72,88,.15);

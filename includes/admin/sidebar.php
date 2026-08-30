@@ -32,7 +32,7 @@ function navActive(string $page, string $currentPage): string
   <div class="dashboard-sidebar-brand d-flex align-items-center justify-content-between gap-2 border-bottom px-3 py-3">
     <div class="d-flex align-items-center gap-2">
       <img src="../assets/img/system_img/logo.png" alt="KMP ConsultHub" width="60" height="60">
-      <span class="fw-bold fs-6">KMP ConsultHub</span>
+      <span class="fw-bold fs-6" style="color: #000000;">KMP ConsultHub</span>
     </div>
     <button type="button" class="btn-close d-lg-none" data-bs-dismiss="offcanvas" data-bs-target="#sidebarOffcanvas" aria-label="Close"></button>
   </div>
@@ -81,7 +81,7 @@ function navActive(string $page, string $currentPage): string
       </li>
       <li class="nav-item mb-1">
         <a href="calendar_deadlines.php" class="nav-link <?= navActive('calendar_deadlines.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
-          <i class="fa-solid fa-calendar-days" style="width:18px;"></i> Calendar &amp; Deadlines
+          <i class="fa-solid fa-calendar-days" style="width:18px;"></i> Calendar Deadlines
         </a>
       </li>
     </ul>
@@ -110,14 +110,23 @@ function navActive(string $page, string $currentPage): string
   </nav>
 
   <div class="dashboard-sidebar-footer border-top p-3">
-    <div class="d-flex align-items-center gap-3">
-      <span class="dashboard-user-icon d-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-10 flex-shrink-0" style="width:38px; height:38px;">
-        <i class="fa-solid fa-user text-primary"></i>
-      </span>
-      <div class="overflow-hidden">
-        <div class="fw-semibold small text-truncate"><?= htmlspecialchars($adminFullname) ?></div>
-        <div class="text-secondary text-truncate" style="font-size:.75rem;"><?= htmlspecialchars(maskEmail($adminEmail)) ?></div>
-      </div>
+    <div class="dropdown">
+      <button type="button" class="btn btn-link p-0 w-100 text-start text-decoration-none dropdown-toggle d-flex align-items-center gap-3 text-dark" data-bs-toggle="dropdown" aria-expanded="false">
+        <span class="dashboard-user-icon d-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-10 flex-shrink-0" style="width:38px; height:38px;">
+          <i class="fa-solid fa-user text-primary"></i>
+        </span>
+        <div class="overflow-hidden flex-grow-1">
+          <div class="fw-semibold small text-truncate"><?= htmlspecialchars($adminFullname) ?></div>
+          <div class="text-secondary text-truncate" style="font-size:.75rem;"><?= htmlspecialchars(maskEmail($adminEmail)) ?></div>
+        </div>
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end w-100 shadow-sm">
+        <li>
+          <a href="../config/logout.php?role=admin" class="dropdown-item d-flex align-items-center gap-2 text-danger">
+            <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout
+          </a>
+        </li>
+      </ul>
     </div>
   </div>
 

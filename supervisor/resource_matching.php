@@ -91,51 +91,11 @@ $assignedRequests = $assignedStmt->fetchAll();
 <link rel="stylesheet" href="../assets/vendor/bootstrap-5.3.8/css/bootstrap.min.css">
 <link rel="stylesheet" href="../assets/vendor/fontawesome-free-7.3.1/css/all.min.css">
 <link rel="stylesheet" href="../assets/css/dashboard.css">
-<style>
-.form-control:focus, .form-select:focus, .form-control:hover, .form-select:hover {
-  border-color:#2F4858;
-  box-shadow:0 0 0 .2rem rgba(47,72,88,.15);
-  outline:none;
-}
-.request-card {
-  cursor:pointer;
-  transition:border-color .15s ease;
-  border:1px solid rgba(0,0,0,.1);
-}
-.request-card:hover, .request-card.active {
-  border-color:#3AA394;
-}
-.skill-badge {
-  background-color:#3AA394;
-  color:#fff;
-  font-size:.7rem;
-  padding:.25rem .5rem;
-  border-radius:999px;
-  margin:0 .25rem .25rem 0;
-  display:inline-block;
-}
-.skill-badge.matched {
-  background-color:#2F4858;
-}
-.skill-badge.unmatched {
-  background-color:#adb5bd;
-}
-.staff-match-row {
-  border:1px solid rgba(0,0,0,.08);
-  border-radius:.5rem;
-}
-.match-score-pill {
-  font-size:.75rem;
-  font-weight:600;
-  padding:.25rem .6rem;
-  border-radius:999px;
-}
-.match-score-high { background-color:#3AA39422; color:#2F4858; }
-.match-score-mid { background-color:#DF6E4F22; color:#DF6E4F; }
-.match-score-none { background-color:#e9ecef; color:#6c757d; }
-</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lexend:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/resource_matching.css">
 </head>
-<body class="bg-light">
+<body>
 
 <div class="dashboard-layout d-flex">
 
@@ -143,14 +103,14 @@ $assignedRequests = $assignedStmt->fetchAll();
 
   <div class="dashboard-main flex-grow-1" style="min-width:0;">
 
-    <header class="dashboard-topbar bg-white border-bottom d-flex align-items-center justify-content-between px-3 px-md-4">
+    <header class="dashboard-topbar bg-white d-flex align-items-center justify-content-between px-3 px-md-4">
       <div class="d-flex align-items-center gap-3">
         <button type="button" class="btn btn-link text-dark p-0 d-lg-none" data-bs-toggle="offcanvas" data-bs-target="#sidebarOffcanvas" aria-controls="sidebarOffcanvas" aria-label="Open menu">
           <i class="fa-solid fa-bars fs-5"></i>
         </button>
         <div>
           <h1 class="dashboard-title h6 h5-md fw-bold mb-0">Resource Matching</h1>
-          <p class="dashboard-subtitle text-secondary small mb-0 d-none d-sm-block">Assign the most suitable staff to pending service requests.</p>
+          <p class="dashboard-subtitle small mb-0 d-none d-sm-block">Assign the most suitable staff to pending service requests.</p>
         </div>
       </div>
       <div class="dashboard-topbar-actions d-flex align-items-center gap-3 gap-md-4">
@@ -159,8 +119,8 @@ $assignedRequests = $assignedStmt->fetchAll();
         </button>
         <div class="dropdown">
           <button type="button" class="btn btn-link p-0 border-0" data-bs-toggle="dropdown" aria-expanded="false">
-            <span class="dashboard-user-icon d-flex align-items-center justify-content-center rounded-circle bg-secondary bg-opacity-10 flex-shrink-0" style="width:36px; height:36px;">
-              <i class="fa-solid fa-user text-secondary"></i>
+            <span class="dashboard-user-icon d-flex align-items-center justify-content-center rounded-circle flex-shrink-0" style="width:36px; height:36px; background-color:var(--navy-soft);">
+              <i class="fa-solid fa-user" style="color:var(--navy);"></i>
             </span>
           </button>
           <ul class="dropdown-menu dropdown-menu-end shadow-sm">
@@ -180,9 +140,9 @@ $assignedRequests = $assignedStmt->fetchAll();
 
         <div class="col-lg-5">
           <section class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-white border-bottom">
+            <div class="card-header">
               <h2 class="h6 fw-bold mb-0">Pending Service Requests</h2>
-              <p class="text-secondary small mb-0">Select a request to find recommended staff.</p>
+              <p class="small mb-0">Select a request to find recommended staff.</p>
             </div>
             <div class="card-body p-2 p-md-3" style="max-height:70vh; overflow-y:auto;">
               <?php if (empty($pendingRequests)): ?>
@@ -195,16 +155,16 @@ $assignedRequests = $assignedStmt->fetchAll();
                     data-request-details="<?= htmlspecialchars($request['request_details'] ?? '') ?>"
                     data-required-skill="<?= htmlspecialchars($request['required_skill'] ?? '') ?>"
                     data-company="<?= htmlspecialchars($request['company_name']) ?>">
-                    <div class="card-body p-3">
+                    <div class="card-body">
                       <div class="d-flex justify-content-between align-items-start gap-2">
                         <div>
                           <div class="fw-semibold small"><?= htmlspecialchars($request['request_title']) ?></div>
-                          <div class="text-secondary" style="font-size:.75rem;"><?= htmlspecialchars($request['company_name']) ?></div>
+                          <div style="font-size:.75rem; color:var(--ink-soft);"><?= htmlspecialchars($request['company_name']) ?></div>
                         </div>
-                        <span class="badge rounded-pill" style="background-color:#DF6E4F22; color:#DF6E4F; font-size:.7rem;">New</span>
+                        <span class="badge-new">New</span>
                       </div>
                       <?php if (!empty($request['required_skill'])): ?>
-                        <span class="skill-badge mt-2"><?= htmlspecialchars($request['required_skill']) ?></span>
+                        <div class="mt-2"><span class="skill-badge"><?= htmlspecialchars($request['required_skill']) ?></span></div>
                       <?php endif; ?>
                     </div>
                   </div>
@@ -216,13 +176,13 @@ $assignedRequests = $assignedStmt->fetchAll();
 
         <div class="col-lg-7">
           <section class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-white border-bottom">
+            <div class="card-header">
               <h2 class="h6 fw-bold mb-0">Recommended Staff</h2>
-              <p class="text-secondary small mb-0" id="matching_subtitle">Select a service request first.</p>
+              <p class="small mb-0" id="matching_subtitle">Select a service request first.</p>
             </div>
             <div class="card-body p-3" id="matching_panel">
 
-              <div id="matching_empty_state" class="text-center text-secondary py-5">
+              <div id="matching_empty_state" class="text-center py-5">
                 <i class="fa-regular fa-hand-pointer fs-3 mb-2 d-block"></i>
                 <p class="small mb-0">Choose a service request on the left to view recommended staff.</p>
               </div>
@@ -235,10 +195,10 @@ $assignedRequests = $assignedStmt->fetchAll();
                   <input type="hidden" name="user_id" id="assign_user_id">
                 </form>
 
-                <div class="mb-3">
+                <div class="mb-3 p-3" style="background-color:var(--navy-soft); border-radius:12px;">
                   <div class="fw-semibold small" id="selected_request_title"></div>
-                  <div class="text-secondary small" id="selected_request_company"></div>
-                  <p class="text-secondary small mt-2 mb-0" id="selected_request_details"></p>
+                  <div class="small" id="selected_request_company" style="color:var(--ink-soft);"></div>
+                  <p class="small mt-2 mb-0" id="selected_request_details" style="color:var(--ink-soft);"></p>
                 </div>
 
                 <div class="mb-3">
@@ -259,18 +219,18 @@ $assignedRequests = $assignedStmt->fetchAll();
       </div>
 
       <section class="card border-0 shadow-sm mt-3">
-        <div class="card-header bg-white border-bottom">
+        <div class="card-header">
           <h2 class="h6 fw-bold mb-0">Recently Assigned</h2>
         </div>
         <div class="table-responsive">
           <table class="table table-hover align-middle mb-0">
-            <thead class="table-light">
+            <thead>
               <tr>
-                <th scope="col" class="small text-uppercase text-secondary">Request</th>
-                <th scope="col" class="small text-uppercase text-secondary d-none d-md-table-cell">Client</th>
-                <th scope="col" class="small text-uppercase text-secondary">Assigned To</th>
-                <th scope="col" class="small text-uppercase text-secondary d-none d-lg-table-cell">Assigned By</th>
-                <th scope="col" class="small text-uppercase text-secondary">Status</th>
+                <th scope="col">Request</th>
+                <th scope="col" class="d-none d-md-table-cell">Client</th>
+                <th scope="col">Assigned To</th>
+                <th scope="col" class="d-none d-lg-table-cell">Assigned By</th>
+                <th scope="col">Status</th>
               </tr>
             </thead>
             <tbody>
@@ -280,23 +240,18 @@ $assignedRequests = $assignedStmt->fetchAll();
                 </tr>
               <?php else: ?>
                 <?php foreach ($assignedRequests as $row): ?>
+                  <?php
+                    $statusClass = 'status-default';
+                    if ($row['status'] === 'In Progress') { $statusClass = 'status-in-progress'; }
+                    if ($row['status'] === 'Completed') { $statusClass = 'status-completed'; }
+                  ?>
                   <tr>
                     <td class="small fw-semibold"><?= htmlspecialchars($row['request_title']) ?></td>
-                    <td class="small text-secondary d-none d-md-table-cell"><?= htmlspecialchars($row['company_name']) ?></td>
+                    <td class="small d-none d-md-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars($row['company_name']) ?></td>
                     <td class="small"><?= htmlspecialchars(trim(($row['staff_firstname'] ?? '') . ' ' . ($row['staff_lastname'] ?? ''))) ?></td>
-                    <td class="small text-secondary d-none d-lg-table-cell"><?= htmlspecialchars(trim(($row['assigned_by_firstname'] ?? '-') . ' ' . ($row['assigned_by_lastname'] ?? ''))) ?></td>
+                    <td class="small d-none d-lg-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars(trim(($row['assigned_by_firstname'] ?? '-') . ' ' . ($row['assigned_by_lastname'] ?? ''))) ?></td>
                     <td class="small">
-                      <?php
-                        $statusColor = match($row['status']) {
-                            'In Progress' => '#E89C5A',
-                            'Completed'   => '#3AA394',
-                            'Cancelled'   => '#DF6E4F',
-                            default       => '#2F4858'
-                        };
-                      ?>
-                      <span class="badge rounded-pill" style="background-color:<?= $statusColor ?>; color:#fff;">
-                        <?= htmlspecialchars($row['status']) ?>
-                      </span>
+                      <span class="status-pill <?= $statusClass ?>"><?= htmlspecialchars($row['status']) ?></span>
                     </td>
                   </tr>
                 <?php endforeach; ?>
@@ -324,7 +279,7 @@ $assignedRequests = $assignedStmt->fetchAll();
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn" style="background-color:#2F4858; color:#fff;" id="confirm_assign_btn">Confirm Assign</button>
+        <button type="button" class="btn btn-confirm" id="confirm_assign_btn">Confirm Assign</button>
       </div>
     </div>
   </div>
@@ -428,11 +383,11 @@ function renderStaffMatches(requiredSkill) {
           scoreHtml +
         '</div>' +
         '<div class="mb-2">' + skillsHtml + '</div>' +
-        '<div class="text-secondary" style="font-size:.75rem;">' +
+        '<div style="font-size:.75rem; color:var(--ink-soft);">' +
           '<i class="fa-regular fa-clock"></i> ' + staff.workload + ' active task(s) &middot; ' + escapeHtml(staff.status) +
         '</div>' +
       '</div>' +
-      '<button type="button" class="btn btn-sm flex-shrink-0" style="background-color:#3AA394; color:#fff;" ' +
+      '<button type="button" class="btn btn-assign flex-shrink-0" ' +
         (staff.status !== 'Active' ? 'disabled' : '') +
         ' data-staff-id="' + staff.user_id + '" data-staff-name="' + escapeHtml(staff.name) + '">Assign</button>';
 

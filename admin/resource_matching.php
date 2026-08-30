@@ -1,10 +1,10 @@
 <?php
 
-session_name('MANAGER_SESSION');
+session_name('ADMIN_SESSION');
 session_start();
 require_once __DIR__ . '/../config/database.php';
 
-if (!isset($_SESSION['manager_id']) || ($_SESSION['role'] ?? '') !== 'manager') {
+if (!isset($_SESSION['admin_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
     header('Location: login.php');
     exit;
 }
@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare(
                 "UPDATE service_requests SET assigned_to = ?, assigned_by = ?, status = 'In Progress' WHERE request_id = ?"
             );
-            $stmt->execute([$userId, $_SESSION['manager_id'], $requestId]);
+            $stmt->execute([$userId, $_SESSION['admin_id'], $requestId]);
 
             $_SESSION['alert_type'] = 'success';
             $_SESSION['alert_message'] = 'Staff assigned successfully.';
@@ -43,11 +43,9 @@ unset($_SESSION['alert_type'], $_SESSION['alert_message']);
 
 $pendingStmt = $pdo->query(
     "SELECT sr.request_id, sr.request_title, sr.request_details, sr.required_skill, sr.status, sr.created_at,
-            c.company_name, c.contact_person,
-            ct.contract_number, ct.total_amount, ct.scope_summary
+            c.company_name, c.contact_person
      FROM service_requests sr
      INNER JOIN clients c ON sr.client_id = c.client_id
-     INNER JOIN contracts ct ON ct.request_id = sr.request_id AND ct.status = 'Approved'
      WHERE sr.assigned_to IS NULL AND sr.status = 'New'
      ORDER BY sr.created_at ASC"
 );
@@ -95,269 +93,13 @@ $assignedRequests = $assignedStmt->fetchAll();
 <link rel="stylesheet" href="../assets/css/dashboard.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lexend:wght@500;600;700&display=swap" rel="stylesheet">
-<style>
-:root {
-  --navy: #33495C;
-  --navy-soft: #EEF2F5;
-  --teal: #4CA79A;
-  --teal-soft: #E7F5F2;
-  --teal-text: #2E6E63;
-  --amber: #E0A44E;
-  --amber-soft: #FBF1E1;
-  --amber-text: #93662A;
-  --coral: #DB7A66;
-  --coral-soft: #FBECE8;
-  --coral-text: #A2452F;
-  --ink: #2B3540;
-  --ink-soft: #6B7684;
-  --line: #E7EAEE;
-  --canvas: #F6F8F9;
-  --card: #FFFFFF;
-}
-
-body {
-  background-color: var(--canvas);
-  color: var(--ink);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-}
-
-.dashboard-title, h1, h2, h3 {
-  font-family: 'Lexend', 'Inter', sans-serif;
-}
-
-.dashboard-title {
-  color: var(--ink);
-  letter-spacing: -0.01em;
-}
-
-.dashboard-subtitle {
-  color: var(--ink-soft) !important;
-}
-
-.dashboard-topbar {
-  border-bottom: 1px solid var(--line) !important;
-}
-
-.card {
-  border-radius: 14px;
-  border: 1px solid var(--line);
-}
-
-.card-header {
-  border-bottom: 1px solid var(--line) !important;
-  background-color: var(--card) !important;
-  border-radius: 14px 14px 0 0 !important;
-  padding: 1rem 1.15rem;
-}
-
-.card-header h2 {
-  color: var(--ink);
-  letter-spacing: -0.01em;
-}
-
-.card-header p {
-  color: var(--ink-soft) !important;
-}
-
-.form-control:focus, .form-select:focus, .form-control:hover, .form-select:hover {
-  border-color: var(--teal);
-  box-shadow: 0 0 0 .2rem rgba(76,167,154,.15);
-  outline: none;
-}
-
-.request-card {
-  cursor: pointer;
-  transition: border-color .15s ease, background-color .15s ease, box-shadow .15s ease;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background-color: var(--card);
-}
-
-.request-card:hover {
-  border-color: var(--teal);
-  box-shadow: 0 2px 10px rgba(51,73,92,.06);
-}
-
-.request-card.active {
-  border-color: var(--teal);
-  background-color: var(--teal-soft);
-  box-shadow: 0 2px 10px rgba(76,167,154,.12);
-}
-
-.request-card .card-body {
-  padding: .9rem 1rem;
-}
-
-.badge-new {
-  background-color: var(--amber-soft);
-  color: var(--amber-text);
-  font-size: .68rem;
-  font-weight: 600;
-  padding: .32rem .65rem;
-  border-radius: 999px;
-}
-
-.skill-badge {
-  background-color: var(--navy-soft);
-  color: var(--navy);
-  font-size: .7rem;
-  font-weight: 500;
-  padding: .3rem .65rem;
-  border-radius: 999px;
-  margin: 0 .35rem .35rem 0;
-  display: inline-block;
-  border: 1px solid rgba(51,73,92,.08);
-}
-
-.skill-badge.matched {
-  background-color: var(--teal-soft);
-  color: var(--teal-text);
-  border-color: rgba(76,167,154,.25);
-  font-weight: 600;
-}
-
-.skill-badge.unmatched {
-  background-color: #F1F2F4;
-  color: #8A93A0;
-  border-color: var(--line);
-}
-
-.staff-match-row {
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background-color: var(--card);
-  transition: box-shadow .15s ease, border-color .15s ease;
-}
-
-.staff-match-row:hover {
-  border-color: rgba(76,167,154,.35);
-  box-shadow: 0 2px 10px rgba(51,73,92,.05);
-}
-
-.match-score-pill {
-  font-size: .7rem;
-  font-weight: 600;
-  padding: .3rem .65rem;
-  border-radius: 999px;
-  letter-spacing: .01em;
-}
-
-.match-score-high {
-  background-color: var(--teal-soft);
-  color: var(--teal-text);
-}
-
-.match-score-mid {
-  background-color: var(--amber-soft);
-  color: var(--amber-text);
-}
-
-.match-score-none {
-  background-color: var(--coral-soft);
-  color: var(--coral-text);
-}
-
-.btn-assign {
-  background-color: var(--teal);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: .82rem;
-  padding: .4rem .9rem;
-  transition: background-color .15s ease;
-}
-
-.btn-assign:hover:not(:disabled) {
-  background-color: var(--teal-text);
-  color: #fff;
-}
-
-.btn-assign:disabled {
-  background-color: #E4E7EA;
-  color: #A6ADB6;
-}
-
-#matching_empty_state {
-  color: var(--ink-soft);
-}
-
-#matching_empty_state i {
-  color: #C7D0D6;
-}
-
-.table thead th {
-  border-bottom: 1px solid var(--line) !important;
-  color: var(--ink-soft);
-  font-weight: 600;
-  font-size: .72rem;
-  letter-spacing: .04em;
-  background-color: var(--canvas) !important;
-}
-
-.table td {
-  border-bottom: 1px solid var(--line);
-  color: var(--ink);
-}
-
-.table-hover tbody tr:hover {
-  background-color: var(--navy-soft);
-}
-
-.status-pill {
-  font-size: .72rem;
-  font-weight: 600;
-  padding: .3rem .65rem;
-  border-radius: 999px;
-}
-
-.status-in-progress {
-  background-color: var(--amber-soft);
-  color: var(--amber-text);
-}
-
-.status-completed {
-  background-color: var(--teal-soft);
-  color: var(--teal-text);
-}
-
-.status-default {
-  background-color: var(--navy-soft);
-  color: var(--navy);
-}
-
-.modal-content {
-  border-radius: 14px;
-  border: none;
-}
-
-.modal-header {
-  border-bottom: 1px solid var(--line);
-}
-
-.modal-footer {
-  border-top: 1px solid var(--line);
-}
-
-.btn-confirm {
-  background-color: var(--navy);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  font-weight: 600;
-}
-
-.btn-confirm:hover {
-  background-color: #263A4A;
-  color: #fff;
-}
-</style>
+<link rel="stylesheet" href="../assets/css/resource_matching.css">
 </head>
 <body>
 
 <div class="dashboard-layout d-flex">
 
-<?php require __DIR__ . '/../includes/manager/sidebar.php'; ?>
+<?php require __DIR__ . '/../includes/admin/sidebar.php'; ?>
 
   <div class="dashboard-main flex-grow-1" style="min-width:0;">
 
@@ -383,7 +125,7 @@ body {
           </button>
           <ul class="dropdown-menu dropdown-menu-end shadow-sm">
             <li>
-              <a href="../config/logout.php?role=manager" class="dropdown-item d-flex align-items-center gap-2 text-danger">
+              <a href="../config/logout.php?role=admin" class="dropdown-item d-flex align-items-center gap-2 text-danger">
                 <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout
               </a>
             </li>
@@ -420,10 +162,6 @@ body {
                           <div style="font-size:.75rem; color:var(--ink-soft);"><?= htmlspecialchars($request['company_name']) ?></div>
                         </div>
                         <span class="badge-new">New</span>
-                      </div>
-                      <div class="mt-2 small" style="color:var(--teal-text);">
-                        <i class="fa-solid fa-file-signature me-1"></i><?= htmlspecialchars($request['contract_number']) ?>
-                        &middot; &#8369;<?= number_format((float) $request['total_amount'], 2) ?>
                       </div>
                       <?php if (!empty($request['required_skill'])): ?>
                         <div class="mt-2"><span class="skill-badge"><?= htmlspecialchars($request['required_skill']) ?></span></div>

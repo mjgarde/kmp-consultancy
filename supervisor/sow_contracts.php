@@ -1,10 +1,10 @@
 <?php
 
-session_name('ADMIN_SESSION');
+session_name('SUPERVISOR_SESSION');
 session_start();
 require_once __DIR__ . '/../config/database.php';
 
-if (!isset($_SESSION['admin_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
+if (!isset($_SESSION['supervisor_id']) || ($_SESSION['role'] ?? '') !== 'supervisor') {
     header('Location: login.php');
     exit;
 }
@@ -69,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
         $insertStmt->execute([
             $contractNumber, $quote['quotation_id'], $quote['request_id'], $quote['client_id'],
-            $quote['project_scope'], $termsConditions, $quote['total_amount'], $startDate, $endDate, $_SESSION['admin_id'],
+            $quote['project_scope'], $termsConditions, $quote['total_amount'], $startDate, $endDate, $_SESSION['supervisor_id'],
         ]);
 
         $_SESSION['alert_type'] = 'success';
@@ -88,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $pdo->prepare(
                     "UPDATE contracts SET status = ?, approved_by = ?, approved_at = NOW() WHERE contract_id = ?"
                 );
-                $stmt->execute([$newStatus, $_SESSION['admin_id'], $contractId]);
+                $stmt->execute([$newStatus, $_SESSION['supervisor_id'], $contractId]);
             } else {
                 $stmt = $pdo->prepare('UPDATE contracts SET status = ? WHERE contract_id = ?');
                 $stmt->execute([$newStatus, $contractId]);
@@ -115,7 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $insertRevision = $pdo->prepare(
                 'INSERT INTO contract_revisions (contract_id, revision_note, revised_by) VALUES (?, ?, ?)'
             );
-            $insertRevision->execute([$contractId, $revisionNote, $_SESSION['admin_id']]);
+            $insertRevision->execute([$contractId, $revisionNote, $_SESSION['supervisor_id']]);
 
             $updateContract = $pdo->prepare("UPDATE contracts SET status = 'Draft' WHERE contract_id = ?");
             $updateContract->execute([$contractId]);
@@ -344,7 +344,7 @@ body {
 
 <div class="dashboard-layout d-flex">
 
-<?php require __DIR__ . '/../includes/admin/sidebar.php'; ?>
+<?php require __DIR__ . '/../includes/supervisor/sidebar.php'; ?>
 
   <div class="dashboard-main flex-grow-1" style="min-width:0;">
 
@@ -362,6 +362,20 @@ body {
         <button type="button" class="btn btn-link text-secondary p-0">
           <i class="fa-regular fa-bell fs-5"></i>
         </button>
+        <div class="dropdown">
+          <button type="button" class="btn btn-link p-0 border-0" data-bs-toggle="dropdown" aria-expanded="false">
+            <span class="d-flex align-items-center justify-content-center rounded-circle flex-shrink-0" style="width:36px; height:36px; background-color:var(--navy-soft);">
+              <i class="fa-solid fa-user" style="color:var(--navy);"></i>
+            </span>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+            <li>
+              <a href="../config/logout.php?role=supervisor" class="dropdown-item d-flex align-items-center gap-2 text-danger">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout
+              </a>
+            </li>
+          </ul>
+        </div>
       </div>
     </header>
 
