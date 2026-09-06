@@ -11,6 +11,12 @@ if (!isset($_SESSION['admin_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
 
 $pdo = getConnection();
 
+$adminId = $_SESSION['admin_id'];
+$adminStmt = $pdo->prepare('SELECT firstname, lastname FROM users WHERE user_id = ?');
+$adminStmt->execute([$adminId]);
+$adminRow = $adminStmt->fetch();
+$adminFullname = $adminRow ? trim($adminRow['firstname'] . ' ' . $adminRow['lastname']) : 'Admin';
+
 $totalClients = (int) $pdo->query('SELECT COUNT(*) FROM clients')->fetchColumn();
 
 $newRequests        = (int) $pdo->query("SELECT COUNT(*) FROM service_requests WHERE status = 'New'")->fetchColumn();
@@ -286,33 +292,10 @@ body {
         </button>
         <div>
           <h1 class="dashboard-title h6 h5-md fw-bold mb-0">Dashboard</h1>
-          <p class="dashboard-subtitle small mb-0 d-none d-sm-block">Welcome back, Administrator.</p>
+          <p class="dashboard-subtitle small mb-0 d-none d-sm-block">Welcome back, <?= htmlspecialchars($adminFullname) ?>.</p>
         </div>
       </div>
       <div class="dashboard-topbar-actions d-flex align-items-center gap-3 gap-md-4">
-        <a href="reports_analytics.php" class="btn btn-sm px-3" style="background-color:var(--teal-soft); color:var(--teal-text); font-weight:600;">
-          <i class="fa-solid fa-chart-line me-1"></i> Reports &amp; Analytics
-        </a>
-        <button type="button" class="btn btn-print btn-sm px-3" onclick="window.print()">
-          <i class="fa-solid fa-print me-1"></i> Print
-        </button>
-        <button type="button" class="btn btn-link text-secondary p-0">
-          <i class="fa-regular fa-bell fs-5"></i>
-        </button>
-        <div class="dropdown">
-          <button type="button" class="btn btn-link p-0 border-0" data-bs-toggle="dropdown" aria-expanded="false">
-            <span class="dashboard-user-icon d-flex align-items-center justify-content-center rounded-circle bg-secondary bg-opacity-10 flex-shrink-0" style="width:36px; height:36px;">
-              <i class="fa-solid fa-user text-secondary"></i>
-            </span>
-          </button>
-          <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-            <li>
-              <a href="../config/logout.php?role=admin" class="dropdown-item d-flex align-items-center gap-2 text-danger">
-                <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout
-              </a>
-            </li>
-          </ul>
-        </div>
       </div>
     </header>
 

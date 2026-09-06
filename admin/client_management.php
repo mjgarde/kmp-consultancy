@@ -358,23 +358,6 @@ body {
         </div>
       </div>
       <div class="dashboard-topbar-actions d-flex align-items-center gap-3 gap-md-4">
-        <button type="button" class="btn btn-link text-secondary p-0">
-          <i class="fa-regular fa-bell fs-5"></i>
-        </button>
-        <div class="dropdown">
-          <button type="button" class="btn btn-link p-0 border-0" data-bs-toggle="dropdown" aria-expanded="false">
-            <span class="dashboard-user-icon d-flex align-items-center justify-content-center rounded-circle bg-secondary bg-opacity-10 flex-shrink-0" style="width:36px; height:36px;">
-              <i class="fa-solid fa-user text-secondary"></i>
-            </span>
-          </button>
-          <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-            <li>
-              <a href="../config/logout.php?role=admin" class="dropdown-item d-flex align-items-center gap-2 text-danger">
-                <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout
-              </a>
-            </li>
-          </ul>
-        </div>
       </div>
     </header>
 

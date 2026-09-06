@@ -410,12 +410,6 @@ body {
       </div>
       <div class="dashboard-topbar-actions d-flex align-items-center gap-3 gap-md-4">
         <form method="get" class="d-flex align-items-center gap-2 flex-wrap" id="filterForm">
-          <div class="range-toggle">
-            <a href="?preset=3m" class="<?= $preset === '3m' ? 'active' : '' ?>">3M</a>
-            <a href="?preset=6m" class="<?= $preset === '6m' ? 'active' : '' ?>">6M</a>
-            <a href="?preset=12m" class="<?= $preset === '12m' ? 'active' : '' ?>">12M</a>
-            <a href="?preset=ytd" class="<?= $preset === 'ytd' ? 'active' : '' ?>">YTD</a>
-          </div>
           <input type="hidden" name="preset" value="custom">
           <input type="date" name="from" value="<?= htmlspecialchars($fromDate->format('Y-m-d')) ?>" class="form-control form-control-sm" style="width:150px;">
           <span class="small" style="color:var(--ink-soft);">to</span>
@@ -425,20 +419,6 @@ body {
         <button type="button" class="btn btn-print btn-sm px-3" onclick="window.print()">
           <i class="fa-solid fa-print me-1"></i> Print
         </button>
-        <div class="dropdown">
-          <button type="button" class="btn btn-link p-0 border-0" data-bs-toggle="dropdown" aria-expanded="false">
-            <span class="dashboard-user-icon d-flex align-items-center justify-content-center rounded-circle bg-secondary bg-opacity-10 flex-shrink-0" style="width:36px; height:36px;">
-              <i class="fa-solid fa-user text-secondary"></i>
-            </span>
-          </button>
-          <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-            <li>
-              <a href="../config/logout.php?role=admin" class="dropdown-item d-flex align-items-center gap-2 text-danger">
-                <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout
-              </a>
-            </li>
-          </ul>
-        </div>
       </div>
     </header>
 

@@ -39,7 +39,43 @@ function navActive(string $page, string $currentPage): string
 {
     return $page === $currentPage ? 'active fw-semibold' : 'text-dark';
 }
+
+function badgeCount(int $count): string
+{
+    return $count > 99 ? '99+' : (string) $count;
+}
 ?>
+
+<style>
+.sidebar-badge-group {
+  gap: 6px;
+}
+
+.sidebar-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 50%;
+  border: 1.4px solid currentColor;
+  background: transparent;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+  user-select: none;
+}
+
+.sidebar-badge-new {
+  color: #33495C;
+}
+
+.sidebar-badge-progress {
+  color: #C6893A;
+}
+</style>
+
 <aside class="dashboard-sidebar offcanvas-lg offcanvas-start bg-white border-end d-flex flex-column min-vh-100" style="width:264px; min-width:264px; max-width:264px; flex-shrink:0;" tabindex="-1" id="sidebarOffcanvas">
 
   <div class="dashboard-sidebar-brand d-flex align-items-center justify-content-between gap-2 border-bottom px-3 py-3">
@@ -71,15 +107,16 @@ function navActive(string $page, string $currentPage): string
         <a href="my_assignments.php" class="nav-link <?= navActive('my_assignments.php', $currentPage) ?> d-flex align-items-center flex-nowrap gap-3 rounded-3 px-3 py-2">
           <i class="fa-solid fa-list-check flex-shrink-0" style="width:18px;"></i>
           <span class="flex-grow-1 text-truncate" style="min-width:0;">My Assignments</span>
-          <span class="d-flex align-items-center gap-1 flex-shrink-0">
+
+          <span class="d-flex align-items-center gap-1 flex-shrink-0 sidebar-badge-group">
             <?php if ($newAssignmentCount > 0): ?>
-              <span class="d-inline-flex align-items-center justify-content-center rounded-circle fw-bold flex-shrink-0" style="background-color:#33495C; color:#fff; font-size:.62rem; width:19px; height:19px; line-height:1;" title="<?= $newAssignmentCount ?> new assignment<?= $newAssignmentCount === 1 ? '' : 's' ?>">
-                <?= $newAssignmentCount ?>
+              <span class="sidebar-badge sidebar-badge-new" title="<?= $newAssignmentCount ?> new assignment<?= $newAssignmentCount === 1 ? '' : 's' ?>">
+                <?= badgeCount($newAssignmentCount) ?>
               </span>
             <?php endif; ?>
             <?php if ($progressAssignmentCount > 0): ?>
-              <span class="d-inline-flex align-items-center justify-content-center rounded-circle fw-bold flex-shrink-0" style="background-color:#E0A44E; color:#fff; font-size:.62rem; width:19px; height:19px; line-height:1;" title="<?= $progressAssignmentCount ?> in progress">
-                <?= $progressAssignmentCount ?>
+              <span class="sidebar-badge sidebar-badge-progress" title="<?= $progressAssignmentCount ?> in progress">
+                <?= badgeCount($progressAssignmentCount) ?>
               </span>
             <?php endif; ?>
           </span>
@@ -93,17 +130,6 @@ function navActive(string $page, string $currentPage): string
       <li class="nav-item mb-1">
         <a href="schedule_tasks.php" class="nav-link <?= navActive('schedule_tasks.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
           <i class="fa-solid fa-calendar-days" style="width:18px;"></i> My Schedule / Tasks
-        </a>
-      </li>
-    </ul>
-
-    <div class="dashboard-nav-label text-uppercase text-secondary small fw-semibold px-3 mb-2" style="letter-spacing:.06em; font-size:.72rem;">
-      Updates
-    </div>
-    <ul class="dashboard-sidebar-menu nav flex-column">
-      <li class="nav-item mb-1">
-        <a href="notifications.php" class="nav-link <?= navActive('notifications.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
-          <i class="fa-solid fa-bell" style="width:18px;"></i> Notifications
         </a>
       </li>
     </ul>

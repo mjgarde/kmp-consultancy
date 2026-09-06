@@ -369,31 +369,6 @@ body {
           <p class="dashboard-subtitle small mb-0 d-none d-sm-block">Deadlines, engagement dates, and pending actions.</p>
         </div>
       </div>
-      <div class="dashboard-topbar-actions d-flex align-items-center gap-3 gap-md-4">
-        <a href="dashboard.php" class="btn btn-sm px-3" style="background-color:var(--navy-soft); color:var(--navy); font-weight:600;">
-          <i class="fa-solid fa-gauge me-1"></i> Dashboard
-        </a>
-        <a href="reports_analytics.php" class="btn btn-sm px-3" style="background-color:var(--teal-soft); color:var(--teal-text); font-weight:600;">
-          <i class="fa-solid fa-chart-line me-1"></i> Reports
-        </a>
-        <button type="button" class="btn btn-print btn-sm px-3" onclick="window.print()">
-          <i class="fa-solid fa-print me-1"></i> Print
-        </button>
-        <div class="dropdown">
-          <button type="button" class="btn btn-link p-0 border-0" data-bs-toggle="dropdown" aria-expanded="false">
-            <span class="dashboard-user-icon d-flex align-items-center justify-content-center rounded-circle bg-secondary bg-opacity-10 flex-shrink-0" style="width:36px; height:36px;">
-              <i class="fa-solid fa-user text-secondary"></i>
-            </span>
-          </button>
-          <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-            <li>
-              <a href="../config/logout.php?role=admin" class="dropdown-item d-flex align-items-center gap-2 text-danger">
-                <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout
-              </a>
-            </li>
-          </ul>
-        </div>
-      </div>
     </header>
 
     <main class="dashboard-content p-3 p-md-4">
@@ -618,56 +593,6 @@ body {
         </div>
 
       </div>
-
-      <section class="card border-0 shadow-sm mt-3 no-print">
-        <div class="card-header">
-          <h2 class="h6 fw-bold mb-0">Quick Actions</h2>
-        </div>
-        <div class="card-body d-flex flex-wrap gap-2">
-          <a href="client_management.php" class="quick-link flex-grow-1" style="min-width:200px;">
-            <span class="quick-link-icon" style="background-color:var(--navy-soft);"><i class="fa-solid fa-building" style="color:var(--navy);"></i></span>
-            <div>
-              <div class="quick-link-title">Client Management</div>
-              <div class="quick-link-sub">Clients &amp; service requests</div>
-            </div>
-          </a>
-          <a href="cpq_builder.php" class="quick-link flex-grow-1" style="min-width:200px;">
-            <span class="quick-link-icon" style="background-color:var(--teal-soft);"><i class="fa-solid fa-file-invoice-dollar" style="color:var(--teal-text);"></i></span>
-            <div>
-              <div class="quick-link-title">CPQ &amp; Scope Builder</div>
-              <div class="quick-link-sub">Create client quotations</div>
-            </div>
-          </a>
-          <a href="sow_contract.php" class="quick-link flex-grow-1" style="min-width:200px;">
-            <span class="quick-link-icon" style="background-color:var(--amber-soft);"><i class="fa-solid fa-file-signature" style="color:var(--amber-text);"></i></span>
-            <div>
-              <div class="quick-link-title">SOW &amp; Contracts</div>
-              <div class="quick-link-sub">Generate &amp; approve contracts</div>
-            </div>
-          </a>
-          <a href="resource_matching.php" class="quick-link flex-grow-1" style="min-width:200px;">
-            <span class="quick-link-icon" style="background-color:var(--coral-soft);"><i class="fa-solid fa-people-arrows" style="color:var(--coral-text);"></i></span>
-            <div>
-              <div class="quick-link-title">Resource Matching</div>
-              <div class="quick-link-sub">Assign staff to contracts</div>
-            </div>
-          </a>
-          <a href="dashboard.php" class="quick-link flex-grow-1" style="min-width:200px;">
-            <span class="quick-link-icon" style="background-color:var(--purple-soft);"><i class="fa-solid fa-gauge" style="color:var(--purple-text);"></i></span>
-            <div>
-              <div class="quick-link-title">Dashboard</div>
-              <div class="quick-link-sub">Overview &amp; quick metrics</div>
-            </div>
-          </a>
-          <a href="reports_analytics.php" class="quick-link flex-grow-1" style="min-width:200px;">
-            <span class="quick-link-icon" style="background-color:var(--navy-soft);"><i class="fa-solid fa-chart-line" style="color:var(--navy);"></i></span>
-            <div>
-              <div class="quick-link-title">Reports &amp; Analytics</div>
-              <div class="quick-link-sub">Revenue, trends &amp; performance</div>
-            </div>
-          </a>
-        </div>
-      </section>
 
     </main>
 

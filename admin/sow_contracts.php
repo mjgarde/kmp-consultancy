@@ -358,11 +358,6 @@ body {
           <p class="dashboard-subtitle small mb-0 d-none d-sm-block">Generate, approve, and manage Statements of Work and contracts.</p>
         </div>
       </div>
-      <div class="dashboard-topbar-actions d-flex align-items-center gap-3 gap-md-4">
-        <button type="button" class="btn btn-link text-secondary p-0">
-          <i class="fa-regular fa-bell fs-5"></i>
-        </button>
-      </div>
     </header>
 
     <main class="dashboard-content p-3 p-md-4">
