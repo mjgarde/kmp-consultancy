@@ -1,7 +1,20 @@
 <?php
+require_once __DIR__ . '/../../config/database.php';
+
 $staffFullname = $_SESSION['staff_fullname'] ?? 'Staff';
 $staffEmail    = $_SESSION['staff_email'] ?? '';
 $currentPage   = basename($_SERVER['PHP_SELF']);
+
+$pdo = getConnection();
+$staffId = $_SESSION['staff_id'] ?? 0;
+
+$newCountStmt = $pdo->prepare('SELECT COUNT(*) FROM service_requests WHERE assigned_to = ? AND status = ?');
+$newCountStmt->execute([$staffId, 'New']);
+$newAssignmentCount = (int) $newCountStmt->fetchColumn();
+
+$progressCountStmt = $pdo->prepare('SELECT COUNT(*) FROM service_requests WHERE assigned_to = ? AND status = ?');
+$progressCountStmt->execute([$staffId, 'In Progress']);
+$progressAssignmentCount = (int) $progressCountStmt->fetchColumn();
 
 function maskEmail(string $email): string
 {
@@ -55,8 +68,21 @@ function navActive(string $page, string $currentPage): string
     </div>
     <ul class="dashboard-sidebar-menu nav flex-column mb-4">
       <li class="nav-item mb-1">
-        <a href="my_assignments.php" class="nav-link <?= navActive('my_assignments.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
-          <i class="fa-solid fa-list-check" style="width:18px;"></i> My Assignments
+        <a href="my_assignments.php" class="nav-link <?= navActive('my_assignments.php', $currentPage) ?> d-flex align-items-center flex-nowrap gap-3 rounded-3 px-3 py-2">
+          <i class="fa-solid fa-list-check flex-shrink-0" style="width:18px;"></i>
+          <span class="flex-grow-1 text-truncate" style="min-width:0;">My Assignments</span>
+          <span class="d-flex align-items-center gap-1 flex-shrink-0">
+            <?php if ($newAssignmentCount > 0): ?>
+              <span class="d-inline-flex align-items-center justify-content-center rounded-circle fw-bold flex-shrink-0" style="background-color:#33495C; color:#fff; font-size:.62rem; width:19px; height:19px; line-height:1;" title="<?= $newAssignmentCount ?> new assignment<?= $newAssignmentCount === 1 ? '' : 's' ?>">
+                <?= $newAssignmentCount ?>
+              </span>
+            <?php endif; ?>
+            <?php if ($progressAssignmentCount > 0): ?>
+              <span class="d-inline-flex align-items-center justify-content-center rounded-circle fw-bold flex-shrink-0" style="background-color:#E0A44E; color:#fff; font-size:.62rem; width:19px; height:19px; line-height:1;" title="<?= $progressAssignmentCount ?> in progress">
+                <?= $progressAssignmentCount ?>
+              </span>
+            <?php endif; ?>
+          </span>
         </a>
       </li>
       <li class="nav-item mb-1">

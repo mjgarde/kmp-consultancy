@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($requestId && $userId) {
             $stmt = $pdo->prepare(
-                "UPDATE service_requests SET assigned_to = ?, assigned_by = ?, status = 'In Progress' WHERE request_id = ?"
+                "UPDATE service_requests SET assigned_to = ?, assigned_by = ? WHERE request_id = ?"
             );
             $stmt->execute([$userId, $_SESSION['supervisor_id'], $requestId]);
 
@@ -53,7 +53,7 @@ $pendingRequests = $pendingStmt->fetchAll();
 
 $staffStmt = $pdo->query(
     "SELECT u.user_id, u.firstname, u.lastname, u.status,
-            (SELECT COUNT(*) FROM service_requests sr WHERE sr.assigned_to = u.user_id AND sr.status = 'In Progress') AS workload
+            (SELECT COUNT(*) FROM service_requests sr WHERE sr.assigned_to = u.user_id AND sr.status IN ('New', 'In Progress')) AS workload
      FROM users u
      WHERE u.role = 'Staff'
      ORDER BY u.firstname ASC"
