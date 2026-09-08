@@ -241,8 +241,6 @@ function categoryPalette(string $category): array
                     <ul class="document-meta">
                       <li><span class="category-pill" style="background-color:<?= $catColors['bg'] ?>; color:<?= $catColors['fg'] ?>;"><?= htmlspecialchars($doc['category']) ?></span></li>
                       <li><?= strtoupper($doc['file_type']) ?> &middot; <?= formatFileSize($doc['file_size']) ?></li>
-                      <li>Uploaded by <?= htmlspecialchars($uploaderName ?: 'Unknown') ?></li>
-                      <li><time datetime="<?= date('Y-m-d', strtotime($doc['created_at'])) ?>"><?= date('M d, Y', strtotime($doc['created_at'])) ?></time></li>
                     </ul>
                     <?php if (!empty($doc['description'])): ?>
                       <p class="document-description"><?= htmlspecialchars(mb_strimwidth($doc['description'], 0, 140, '...')) ?></p>

@@ -100,9 +100,14 @@ function navActive(string $page, string $currentPage): string
           <i class="fa-solid fa-chart-line" style="width:18px;"></i> Reports &amp; Analytics
         </a>
       </li>
-      <li class="nav-item mb-1">
+      <!-- <li class="nav-item mb-1">
         <a href="system_settings.php" class="nav-link <?= navActive('system_settings.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
           <i class="fa-solid fa-gear" style="width:18px;"></i> System Settings
+        </a>
+      </li> -->
+      <li class="nav-item mb-1">
+        <a href="activity_logs.php" class="nav-link <?= navActive('activity_logs.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
+          <i class="fa-solid fa-clock-rotate-left" style="width:18px;"></i> Activity Logs
         </a>
       </li>
     </ul>
