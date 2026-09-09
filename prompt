@@ -1,0 +1,48 @@
+Gumawa ka ng [ANO YUNG PAGE, hal. "client management page" o "invoice list"] gamit ang parehong 
+design system na ito (enterprise, minimalist, outline-based na style):
+
+COLOR PALETTE (CSS variables):
+--navy: #1E293B;
+--navy-deep: #0F172A;
+--navy-soft: #EEF1F6;
+--indigo: #3B4E8A;
+--indigo-soft: #E9ECF6;
+--indigo-text: #2E3E70;
+--slate: #475569;
+--slate-soft: #64748B;
+--success: #157A5F;
+--success-soft: #E3F3EC;
+--success-text: #0F5F49;
+--success-border: #BFE3D3;
+--warn: #B7791F;
+--warn-soft: #FBF0DD;
+--warn-text: #8A5A15;
+--warn-border: #EFD8A8;
+--danger: #B4432F;
+--danger-soft: #FAECE8;
+--danger-text: #93382A;
+--danger-border: #EDC7BC;
+--ink: #1A2233;
+--ink-soft: #667085;
+--line: #E2E5EB;
+--canvas: #FFFFFF;
+--card: #FFFFFF;
+
+DESIGN RULES (importante, sundin mabuti):
+1. Puting-puti (#FFFFFF) ang background ng buong page (canvas) AT ng bawat card/box (card) — 
+   walang gray na page background.
+2. WALANG box-shadow kahit saan. Gamitin ang lang na 1px solid border (var(--line)) para i-separate 
+   ang bawat card/section mula sa isa't isa. "Outline-based" style, hindi "shadow-based."
+3. Font: 'Inter' para sa body text, 'Lexend' para sa headings (h1-h3, titles).
+4. Border-radius: 12px para sa cards/sections, 8-9px para sa buttons, 999px (pill) para sa status badges.
+5. Status colors dapat solid/pure (hindi pale/washed-out) bilang default state — 
+   halimbawa Approve button = var(--success) bg na may white text, hindi yung soft/pale version.
+6. Buttons: primary action = var(--indigo), destructive/reject = var(--danger) solid, 
+   neutral/ghost action = var(--navy-soft) bg na may border.
+7. Tables: header row may background na var(--navy-soft), uppercase text, maliit na font-size (.7rem), 
+   bold letter-spacing.
+8. Status badges/pills: soft background color (hal. var(--success-soft)) na may matching border color 
+   at text color — hindi solid dito, dahil informational lang sila, hindi buttons.
+
+Bootstrap 5 ang framework, FontAwesome icons. Gumamit ng utility classes pero i-override yung 
+default Bootstrap shadow/border behaviors para tumugma sa outline-based system sa itaas.

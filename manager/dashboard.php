@@ -16,16 +16,17 @@ $totalClients = (int) $pdo->query('SELECT COUNT(*) FROM clients')->fetchColumn()
 $newRequests        = (int) $pdo->query("SELECT COUNT(*) FROM service_requests WHERE status = 'New'")->fetchColumn();
 $inProgressRequests = (int) $pdo->query("SELECT COUNT(*) FROM service_requests WHERE status = 'In Progress'")->fetchColumn();
 $completedRequests  = (int) $pdo->query("SELECT COUNT(*) FROM service_requests WHERE status = 'Completed'")->fetchColumn();
+$cancelledRequests  = (int) $pdo->query("SELECT COUNT(*) FROM service_requests WHERE status = 'Cancelled'")->fetchColumn();
 
 $draftQuotations    = (int) $pdo->query("SELECT COUNT(*) FROM quotations WHERE status = 'Draft'")->fetchColumn();
-$sentQuotations      = (int) $pdo->query("SELECT COUNT(*) FROM quotations WHERE status = 'Sent'")->fetchColumn();
-$approvedQuotations  = (int) $pdo->query("SELECT COUNT(*) FROM quotations WHERE status = 'Approved'")->fetchColumn();
-$quotationValue      = (float) $pdo->query("SELECT COALESCE(SUM(total_amount),0) FROM quotations WHERE status = 'Approved'")->fetchColumn();
+$sentQuotations     = (int) $pdo->query("SELECT COUNT(*) FROM quotations WHERE status = 'Sent'")->fetchColumn();
+$approvedQuotations = (int) $pdo->query("SELECT COUNT(*) FROM quotations WHERE status = 'Approved'")->fetchColumn();
+$rejectedQuotations = (int) $pdo->query("SELECT COUNT(*) FROM quotations WHERE status = 'Rejected'")->fetchColumn();
 
-$draftContracts     = (int) $pdo->query("SELECT COUNT(*) FROM contracts WHERE status = 'Draft'")->fetchColumn();
-$pendingContracts   = (int) $pdo->query("SELECT COUNT(*) FROM contracts WHERE status = 'Pending Approval'")->fetchColumn();
-$approvedContracts  = (int) $pdo->query("SELECT COUNT(*) FROM contracts WHERE status = 'Approved'")->fetchColumn();
-$contractValue      = (float) $pdo->query("SELECT COALESCE(SUM(total_amount),0) FROM contracts WHERE status = 'Approved'")->fetchColumn();
+$draftContracts    = (int) $pdo->query("SELECT COUNT(*) FROM contracts WHERE status = 'Draft'")->fetchColumn();
+$pendingContracts  = (int) $pdo->query("SELECT COUNT(*) FROM contracts WHERE status = 'Pending Approval'")->fetchColumn();
+$approvedContracts = (int) $pdo->query("SELECT COUNT(*) FROM contracts WHERE status = 'Approved'")->fetchColumn();
+$rejectedContracts = (int) $pdo->query("SELECT COUNT(*) FROM contracts WHERE status = 'Rejected'")->fetchColumn();
 
 $awaitingAssignment = (int) $pdo->query(
     "SELECT COUNT(*) FROM service_requests sr
@@ -161,15 +162,20 @@ body {
 }
 .metric-label { font-size: .75rem; color: var(--ink-soft); font-weight: 600; }
 .metric-value { font-size: 1.5rem; font-weight: 700; font-family: 'Lexend', sans-serif; color: var(--ink); }
-.metric-sub { font-size: .72rem; color: var(--ink-soft); }
 
-.pipeline-box {
-  border-radius: 12px;
-  padding: .9rem 1rem;
-  height: 100%;
+.chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .78rem;
+  color: var(--ink-soft);
 }
-.pipeline-count { font-size: 1.35rem; font-weight: 700; font-family: 'Lexend', sans-serif; }
-.pipeline-label { font-size: .72rem; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; }
+.chart-legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
 
 .status-pill {
   font-size: .68rem;
@@ -247,30 +253,11 @@ body {
           <p class="dashboard-subtitle small mb-0 d-none d-sm-block">Welcome back, <?= htmlspecialchars($_SESSION['manager_fullname'] ?? 'Manager') ?>.</p>
         </div>
       </div>
-      <div class="dashboard-topbar-actions d-flex align-items-center gap-3 gap-md-4">
-        <button type="button" class="btn btn-link text-secondary p-0">
-          <i class="fa-regular fa-bell fs-5"></i>
-        </button>
-        <div class="dropdown">
-          <button type="button" class="btn btn-link p-0 border-0" data-bs-toggle="dropdown" aria-expanded="false">
-            <span class="d-flex align-items-center justify-content-center rounded-circle flex-shrink-0" style="width:36px; height:36px; background-color:var(--navy-soft);">
-              <i class="fa-solid fa-user" style="color:var(--navy);"></i>
-            </span>
-          </button>
-          <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-            <li>
-              <a href="../config/logout.php?role=manager" class="dropdown-item d-flex align-items-center gap-2 text-danger">
-                <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout
-              </a>
-            </li>
-          </ul>
-        </div>
-      </div>
+      <!-- Notification, profile, and logout removed for a clean navbar -->
     </header>
 
     <main class="dashboard-content p-3 p-md-4">
 
-      <!-- Top metrics -->
       <div class="row g-3 mb-3">
         <div class="col-6 col-lg-3">
           <div class="metric-card d-flex align-items-center gap-3">
@@ -297,11 +284,11 @@ body {
         <div class="col-6 col-lg-3">
           <div class="metric-card d-flex align-items-center gap-3">
             <span class="metric-icon" style="background-color:var(--teal-soft);">
-              <i class="fa-solid fa-sack-dollar" style="color:var(--teal-text);"></i>
+              <i class="fa-solid fa-user-check" style="color:var(--teal-text);"></i>
             </span>
             <div>
-              <div class="metric-label">Approved Contracts Value</div>
-              <div class="metric-value" style="font-size:1.15rem;">&#8369;<?= number_format($contractValue, 2) ?></div>
+              <div class="metric-label">Active Staff</div>
+              <div class="metric-value"><?= $activeStaffCount ?></div>
             </div>
           </div>
         </div>
@@ -318,87 +305,70 @@ body {
         </div>
       </div>
 
-      <div class="row g-3">
-
-        <!-- Left column -->
-        <div class="col-lg-8">
-
-          <!-- Pipeline overview -->
-          <section class="card border-0 shadow-sm mb-3">
+      <div class="row g-3 mb-3">
+        <div class="col-lg-4">
+          <section class="card border-0 shadow-sm h-100">
             <div class="card-header">
-              <h2 class="h6 fw-bold mb-0">Pipeline Overview</h2>
-              <p class="small mb-0">Service requests, quotations, and contracts across every stage.</p>
+              <h2 class="h6 fw-bold mb-0">Service Requests</h2>
+              <p class="small mb-0">Status distribution.</p>
             </div>
             <div class="card-body">
-              <div class="row g-2 mb-2">
-                <div class="col-12"><span class="small fw-semibold" style="color:var(--ink-soft);">Service Requests</span></div>
-                <div class="col-4">
-                  <div class="pipeline-box" style="background-color:var(--navy-soft);">
-                    <div class="pipeline-count" style="color:var(--navy);"><?= $newRequests ?></div>
-                    <div class="pipeline-label" style="color:var(--navy);">New</div>
-                  </div>
-                </div>
-                <div class="col-4">
-                  <div class="pipeline-box" style="background-color:var(--amber-soft);">
-                    <div class="pipeline-count" style="color:var(--amber-text);"><?= $inProgressRequests ?></div>
-                    <div class="pipeline-label" style="color:var(--amber-text);">In Progress</div>
-                  </div>
-                </div>
-                <div class="col-4">
-                  <div class="pipeline-box" style="background-color:var(--teal-soft);">
-                    <div class="pipeline-count" style="color:var(--teal-text);"><?= $completedRequests ?></div>
-                    <div class="pipeline-label" style="color:var(--teal-text);">Completed</div>
-                  </div>
-                </div>
+              <div style="height:150px;">
+                <canvas id="requestsChart"></canvas>
               </div>
-
-              <div class="row g-2 mb-2 mt-1">
-                <div class="col-12"><span class="small fw-semibold" style="color:var(--ink-soft);">Quotations</span></div>
-                <div class="col-4">
-                  <div class="pipeline-box" style="background-color:var(--navy-soft);">
-                    <div class="pipeline-count" style="color:var(--navy);"><?= $draftQuotations ?></div>
-                    <div class="pipeline-label" style="color:var(--navy);">Draft</div>
-                  </div>
-                </div>
-                <div class="col-4">
-                  <div class="pipeline-box" style="background-color:var(--amber-soft);">
-                    <div class="pipeline-count" style="color:var(--amber-text);"><?= $sentQuotations ?></div>
-                    <div class="pipeline-label" style="color:var(--amber-text);">Sent</div>
-                  </div>
-                </div>
-                <div class="col-4">
-                  <div class="pipeline-box" style="background-color:var(--teal-soft);">
-                    <div class="pipeline-count" style="color:var(--teal-text);"><?= $approvedQuotations ?></div>
-                    <div class="pipeline-label" style="color:var(--teal-text);">Approved</div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="row g-2 mt-1">
-                <div class="col-12"><span class="small fw-semibold" style="color:var(--ink-soft);">Contracts</span></div>
-                <div class="col-4">
-                  <div class="pipeline-box" style="background-color:var(--navy-soft);">
-                    <div class="pipeline-count" style="color:var(--navy);"><?= $draftContracts ?></div>
-                    <div class="pipeline-label" style="color:var(--navy);">Draft</div>
-                  </div>
-                </div>
-                <div class="col-4">
-                  <div class="pipeline-box" style="background-color:var(--amber-soft);">
-                    <div class="pipeline-count" style="color:var(--amber-text);"><?= $pendingContracts ?></div>
-                    <div class="pipeline-label" style="color:var(--amber-text);">Pending Approval</div>
-                  </div>
-                </div>
-                <div class="col-4">
-                  <div class="pipeline-box" style="background-color:var(--teal-soft);">
-                    <div class="pipeline-count" style="color:var(--teal-text);"><?= $approvedContracts ?></div>
-                    <div class="pipeline-label" style="color:var(--teal-text);">Approved</div>
-                  </div>
-                </div>
+              <div class="d-flex flex-wrap gap-3 justify-content-center mt-3">
+                <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#33495C;"></span>New</span>
+                <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#E0A44E;"></span>In Progress</span>
+                <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#4CA79A;"></span>Completed</span>
+                <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#DB7A66;"></span>Cancelled</span>
               </div>
             </div>
           </section>
+        </div>
+        <div class="col-lg-4">
+          <section class="card border-0 shadow-sm h-100">
+            <div class="card-header">
+              <h2 class="h6 fw-bold mb-0">Quotations</h2>
+              <p class="small mb-0">Status distribution.</p>
+            </div>
+            <div class="card-body">
+              <div style="height:150px;">
+                <canvas id="quotationsChart"></canvas>
+              </div>
+              <div class="d-flex flex-wrap gap-3 justify-content-center mt-3">
+                <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#33495C;"></span>Draft</span>
+                <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#E0A44E;"></span>Sent</span>
+                <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#4CA79A;"></span>Approved</span>
+                <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#DB7A66;"></span>Rejected</span>
+              </div>
+            </div>
+          </section>
+        </div>
+        <div class="col-lg-4">
+          <section class="card border-0 shadow-sm h-100">
+            <div class="card-header">
+              <h2 class="h6 fw-bold mb-0">Contracts</h2>
+              <p class="small mb-0">Status distribution.</p>
+            </div>
+            <div class="card-body">
+              <div style="height:150px;">
+                <canvas id="contractsChart"></canvas>
+              </div>
+              <div class="d-flex flex-wrap gap-3 justify-content-center mt-3">
+                <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#33495C;"></span>Draft</span>
+                <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#E0A44E;"></span>Pending</span>
+                <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#4CA79A;"></span>Approved</span>
+                <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#DB7A66;"></span>Rejected</span>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
 
-          <!-- Recent service requests -->
+      <div class="row g-3">
+
+        <div class="col-lg-8">
+
           <section class="card border-0 shadow-sm mb-3">
             <div class="card-header d-flex justify-content-between align-items-center">
               <div>
@@ -433,50 +403,43 @@ body {
             </div>
           </section>
 
-        </div>
-
-        <!-- Right column -->
-        <div class="col-lg-4">
-
-          <!-- Quick links -->
-          <section class="card border-0 shadow-sm mb-3">
+          <section class="card border-0 shadow-sm">
             <div class="card-header">
-              <h2 class="h6 fw-bold mb-0">Quick Actions</h2>
+              <h2 class="h6 fw-bold mb-0">Recent Quotations</h2>
             </div>
-            <div class="card-body d-flex flex-column gap-2">
-              <a href="client_management.php" class="quick-link">
-                <span class="quick-link-icon" style="background-color:var(--navy-soft);"><i class="fa-solid fa-building" style="color:var(--navy);"></i></span>
-                <div>
-                  <div class="quick-link-title">Client Management</div>
-                  <div class="quick-link-sub">Clients &amp; service requests</div>
-                </div>
-              </a>
-              <a href="cpq_builder.php" class="quick-link">
-                <span class="quick-link-icon" style="background-color:var(--teal-soft);"><i class="fa-solid fa-file-invoice-dollar" style="color:var(--teal-text);"></i></span>
-                <div>
-                  <div class="quick-link-title">CPQ &amp; Scope Builder</div>
-                  <div class="quick-link-sub">Create client quotations</div>
-                </div>
-              </a>
-              <a href="sow_contract.php" class="quick-link">
-                <span class="quick-link-icon" style="background-color:var(--amber-soft);"><i class="fa-solid fa-file-signature" style="color:var(--amber-text);"></i></span>
-                <div>
-                  <div class="quick-link-title">SOW &amp; Contracts</div>
-                  <div class="quick-link-sub">Generate &amp; approve contracts</div>
-                </div>
-              </a>
-              <a href="resource_matching.php" class="quick-link">
-                <span class="quick-link-icon" style="background-color:var(--coral-soft);"><i class="fa-solid fa-people-arrows" style="color:var(--coral-text);"></i></span>
-                <div>
-                  <div class="quick-link-title">Resource Matching</div>
-                  <div class="quick-link-sub">Assign staff to contracts</div>
-                </div>
-              </a>
+            <div class="table-responsive">
+              <table class="table table-hover align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th scope="col">Quotation #</th>
+                    <th scope="col" class="d-none d-md-table-cell">Client</th>
+                    <th scope="col">Total</th>
+                    <th scope="col">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php if (empty($recentQuotations)): ?>
+                    <tr><td colspan="4"><div class="empty-state text-center py-4"><i class="fa-regular fa-file-lines fs-4 d-block mb-2"></i><p class="small mb-0">No quotations yet.</p></div></td></tr>
+                  <?php else: ?>
+                    <?php foreach ($recentQuotations as $q): ?>
+                      <tr>
+                        <td class="fw-semibold"><?= htmlspecialchars($q['quotation_number']) ?></td>
+                        <td class="d-none d-md-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars($q['company_name']) ?></td>
+                        <td style="color:var(--teal-text);">&#8369;<?= number_format((float) $q['total_amount'], 2) ?></td>
+                        <td><span class="status-pill <?= quotationStatusClass($q['status']) ?>"><?= htmlspecialchars($q['status']) ?></span></td>
+                      </tr>
+                    <?php endforeach; ?>
+                  <?php endif; ?>
+                </tbody>
+              </table>
             </div>
           </section>
 
-          <!-- Staff workload -->
-          <section class="card border-0 shadow-sm mb-3">
+        </div>
+
+        <div class="col-lg-4">
+
+          <section class="card border-0 shadow-sm">
             <div class="card-header">
               <h2 class="h6 fw-bold mb-0">Staff Workload</h2>
               <p class="small mb-0"><?= $activeStaffCount ?> active staff members</p>
@@ -504,31 +467,6 @@ body {
             </div>
           </section>
 
-          <!-- Recent quotations -->
-          <section class="card border-0 shadow-sm">
-            <div class="card-header">
-              <h2 class="h6 fw-bold mb-0">Recent Quotations</h2>
-            </div>
-            <div class="card-body d-flex flex-column gap-2">
-              <?php if (empty($recentQuotations)): ?>
-                <div class="empty-state text-center py-3"><p class="small mb-0">No quotations yet.</p></div>
-              <?php else: ?>
-                <?php foreach ($recentQuotations as $q): ?>
-                  <div class="d-flex justify-content-between align-items-start gap-2 pb-2" style="border-bottom:1px solid var(--line);">
-                    <div>
-                      <div class="small fw-semibold"><?= htmlspecialchars($q['quotation_number']) ?></div>
-                      <div class="small" style="color:var(--ink-soft);"><?= htmlspecialchars($q['company_name']) ?></div>
-                    </div>
-                    <div class="text-end">
-                      <div class="small fw-semibold" style="color:var(--teal-text);">&#8369;<?= number_format((float) $q['total_amount'], 2) ?></div>
-                      <span class="status-pill <?= quotationStatusClass($q['status']) ?>"><?= htmlspecialchars($q['status']) ?></span>
-                    </div>
-                  </div>
-                <?php endforeach; ?>
-              <?php endif; ?>
-            </div>
-          </section>
-
         </div>
 
       </div>
@@ -540,6 +478,38 @@ body {
 </div>
 
 <script src="../assets/vendor/bootstrap-5.3.8/js/bootstrap.bundle.min.js"></script>
+<script src="../assets/vendor/chartjs/chart.umd.js"></script>
+<script>
+Chart.defaults.font.family = "'Inter', sans-serif";
+Chart.defaults.font.size = 12;
+Chart.defaults.color = '#6B7684';
+
+function buildDoughnut(canvasId, values) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  new Chart(canvas, {
+    type: 'doughnut',
+    data: {
+      datasets: [{
+        data: values,
+        backgroundColor: ['#33495C', '#E0A44E', '#4CA79A', '#DB7A66'],
+        borderWidth: 0,
+        hoverOffset: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '68%',
+      plugins: { legend: { display: false } },
+    }
+  });
+}
+
+buildDoughnut('requestsChart', [<?= $newRequests ?>, <?= $inProgressRequests ?>, <?= $completedRequests ?>, <?= $cancelledRequests ?>]);
+buildDoughnut('quotationsChart', [<?= $draftQuotations ?>, <?= $sentQuotations ?>, <?= $approvedQuotations ?>, <?= $rejectedQuotations ?>]);
+buildDoughnut('contractsChart', [<?= $draftContracts ?>, <?= $pendingContracts ?>, <?= $approvedContracts ?>, <?= $rejectedContracts ?>]);
+</script>
 
 </body>
 </html>
