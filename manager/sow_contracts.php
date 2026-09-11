@@ -506,13 +506,6 @@ body {
 
     <main class="dashboard-content p-3 p-md-4">
 
-      <?php if (empty($availableQuotations)): ?>
-        <div class="card mb-3">
-          <div class="card-body small py-3" style="color:var(--ink-soft);">
-            <i class="fa-regular fa-circle-question me-1"></i> No approved quotations are waiting for a contract. Approve a quotation in CPQ and Scope Builder first.
-          </div>
-        </div>
-      <?php endif; ?>
 
       <div class="card mb-3">
         <div class="card-body p-2 p-md-3">

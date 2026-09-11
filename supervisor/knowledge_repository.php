@@ -1,5 +1,4 @@
 <?php
-
 session_name('SUPERVISOR_SESSION');
 session_start();
 require_once __DIR__ . '/../config/database.php';
@@ -217,24 +216,24 @@ function fileIconClass(string $fileType): string
 function fileTypePalette(string $fileType): array
 {
     return match ($fileType) {
-        'pdf' => ['bg' => '#F7DCD2', 'fg' => '#9C4A2E'],
-        'doc', 'docx' => ['bg' => '#D6E4F0', 'fg' => '#2E5C82'],
-        'xls', 'xlsx' => ['bg' => '#D7EEE3', 'fg' => '#276B4E'],
-        'ppt', 'pptx' => ['bg' => '#F5E3C4', 'fg' => '#93611A'],
-        'txt' => ['bg' => '#E4E7EB', 'fg' => '#4B5563'],
-        default => ['bg' => '#E4E7EB', 'fg' => '#4B5563'],
+        'pdf' => ['bg' => '#FAECE8', 'fg' => '#93382A'],
+        'doc', 'docx' => ['bg' => '#E9ECF6', 'fg' => '#2E3E70'],
+        'xls', 'xlsx' => ['bg' => '#E3F3EC', 'fg' => '#0F5F49'],
+        'ppt', 'pptx' => ['bg' => '#FBF0DD', 'fg' => '#8A5A15'],
+        'txt' => ['bg' => '#EEF1F6', 'fg' => '#475569'],
+        default => ['bg' => '#EEF1F6', 'fg' => '#475569'],
     };
 }
 
 function categoryPalette(string $category): array
 {
     return match ($category) {
-        'SOW Template' => ['bg' => '#D6E4F0', 'fg' => '#2E5C82'],
-        'Contract Template' => ['bg' => '#F7DCD2', 'fg' => '#9C4A2E'],
-        'Best Practice' => ['bg' => '#D7EEE3', 'fg' => '#276B4E'],
-        'Proposal Template' => ['bg' => '#F5E3C4', 'fg' => '#93611A'],
-        'Reference Material' => ['bg' => '#E5DBF2', 'fg' => '#5F3E8C'],
-        default => ['bg' => '#E4E7EB', 'fg' => '#4B5563'],
+        'SOW Template' => ['bg' => '#E9ECF6', 'fg' => '#2E3E70'],
+        'Contract Template' => ['bg' => '#FAECE8', 'fg' => '#93382A'],
+        'Best Practice' => ['bg' => '#E3F3EC', 'fg' => '#0F5F49'],
+        'Proposal Template' => ['bg' => '#FBF0DD', 'fg' => '#8A5A15'],
+        'Reference Material' => ['bg' => '#EEF1F6', 'fg' => '#475569'],
+        default => ['bg' => '#EEF1F6', 'fg' => '#475569'],
     };
 }
 ?>
@@ -250,19 +249,185 @@ function categoryPalette(string $category): array
 <link rel="stylesheet" href="../assets/css/repository.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lexend:wght@500;600;700&display=swap" rel="stylesheet">
+
 <style>
-  body {
+:root {
+  --navy: #1E293B;
+  --navy-deep: #0F172A;
+  --navy-soft: #EEF1F6;
+  --indigo: #3B4E8A;
+  --indigo-soft: #E9ECF6;
+  --indigo-text: #2E3E70;
+  --slate: #475569;
+  --slate-soft: #64748B;
+
+  --success: #157A5F;
+  --success-soft: #E3F3EC;
+  --success-text: #0F5F49;
+  --success-border: #BFE3D3;
+
+  --warn: #B7791F;
+  --warn-soft: #FBF0DD;
+  --warn-text: #8A5A15;
+  --warn-border: #EFD8A8;
+
+  --danger: #B4432F;
+  --danger-soft: #FAECE8;
+  --danger-text: #93382A;
+  --danger-border: #EDC7BC;
+
+  --ink: #1A2233;
+  --ink-soft: #667085;
+  --line: #E2E5EB;
+  --canvas: #FFFFFF;
+  --card: #FFFFFF;
+}
+
+body {
   background-color: var(--canvas);
   color: var(--ink);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
+.dashboard-layout, .dashboard-main, .dashboard-content {
+  background-color: var(--canvas) !important;
+}
+
 .dashboard-title, h1, h2, h3 {
   font-family: 'Lexend', 'Inter', sans-serif;
 }
+
+.dashboard-title { color: var(--navy-deep); letter-spacing: -0.01em; }
+.dashboard-subtitle { color: var(--ink-soft) !important; }
+.dashboard-topbar { border-bottom: 1px solid var(--line) !important; background-color: #fff; }
+
+.card { border-radius: 12px; border: 1px solid var(--line) !important; box-shadow: none !important; }
+
+.form-control:focus, .form-select:focus {
+  border-color: var(--indigo);
+  box-shadow: 0 0 0 .2rem rgba(59,78,138,.13);
+  outline: none;
+}
+.form-control:hover, .form-select:hover { border-color: #C6CCD8; }
+
+.stat-card {
+  background-color: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1rem 1.15rem;
+  display: flex;
+  align-items: center;
+  gap: .85rem;
+  height: 100%;
+}
+.stat-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 1rem;
+}
+.stat-label { font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-soft); }
+.stat-value { font-family: 'Lexend', sans-serif; font-size: 1.35rem; font-weight: 700; margin-top: .1rem; }
+
+.btn-repo {
+  border-radius: 7px;
+  font-weight: 600;
+  font-size: .82rem;
+  border: 1px solid transparent;
+}
+.btn-repo-primary { background-color: var(--indigo); color: #fff; }
+.btn-repo-primary:hover { background-color: var(--indigo-text); color: #fff; }
+.btn-repo-success { background-color: var(--success); color: #fff; }
+.btn-repo-success:hover { background-color: #0F5F49; color: #fff; }
+.btn-repo-danger { background-color: var(--danger-soft); color: var(--danger-text); border-color: var(--danger-border); }
+.btn-repo-danger:hover { background-color: var(--danger); color: #fff; border-color: var(--danger); }
+
+.repo-filter-pills a {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: .35rem .9rem;
+  font-size: .78rem;
+  color: var(--ink-soft);
+  text-decoration: none;
+  background-color: #fff;
+}
+.repo-filter-pills a:hover { border-color: var(--indigo); color: var(--indigo-text); }
+
+.document-list { margin: 0; }
+.document-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem 1.15rem;
+  border-bottom: 1px solid var(--line);
+}
+.document-row:last-child { border-bottom: none; }
+.document-row:hover { background-color: var(--navy-soft); }
+
+.document-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 1.05rem;
+}
+
+.document-body { flex: 1; min-width: 0; }
+.document-title { font-size: .92rem; font-weight: 700; color: var(--ink); font-family: 'Lexend', sans-serif; }
+.document-meta {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .55rem;
+  align-items: center;
+  padding: 0;
+  margin: 0 0 .35rem 0;
+  font-size: .76rem;
+  color: var(--ink-soft);
+}
+.document-meta li:not(:first-child)::before { content: '\2022'; margin-right: .55rem; color: var(--line); }
+.category-pill {
+  font-size: .68rem;
+  font-weight: 700;
+  padding: .2rem .6rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.document-description { font-size: .82rem; color: var(--ink-soft); margin: 0; }
+
+.document-actions {
+  display: flex;
+  gap: .4rem;
+  flex-shrink: 0;
+}
+.document-actions .btn-repo { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; padding: 0; }
+
+.dropzone-upload {
+  border: 1.5px dashed var(--line);
+  border-radius: 10px;
+  padding: 1.5rem 1rem;
+  text-align: center;
+  cursor: pointer;
+  background-color: var(--navy-soft);
+}
+.dropzone-upload:hover, .dropzone-upload.dragover { border-color: var(--indigo); background-color: var(--indigo-soft); }
+.dropzone-upload.has-file { border-color: var(--success); background-color: var(--success-soft); }
+
+.modal-content { border-radius: 14px; border: none; }
+.modal-header { border-bottom: 1px solid var(--line); }
+.modal-footer { border-top: 1px solid var(--line); }
+
+.form-label.fw-semibold { font-size: .8rem; font-weight: 700 !important; color: var(--slate); text-transform: uppercase; letter-spacing: .02em; }
 </style>
 </head>
-<body class="bg-light">
+<body>
 
 <div class="dashboard-layout d-flex">
 
@@ -270,20 +435,15 @@ function categoryPalette(string $category): array
 
   <div class="dashboard-main flex-grow-1" style="min-width:0;">
 
-    <header class="dashboard-topbar bg-white border-bottom d-flex align-items-center justify-content-between px-3 px-md-4">
+    <header class="dashboard-topbar bg-white d-flex align-items-center justify-content-between px-3 px-md-4">
       <div class="d-flex align-items-center gap-3">
         <button type="button" class="btn btn-link text-dark p-0 d-lg-none" data-bs-toggle="offcanvas" data-bs-target="#sidebarOffcanvas" aria-controls="sidebarOffcanvas" aria-label="Open menu">
           <i class="fa-solid fa-bars fs-5"></i>
         </button>
         <div>
           <h1 class="dashboard-title h6 h5-md fw-bold mb-0">Knowledge Repository</h1>
-          <p class="dashboard-subtitle text-secondary small mb-0 d-none d-sm-block">Manage consultancy templates, SOW/contract documents, and best practices.</p>
+          <p class="dashboard-subtitle small mb-0 d-none d-sm-block">Manage consultancy templates, SOW/contract documents, and best practices.</p>
         </div>
-      </div>
-      <div class="dashboard-topbar-actions d-flex align-items-center gap-3 gap-md-4">
-        <button type="button" class="btn btn-link text-secondary p-0">
-          <i class="fa-regular fa-bell fs-5"></i>
-        </button>
       </div>
     </header>
 
@@ -291,72 +451,61 @@ function categoryPalette(string $category): array
 
       <section class="row g-2 g-md-3 mb-3" aria-label="Repository summary">
         <div class="col-6 col-md-3">
-          <div class="card border-0 shadow-sm h-100">
-            <div class="card-body repo-stat-body d-flex align-items-center gap-2 gap-md-3">
-              <span class="repo-stat-icon d-flex align-items-center justify-content-center rounded-3 flex-shrink-0" style="background-color:#D6E4F0;">
-                <i class="fa-solid fa-folder-open" style="color:#2E5C82;"></i>
-              </span>
-              <div class="overflow-hidden">
-                <div class="repo-stat-label text-secondary text-truncate">Total Documents</div>
-                <div class="repo-stat-value fw-bold" style="color:#2E5C82;"><?= $totalDocuments ?></div>
-              </div>
+          <div class="stat-card">
+            <span class="stat-icon" style="background-color:var(--indigo-soft);">
+              <i class="fa-solid fa-folder-open" style="color:var(--indigo-text);"></i>
+            </span>
+            <div class="overflow-hidden">
+              <div class="stat-label text-truncate">Total Documents</div>
+              <div class="stat-value" style="color:var(--indigo-text);"><?= $totalDocuments ?></div>
             </div>
           </div>
         </div>
         <div class="col-6 col-md-3">
-          <div class="card border-0 shadow-sm h-100">
-            <div class="card-body repo-stat-body d-flex align-items-center gap-2 gap-md-3">
-              <span class="repo-stat-icon d-flex align-items-center justify-content-center rounded-3 flex-shrink-0" style="background-color:#F7DCD2;">
-                <i class="fa-solid fa-file-contract" style="color:#9C4A2E;"></i>
-              </span>
-              <div class="overflow-hidden">
-                <div class="repo-stat-label text-secondary text-truncate">SOW &amp; Contracts</div>
-                <div class="repo-stat-value fw-bold" style="color:#9C4A2E;"><?= $totalSowContract ?></div>
-              </div>
+          <div class="stat-card">
+            <span class="stat-icon" style="background-color:var(--danger-soft);">
+              <i class="fa-solid fa-file-contract" style="color:var(--danger-text);"></i>
+            </span>
+            <div class="overflow-hidden">
+              <div class="stat-label text-truncate">SOW &amp; Contracts</div>
+              <div class="stat-value" style="color:var(--danger-text);"><?= $totalSowContract ?></div>
             </div>
           </div>
         </div>
         <div class="col-6 col-md-3">
-          <div class="card border-0 shadow-sm h-100">
-            <div class="card-body repo-stat-body d-flex align-items-center gap-2 gap-md-3">
-              <span class="repo-stat-icon d-flex align-items-center justify-content-center rounded-3 flex-shrink-0" style="background-color:#D7EEE3;">
-                <i class="fa-solid fa-star" style="color:#276B4E;"></i>
-              </span>
-              <div class="overflow-hidden">
-                <div class="repo-stat-label text-secondary text-truncate">Best Practices</div>
-                <div class="repo-stat-value fw-bold" style="color:#276B4E;"><?= $totalBestPractice ?></div>
-              </div>
+          <div class="stat-card">
+            <span class="stat-icon" style="background-color:var(--success-soft);">
+              <i class="fa-solid fa-star" style="color:var(--success-text);"></i>
+            </span>
+            <div class="overflow-hidden">
+              <div class="stat-label text-truncate">Best Practices</div>
+              <div class="stat-value" style="color:var(--success-text);"><?= $totalBestPractice ?></div>
             </div>
           </div>
         </div>
         <div class="col-6 col-md-3">
-          <div class="card border-0 shadow-sm h-100">
-            <div class="card-body repo-stat-body d-flex align-items-center gap-2 gap-md-3">
-              <span class="repo-stat-icon d-flex align-items-center justify-content-center rounded-3 flex-shrink-0" style="background-color:#F5E3C4;">
-                <i class="fa-solid fa-database" style="color:#93611A;"></i>
-              </span>
-              <div class="overflow-hidden">
-                <div class="repo-stat-label text-secondary text-truncate">Storage Used</div>
-                <div class="repo-stat-value fw-bold" style="color:#93611A;"><?= formatFileSize($totalStorageUsed) ?></div>
-              </div>
+          <div class="stat-card">
+            <span class="stat-icon" style="background-color:var(--warn-soft);">
+              <i class="fa-solid fa-database" style="color:var(--warn-text);"></i>
+            </span>
+            <div class="overflow-hidden">
+              <div class="stat-label text-truncate">Storage Used</div>
+              <div class="stat-value" style="color:var(--warn-text);"><?= formatFileSize($totalStorageUsed) ?></div>
             </div>
           </div>
         </div>
       </section>
 
-      <section class="card border-0 shadow-sm mb-3">
+      <section class="card mb-3">
         <div class="card-body p-2 p-md-3">
-          <form class="row g-2 align-items-center mb-2" method="GET">
+          <form class="row g-2 align-items-center mb-2" method="GET" id="repoFilterForm">
             <div class="col-12 col-md-7">
               <div class="input-group">
-                <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass text-secondary"></i></span>
-                <input type="text" name="search" class="form-control" placeholder="Search documents by title or description" value="<?= htmlspecialchars($searchTerm) ?>">
+                <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass" style="color:var(--ink-soft);"></i></span>
+                <input type="text" name="search" id="liveSearchInput" class="form-control" placeholder="Search documents by title or description" value="<?= htmlspecialchars($searchTerm) ?>" autocomplete="off">
                 <?php if ($categoryFilter !== ''): ?>
                   <input type="hidden" name="category" value="<?= htmlspecialchars($categoryFilter) ?>">
                 <?php endif; ?>
-                <button type="submit" class="btn btn-repo btn-repo-success">
-                  <i class="fa-solid fa-filter"></i> <span class="d-none d-sm-inline">Search</span>
-                </button>
               </div>
             </div>
             <div class="col-12 col-md-5 text-md-end">
@@ -367,23 +516,23 @@ function categoryPalette(string $category): array
           </form>
 
           <nav class="repo-filter-pills d-flex flex-wrap gap-2" aria-label="Filter by category">
-            <a href="?search=<?= urlencode($searchTerm) ?>" class="btn <?= $categoryFilter === '' ? 'fw-semibold' : '' ?>" style="<?= $categoryFilter === '' ? 'background-color:#E4E7EB; border-color:#E4E7EB; color:#374151;' : '' ?>">All</a>
+            <a href="?search=<?= urlencode($searchTerm) ?>" style="<?= $categoryFilter === '' ? 'background-color:var(--indigo-soft); border-color:var(--indigo-soft); color:var(--indigo-text); font-weight:700;' : '' ?>">All</a>
             <?php foreach ($validCategories as $cat): ?>
               <?php $catColors = categoryPalette($cat); ?>
-              <a href="?search=<?= urlencode($searchTerm) ?>&category=<?= urlencode($cat) ?>" class="btn <?= $categoryFilter === $cat ? 'fw-semibold' : '' ?>" style="<?= $categoryFilter === $cat ? 'background-color:' . $catColors['bg'] . '; border-color:' . $catColors['bg'] . '; color:' . $catColors['fg'] . ';' : '' ?>"><?= htmlspecialchars($cat) ?></a>
+              <a href="?search=<?= urlencode($searchTerm) ?>&category=<?= urlencode($cat) ?>" style="<?= $categoryFilter === $cat ? 'background-color:' . $catColors['bg'] . '; border-color:' . $catColors['bg'] . '; color:' . $catColors['fg'] . '; font-weight:700;' : '' ?>"><?= htmlspecialchars($cat) ?></a>
             <?php endforeach; ?>
           </nav>
         </div>
       </section>
 
-      <section class="card border-0 shadow-sm" aria-label="Document list">
+      <section class="card" aria-label="Document list">
         <?php if (empty($documents)): ?>
-          <div class="text-center text-secondary py-5">
+          <div class="text-center py-5" style="color:var(--ink-soft);">
             <i class="fa-regular fa-folder-open fs-2 d-block mb-2"></i>
             <p class="mb-0 small">No documents found. Upload your first template or reference file.</p>
           </div>
         <?php else: ?>
-          <ul class="document-list list-unstyled">
+          <ul class="document-list list-unstyled" id="documentListUl">
             <?php foreach ($documents as $doc): ?>
               <?php
                 $uploaderName = $doc['uploaded_by_role'] === 'admin'
@@ -393,7 +542,7 @@ function categoryPalette(string $category): array
                 $catColors = categoryPalette($doc['category']);
                 $isOwner = $doc['uploaded_by_role'] === 'supervisor' && (int) $doc['uploaded_by'] === (int) $currentUserId;
               ?>
-              <li class="document-row">
+              <li class="document-row" data-title="<?= htmlspecialchars(mb_strtolower($doc['title'])) ?>" data-description="<?= htmlspecialchars(mb_strtolower($doc['description'] ?? '')) ?>">
                 <span class="document-thumb" style="background-color:<?= $thumbColors['bg'] ?>; color:<?= $thumbColors['fg'] ?>;" aria-hidden="true">
                   <i class="fa-solid <?= fileIconClass($doc['file_type']) ?>"></i>
                 </span>
@@ -433,6 +582,10 @@ function categoryPalette(string $category): array
               </li>
             <?php endforeach; ?>
           </ul>
+          <div class="text-center py-5 d-none" id="noSearchResults" style="color:var(--ink-soft);">
+            <i class="fa-regular fa-folder-open fs-2 d-block mb-2"></i>
+            <p class="mb-0 small">No documents match your search.</p>
+          </div>
         <?php endif; ?>
       </section>
 
@@ -475,9 +628,9 @@ function categoryPalette(string $category): array
             <div class="col-12">
               <label class="form-label fw-semibold">File</label>
               <div class="dropzone-upload" id="dropzone">
-                <i class="fa-solid fa-cloud-arrow-up fs-3 mb-2 d-block text-secondary"></i>
+                <i class="fa-solid fa-cloud-arrow-up fs-3 mb-2 d-block" style="color:var(--ink-soft);"></i>
                 <p class="small mb-1" id="dropzoneText">Click to browse or drag and drop a file here</p>
-                <p class="text-secondary" style="font-size:.7rem;">PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT — up to 20MB</p>
+                <p style="font-size:.7rem; color:var(--ink-soft);">PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT — up to 20MB</p>
                 <input type="file" name="document_file" id="document_file" class="d-none" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" required>
               </div>
             </div>
@@ -523,7 +676,7 @@ function categoryPalette(string $category): array
               <textarea name="description" id="edit_description" class="form-control" rows="3"></textarea>
             </div>
           </div>
-          <p class="text-secondary small mt-2 mb-0"><i class="fa-solid fa-circle-info"></i> To replace the file itself, delete this document and upload a new version.</p>
+          <p class="small mt-2 mb-0" style="color:var(--ink-soft);"><i class="fa-solid fa-circle-info"></i> To replace the file itself, delete this document and upload a new version.</p>
         </div>
         <div class="modal-footer">
           <button type="submit" class="btn btn-repo btn-repo-primary">Save Changes</button>
@@ -547,7 +700,6 @@ function categoryPalette(string $category): array
           <p class="mb-0">Are you sure you want to delete <strong id="delete_document_title"></strong>? This will permanently remove the file and cannot be undone.</p>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-outline-secondary btn-repo" data-bs-dismiss="modal">Cancel</button>
           <button type="submit" class="btn btn-repo btn-repo-danger">Delete Document</button>
         </div>
       </form>
@@ -613,6 +765,34 @@ document.getElementById('deleteDocumentModal').addEventListener('show.bs.modal',
   document.getElementById('delete_document_id').value = btn.dataset.id;
   document.getElementById('delete_document_title').textContent = btn.dataset.title;
 });
+
+const liveSearchInput = document.getElementById('liveSearchInput');
+const documentListUl = document.getElementById('documentListUl');
+const noSearchResults = document.getElementById('noSearchResults');
+
+if (liveSearchInput && documentListUl) {
+  liveSearchInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') e.preventDefault();
+  });
+
+  liveSearchInput.addEventListener('input', function () {
+    const query = liveSearchInput.value.trim().toLowerCase();
+    const rows = documentListUl.querySelectorAll('.document-row');
+    let visibleCount = 0;
+
+    rows.forEach(function (row) {
+      const title = row.dataset.title || '';
+      const description = row.dataset.description || '';
+      const matches = query === '' || title.includes(query) || description.includes(query);
+      row.style.display = matches ? '' : 'none';
+      if (matches) visibleCount++;
+    });
+
+    if (noSearchResults) {
+      noSearchResults.classList.toggle('d-none', visibleCount !== 0);
+    }
+  });
+}
 
 <?php if ($alertType && $alertMessage): ?>
 window.addEventListener('DOMContentLoaded', function () {

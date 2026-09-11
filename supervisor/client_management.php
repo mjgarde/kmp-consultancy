@@ -177,14 +177,14 @@ $completedRequests  = (int) $pdo->query("SELECT COUNT(*) FROM service_requests W
 $reportClients  = $pdo->query('SELECT * FROM clients ORDER BY company_name ASC')->fetchAll();
 $reportRequests = $pdo->query('SELECT client_id, status FROM service_requests')->fetchAll();
 
-function statusBadgeColor(string $status): string
+function statusBadgeClass(string $status): string
 {
     return match ($status) {
-        'New' => '#2F4858',
-        'In Progress' => '#E89C5A',
-        'Completed' => '#3AA394',
-        'Cancelled' => '#DF6E4F',
-        default => '#2F4858',
+        'New' => 'status-draft',
+        'In Progress' => 'status-warn',
+        'Completed' => 'status-approved',
+        'Cancelled' => 'status-rejected',
+        default => 'status-draft',
     };
 }
 
@@ -214,98 +214,178 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lexend:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-  body {
+:root {
+  --navy: #1E293B;
+  --navy-deep: #0F172A;
+  --navy-soft: #EEF1F6;
+  --indigo: #3B4E8A;
+  --indigo-soft: #E9ECF6;
+  --indigo-text: #2E3E70;
+  --slate: #475569;
+  --slate-soft: #64748B;
+
+  --success: #157A5F;
+  --success-soft: #E3F3EC;
+  --success-text: #0F5F49;
+  --success-border: #BFE3D3;
+
+  --warn: #B7791F;
+  --warn-soft: #FBF0DD;
+  --warn-text: #8A5A15;
+  --warn-border: #EFD8A8;
+
+  --danger: #B4432F;
+  --danger-soft: #FAECE8;
+  --danger-text: #93382A;
+  --danger-border: #EDC7BC;
+
+  --ink: #1A2233;
+  --ink-soft: #667085;
+  --line: #E2E5EB;
+  --canvas: #FFFFFF;
+  --card: #FFFFFF;
+}
+
+body {
   background-color: var(--canvas);
   color: var(--ink);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.dashboard-layout, .dashboard-main, .dashboard-content {
+  background-color: var(--canvas) !important;
 }
 
 .dashboard-title, h1, h2, h3 {
   font-family: 'Lexend', 'Inter', sans-serif;
 }
 
-.form-control:focus, .form-select:focus, .form-control:hover, .form-select:hover {
-  border-color:#2F4858;
-  box-shadow:0 0 0 .2rem rgba(47,72,88,.15);
-  outline:none;
-}
-.client-management-pagination .page-link {
-  color:#2F4858;
-  border-color:#e5e7eb;
-}
-.client-management-pagination .page-item.active .page-link {
-  background-color:#2F4858;
-  border-color:#2F4858;
-  color:#fff;
-}
-.client-management-pagination .page-item.disabled .page-link {
-  color:#adb5bd;
-}
+.dashboard-title { color: var(--navy-deep); letter-spacing: -0.01em; }
+.dashboard-subtitle { color: var(--ink-soft) !important; }
+.dashboard-topbar { border-bottom: 1px solid var(--line) !important; background-color: #fff; }
 
-.client-stat-body {
-  padding:.6rem;
-}
-.client-stat-icon {
-  width:34px;
-  height:34px;
-  font-size:.8rem;
-}
-.client-stat-label {
-  font-size:.62rem;
-}
-.client-stat-value {
-  font-size:1rem;
-}
+.card { border-radius: 12px; border: 1px solid var(--line) !important; box-shadow: none !important; }
 
-.client-management-tabs .nav-link {
-  font-size:.72rem;
-  padding:.4rem .55rem;
+.form-control:focus, .form-select:focus {
+  border-color: var(--indigo);
+  box-shadow: 0 0 0 .2rem rgba(59,78,138,.13);
+  outline: none;
 }
+.form-control:hover, .form-select:hover { border-color: #C6CCD8; }
 
-.client-management-toolbar .btn {
-  font-size:.75rem;
-  padding:.4rem .6rem;
+.form-label { font-size: .8rem; font-weight: 700; color: var(--slate); text-transform: uppercase; letter-spacing: .02em; }
+
+.btn-primary-solid {
+  background-color: var(--navy-deep);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
 }
-.client-management-table .btn-sm {
-  font-size:.68rem;
-  padding:.25rem .45rem;
+.btn-primary-solid:hover { background-color: #060B14; color: #fff; }
+
+.btn-teal-solid {
+  background-color: var(--indigo);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
 }
-.client-management-table td, .client-management-table th {
-  font-size:.72rem;
+.btn-teal-solid:hover { background-color: var(--indigo-text); color: #fff; }
+
+.stat-card {
+  background-color: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: .85rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  height: 100%;
 }
+.stat-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: .95rem;
+}
+.stat-label { font-size: .68rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-soft); }
+.stat-value { font-family: 'Lexend', sans-serif; font-size: 1.25rem; font-weight: 700; margin-top: .1rem; }
+
+.client-management-tabs {
+  display: flex;
+  gap: .4rem;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--line);
+}
+.client-management-tabs a {
+  border: none;
+  background: none;
+  padding: .75rem .3rem;
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+.client-management-tabs a:hover { color: var(--navy-deep); }
+.client-management-tabs a.active { color: var(--indigo-text); border-bottom-color: var(--indigo); }
+
+.table thead th {
+  border-bottom: 1px solid var(--line) !important;
+  color: var(--ink-soft);
+  font-weight: 700;
+  font-size: .7rem;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  background-color: var(--navy-soft) !important;
+}
+.table td { border-bottom: 1px solid var(--line); color: var(--ink); vertical-align: middle; }
+.table-hover tbody tr:hover { background-color: var(--navy-soft); }
+
+.status-pill {
+  font-size: .7rem;
+  font-weight: 700;
+  padding: .32rem .7rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.status-draft { background-color: var(--navy-soft); color: var(--slate); border-color: var(--line); }
+.status-warn { background-color: var(--warn-soft); color: var(--warn-text); border-color: var(--warn-border); }
+.status-approved { background-color: var(--success-soft); color: var(--success-text); border-color: var(--success-border); }
+.status-rejected { background-color: var(--danger-soft); color: var(--danger-text); border-color: var(--danger-border); }
+
 .skill-tag-static {
-  background-color:#3AA39422;
-  color:#2F4858;
-  font-size:.68rem;
-  padding:.2rem .5rem;
-  border-radius:999px;
-  display:inline-block;
+  background-color: var(--indigo-soft);
+  color: var(--indigo-text);
+  font-size: .68rem;
+  font-weight: 700;
+  padding: .2rem .55rem;
+  border-radius: 999px;
+  display: inline-block;
 }
 
-@media (min-width:576px) {
-  .client-stat-body { padding:.85rem; }
-  .client-stat-icon { width:40px; height:40px; font-size:.95rem; }
-  .client-stat-label { font-size:.72rem; }
-  .client-stat-value { font-size:1.25rem; }
-  .client-management-tabs .nav-link { font-size:.85rem; padding:.5rem .9rem; }
-  .client-management-toolbar .btn { font-size:.85rem; padding:.45rem .8rem; }
-  .client-management-table .btn-sm { font-size:.75rem; padding:.3rem .55rem; }
-  .client-management-table td, .client-management-table th { font-size:.8rem; }
-}
+.client-management-row { cursor: pointer; }
 
-@media (min-width:768px) {
-  .client-stat-body { padding:1rem; }
-  .client-stat-icon { width:44px; height:44px; font-size:1.05rem; }
-  .client-stat-label { font-size:.8rem; }
-  .client-stat-value { font-size:1.5rem; }
-  .client-management-tabs .nav-link { font-size:.95rem; padding:.55rem 1rem; }
-  .client-management-toolbar .btn { font-size:.9rem; padding:.5rem 1rem; }
-  .client-management-table .btn-sm { font-size:.8rem; padding:.35rem .65rem; }
-  .client-management-table td, .client-management-table th { font-size:.85rem; }
-}
+.pagination .page-link { color: var(--indigo-text); border-color: var(--line); }
+.pagination .page-item.active .page-link { background-color: var(--indigo); border-color: var(--indigo); color: #fff; }
+.pagination .page-item.disabled .page-link { color: #adb5bd; }
+
+.modal-content { border-radius: 14px; border: none; }
+.modal-header { border-bottom: 1px solid var(--line); }
+.modal-footer { border-top: 1px solid var(--line); }
 </style>
 </head>
-<body class="bg-light">
+<body>
 
 <div class="dashboard-layout d-flex">
 
@@ -313,123 +393,88 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
 
   <div class="dashboard-main flex-grow-1" style="min-width:0;">
 
-    <header class="dashboard-topbar bg-white border-bottom d-flex align-items-center justify-content-between px-3 px-md-4">
+    <header class="dashboard-topbar bg-white d-flex align-items-center justify-content-between px-3 px-md-4">
       <div class="d-flex align-items-center gap-3">
         <button type="button" class="btn btn-link text-dark p-0 d-lg-none" data-bs-toggle="offcanvas" data-bs-target="#sidebarOffcanvas" aria-controls="sidebarOffcanvas" aria-label="Open menu">
           <i class="fa-solid fa-bars fs-5"></i>
         </button>
         <div>
           <h1 class="dashboard-title h6 h5-md fw-bold mb-0">Client Management</h1>
-          <p class="dashboard-subtitle text-secondary small mb-0 d-none d-sm-block">Manage client profiles and record service requests.</p>
-        </div>
-      </div>
-      <div class="dashboard-topbar-actions d-flex align-items-center gap-3 gap-md-4">
-        <button type="button" class="btn btn-link text-secondary p-0">
-          <i class="fa-regular fa-bell fs-5"></i>
-        </button>
-        <div class="dropdown">
-          <button type="button" class="btn btn-link p-0 border-0" data-bs-toggle="dropdown" aria-expanded="false">
-            <span class="dashboard-user-icon d-flex align-items-center justify-content-center rounded-circle bg-secondary bg-opacity-10 flex-shrink-0" style="width:36px; height:36px;">
-              <i class="fa-solid fa-user text-secondary"></i>
-            </span>
-          </button>
-          <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-            <li>
-              <a href="../config/logout.php?role=supervisor" class="dropdown-item d-flex align-items-center gap-2 text-danger">
-                <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout
-              </a>
-            </li>
-          </ul>
+          <p class="dashboard-subtitle small mb-0 d-none d-sm-block">Manage client profiles and record service requests.</p>
         </div>
       </div>
     </header>
 
     <main class="dashboard-content p-3 p-md-4">
 
-      <section class="client-management-summary row g-2 g-md-3 mb-3">
-        <div class="col-3">
-          <div class="card border-0 shadow-sm h-100">
-            <div class="card-body client-stat-body d-flex align-items-center gap-2 gap-md-3">
-              <span class="client-stat-icon d-flex align-items-center justify-content-center rounded-3 flex-shrink-0" style="background-color:#2F485815;">
-                <i class="fa-solid fa-building" style="color:#2F4858;"></i>
-              </span>
-              <div class="overflow-hidden">
-                <div class="client-stat-label text-secondary text-truncate">Total Clients</div>
-                <div class="client-stat-value fw-bold" style="color:#2F4858;"><?= $totalClientsAll ?></div>
-              </div>
+      <section class="row g-2 g-md-3 mb-3">
+        <div class="col-6 col-md-3">
+          <div class="stat-card">
+            <span class="stat-icon" style="background-color:var(--indigo-soft);">
+              <i class="fa-solid fa-building" style="color:var(--indigo-text);"></i>
+            </span>
+            <div class="overflow-hidden">
+              <div class="stat-label text-truncate">Total Clients</div>
+              <div class="stat-value" style="color:var(--indigo-text);"><?= $totalClientsAll ?></div>
             </div>
           </div>
         </div>
-        <div class="col-3">
-          <div class="card border-0 shadow-sm h-100">
-            <div class="card-body client-stat-body d-flex align-items-center gap-2 gap-md-3">
-              <span class="client-stat-icon d-flex align-items-center justify-content-center rounded-3 flex-shrink-0" style="background-color:#E0C06A15;">
-                <i class="fa-solid fa-clipboard-list" style="color:#B8912E;"></i>
-              </span>
-              <div class="overflow-hidden">
-                <div class="client-stat-label text-secondary text-truncate">Total Requests</div>
-                <div class="client-stat-value fw-bold" style="color:#B8912E;"><?= $totalRequestsAll ?></div>
-              </div>
+        <div class="col-6 col-md-3">
+          <div class="stat-card">
+            <span class="stat-icon" style="background-color:var(--warn-soft);">
+              <i class="fa-solid fa-clipboard-list" style="color:var(--warn-text);"></i>
+            </span>
+            <div class="overflow-hidden">
+              <div class="stat-label text-truncate">Total Requests</div>
+              <div class="stat-value" style="color:var(--warn-text);"><?= $totalRequestsAll ?></div>
             </div>
           </div>
         </div>
-        <div class="col-3">
-          <div class="card border-0 shadow-sm h-100">
-            <div class="card-body client-stat-body d-flex align-items-center gap-2 gap-md-3">
-              <span class="client-stat-icon d-flex align-items-center justify-content-center rounded-3 flex-shrink-0" style="background-color:#E89C5A15;">
-                <i class="fa-solid fa-spinner" style="color:#C9762F;"></i>
-              </span>
-              <div class="overflow-hidden">
-                <div class="client-stat-label text-secondary text-truncate">In Progress</div>
-                <div class="client-stat-value fw-bold" style="color:#C9762F;"><?= $inProgressRequests ?></div>
-              </div>
+        <div class="col-6 col-md-3">
+          <div class="stat-card">
+            <span class="stat-icon" style="background-color:var(--navy-soft);">
+              <i class="fa-solid fa-spinner" style="color:var(--slate);"></i>
+            </span>
+            <div class="overflow-hidden">
+              <div class="stat-label text-truncate">In Progress</div>
+              <div class="stat-value" style="color:var(--slate);"><?= $inProgressRequests ?></div>
             </div>
           </div>
         </div>
-        <div class="col-3">
-          <div class="card border-0 shadow-sm h-100">
-            <div class="card-body client-stat-body d-flex align-items-center gap-2 gap-md-3">
-              <span class="client-stat-icon d-flex align-items-center justify-content-center rounded-3 flex-shrink-0" style="background-color:#3AA39415;">
-                <i class="fa-solid fa-circle-check" style="color:#2C7C71;"></i>
-              </span>
-              <div class="overflow-hidden">
-                <div class="client-stat-label text-secondary text-truncate">Completed</div>
-                <div class="client-stat-value fw-bold" style="color:#2C7C71;"><?= $completedRequests ?></div>
-              </div>
+        <div class="col-6 col-md-3">
+          <div class="stat-card">
+            <span class="stat-icon" style="background-color:var(--success-soft);">
+              <i class="fa-solid fa-circle-check" style="color:var(--success-text);"></i>
+            </span>
+            <div class="overflow-hidden">
+              <div class="stat-label text-truncate">Completed</div>
+              <div class="stat-value" style="color:var(--success-text);"><?= $completedRequests ?></div>
             </div>
           </div>
         </div>
       </section>
 
       <nav class="client-management-tabs mb-3">
-        <ul class="nav gap-2">
-          <li class="nav-item">
-            <a href="?tab=clients" class="nav-link rounded-3 fw-semibold" style="background-color:#2F4858; color:#fff; <?= $activeTab === 'clients' ? 'box-shadow:0 2px 6px rgba(47,72,88,.4);' : '' ?>">
-              <i class="fa-solid fa-building me-1"></i> Clients
-            </a>
-          </li>
-          <li class="nav-item">
-            <a href="?tab=requests" class="nav-link rounded-3 fw-semibold" style="background-color:#E89C5A; color:#fff; <?= $activeTab === 'requests' ? 'box-shadow:0 2px 6px rgba(232,156,90,.5);' : '' ?>">
-              <i class="fa-solid fa-clipboard-list me-1"></i> Service Requests
-            </a>
-          </li>
-          <li class="nav-item">
-            <a href="?tab=reports" class="nav-link rounded-3 fw-semibold" style="background-color:#3AA394; color:#fff; <?= $activeTab === 'reports' ? 'box-shadow:0 2px 6px rgba(58,163,148,.5);' : '' ?>">
-              <i class="fa-solid fa-chart-simple me-1"></i> Reports
-            </a>
-          </li>
-        </ul>
+        <a href="?tab=clients" class="<?= $activeTab === 'clients' ? 'active' : '' ?>">
+          <i class="fa-solid fa-building"></i> Clients
+        </a>
+        <a href="?tab=requests" class="<?= $activeTab === 'requests' ? 'active' : '' ?>">
+          <i class="fa-solid fa-clipboard-list"></i> Service Requests
+        </a>
+        <a href="?tab=reports" class="<?= $activeTab === 'reports' ? 'active' : '' ?>">
+          <i class="fa-solid fa-chart-simple"></i> Reports
+        </a>
       </nav>
 
       <?php if ($activeTab === 'clients'): ?>
 
-        <section class="client-management-toolbar card border-0 shadow-sm mb-3">
+        <section class="card mb-3">
           <div class="card-body p-2 p-md-3">
             <form class="row g-2 align-items-center" method="GET">
               <input type="hidden" name="tab" value="clients">
               <div class="col-12 col-md-6">
                 <div class="input-group">
-                  <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass text-secondary"></i></span>
+                  <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass" style="color:var(--ink-soft);"></i></span>
                   <input type="text" name="search" class="form-control" placeholder="Search by company or contact person" value="<?= htmlspecialchars($searchTerm) ?>">
                 </div>
               </div>
@@ -440,7 +485,7 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
                 </select>
               </div>
               <div class="col-6 col-md-3 text-md-end">
-                <button type="button" class="btn w-100" style="background-color:#2F4858; color:#fff;" data-bs-toggle="modal" data-bs-target="#addClientModal">
+                <button type="button" class="btn btn-teal-solid w-100" data-bs-toggle="modal" data-bs-target="#addClientModal">
                   <i class="fa-solid fa-plus"></i> Add Client
                 </button>
               </div>
@@ -448,28 +493,28 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
           </div>
         </section>
 
-        <section class="client-management-table card border-0 shadow-sm">
+        <section class="card">
           <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
-              <thead class="table-light">
+              <thead>
                 <tr>
-                  <th scope="col" class="small text-uppercase text-secondary">Company</th>
-                  <th scope="col" class="small text-uppercase text-secondary d-none d-md-table-cell">Contact Person</th>
-                  <th scope="col" class="small text-uppercase text-secondary d-none d-lg-table-cell">Email</th>
-                  <th scope="col" class="small text-uppercase text-secondary d-none d-lg-table-cell">Contact Number</th>
+                  <th scope="col">Company</th>
+                  <th scope="col" class="d-none d-md-table-cell">Contact Person</th>
+                  <th scope="col" class="d-none d-lg-table-cell">Email</th>
+                  <th scope="col" class="d-none d-lg-table-cell">Contact Number</th>
                 </tr>
               </thead>
               <tbody>
                 <?php if (empty($clients)): ?>
                   <tr>
-                    <td colspan="4" class="text-center text-secondary py-5">
+                    <td colspan="4" class="text-center py-5" style="color:var(--ink-soft);">
                       <i class="fa-regular fa-folder-open fs-3 d-block mb-2"></i>
                       No clients found.
                     </td>
                   </tr>
                 <?php else: ?>
                   <?php foreach ($clients as $client): ?>
-                    <tr class="client-management-row" role="button" style="cursor:pointer;"
+                    <tr class="client-management-row"
                       data-bs-toggle="modal" data-bs-target="#viewClientModal"
                       data-company="<?= htmlspecialchars($client['company_name']) ?>"
                       data-contact="<?= htmlspecialchars($client['contact_person']) ?>"
@@ -479,11 +524,11 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
                       data-industry="<?= htmlspecialchars($client['industry'] ?? '') ?>">
                       <td>
                         <div class="fw-semibold small"><?= htmlspecialchars($client['company_name']) ?></div>
-                        <div class="text-secondary d-md-none" style="font-size:.72rem;"><?= htmlspecialchars($client['contact_person']) ?></div>
+                        <div class="d-md-none" style="font-size:.72rem; color:var(--ink-soft);"><?= htmlspecialchars($client['contact_person']) ?></div>
                       </td>
-                      <td class="text-secondary small d-none d-md-table-cell"><?= htmlspecialchars($client['contact_person']) ?></td>
-                      <td class="text-secondary small d-none d-lg-table-cell"><?= htmlspecialchars($client['email']) ?></td>
-                      <td class="text-secondary small d-none d-lg-table-cell"><?= htmlspecialchars($client['contact_number']) ?></td>
+                      <td class="small d-none d-md-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars($client['contact_person']) ?></td>
+                      <td class="small d-none d-lg-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars($client['email']) ?></td>
+                      <td class="small d-none d-lg-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars($client['contact_number']) ?></td>
                     </tr>
                   <?php endforeach; ?>
                 <?php endif; ?>
@@ -491,10 +536,10 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
             </table>
           </div>
           <?php if ($totalPages > 1): ?>
-          <div class="card-footer bg-white border-top-0 d-flex justify-content-between align-items-center flex-wrap gap-2 py-3">
-            <span class="text-secondary small">Page <?= $page ?> of <?= $totalPages ?> &middot; <?= $filteredClientCount ?> total</span>
+          <div class="card-footer bg-white d-flex justify-content-between align-items-center flex-wrap gap-2 py-3" style="border-top:1px solid var(--line);">
+            <span class="small" style="color:var(--ink-soft);">Page <?= $page ?> of <?= $totalPages ?> &middot; <?= $filteredClientCount ?> total</span>
             <nav aria-label="Clients pagination">
-              <ul class="pagination pagination-sm mb-0 client-management-pagination">
+              <ul class="pagination pagination-sm mb-0">
                 <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
                   <a class="page-link" href="<?= buildPageUrl($page - 1, 'clients', $searchTerm, $sortOrder, '') ?>">Previous</a>
                 </li>
@@ -514,13 +559,13 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
 
       <?php elseif ($activeTab === 'requests'): ?>
 
-        <section class="client-management-toolbar card border-0 shadow-sm mb-3">
+        <section class="card mb-3">
           <div class="card-body p-2 p-md-3">
             <form class="row g-2 align-items-center" method="GET">
               <input type="hidden" name="tab" value="requests">
               <div class="col-12 col-md-4">
                 <div class="input-group">
-                  <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass text-secondary"></i></span>
+                  <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass" style="color:var(--ink-soft);"></i></span>
                   <input type="text" name="search" class="form-control" placeholder="Search request or client" value="<?= htmlspecialchars($searchTerm) ?>">
                 </div>
               </div>
@@ -540,7 +585,7 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
                 </select>
               </div>
               <div class="col-12 col-md-2 text-md-end">
-                <button type="button" class="btn w-100" style="background-color:#2F4858; color:#fff;" data-bs-toggle="modal" data-bs-target="#addRequestModal">
+                <button type="button" class="btn btn-teal-solid w-100" data-bs-toggle="modal" data-bs-target="#addRequestModal">
                   <i class="fa-solid fa-plus"></i> Add Request
                 </button>
               </div>
@@ -548,22 +593,22 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
           </div>
         </section>
 
-        <section class="client-management-table card border-0 shadow-sm">
+        <section class="card">
           <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
-              <thead class="table-light">
+              <thead>
                 <tr>
-                  <th scope="col" class="small text-uppercase text-secondary">Request</th>
-                  <th scope="col" class="small text-uppercase text-secondary d-none d-md-table-cell">Client</th>
-                  <th scope="col" class="small text-uppercase text-secondary d-none d-lg-table-cell">Required Skill</th>
-                  <th scope="col" class="small text-uppercase text-secondary d-none d-lg-table-cell">Assigned To</th>
-                  <th scope="col" class="small text-uppercase text-secondary">Status</th>
+                  <th scope="col">Request</th>
+                  <th scope="col" class="d-none d-md-table-cell">Client</th>
+                  <th scope="col" class="d-none d-lg-table-cell">Required Skill</th>
+                  <th scope="col" class="d-none d-lg-table-cell">Assigned To</th>
+                  <th scope="col">Status</th>
                 </tr>
               </thead>
               <tbody>
                 <?php if (empty($requests)): ?>
                   <tr>
-                    <td colspan="5" class="text-center text-secondary py-5">
+                    <td colspan="5" class="text-center py-5" style="color:var(--ink-soft);">
                       <i class="fa-regular fa-folder-open fs-3 d-block mb-2"></i>
                       No service requests found.
                     </td>
@@ -573,21 +618,21 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
                     <tr>
                       <td>
                         <div class="fw-semibold small"><?= htmlspecialchars($request['request_title']) ?></div>
-                        <div class="text-secondary d-md-none" style="font-size:.72rem;"><?= htmlspecialchars($request['company_name']) ?></div>
+                        <div class="d-md-none" style="font-size:.72rem; color:var(--ink-soft);"><?= htmlspecialchars($request['company_name']) ?></div>
                       </td>
-                      <td class="text-secondary small d-none d-md-table-cell"><?= htmlspecialchars($request['company_name']) ?></td>
+                      <td class="small d-none d-md-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars($request['company_name']) ?></td>
                       <td class="d-none d-lg-table-cell">
                         <?php if (!empty($request['required_skill'])): ?>
                           <span class="skill-tag-static"><?= htmlspecialchars($request['required_skill']) ?></span>
                         <?php else: ?>
-                          <span class="text-secondary small">—</span>
+                          <span class="small" style="color:var(--ink-soft);">&mdash;</span>
                         <?php endif; ?>
                       </td>
-                      <td class="text-secondary small d-none d-lg-table-cell">
-                        <?= $request['firstname'] ? htmlspecialchars($request['firstname'] . ' ' . $request['lastname']) : '—' ?>
+                      <td class="small d-none d-lg-table-cell" style="color:var(--ink-soft);">
+                        <?= $request['firstname'] ? htmlspecialchars($request['firstname'] . ' ' . $request['lastname']) : '&mdash;' ?>
                       </td>
                       <td>
-                        <span class="badge rounded-pill" style="background-color:<?= statusBadgeColor($request['status']) ?>; color:#fff;"><?= htmlspecialchars($request['status']) ?></span>
+                        <span class="status-pill <?= statusBadgeClass($request['status']) ?>"><?= htmlspecialchars($request['status']) ?></span>
                       </td>
                     </tr>
                   <?php endforeach; ?>
@@ -596,10 +641,10 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
             </table>
           </div>
           <?php if ($totalPages > 1): ?>
-          <div class="card-footer bg-white border-top-0 d-flex justify-content-between align-items-center flex-wrap gap-2 py-3">
-            <span class="text-secondary small">Page <?= $page ?> of <?= $totalPages ?> &middot; <?= $filteredRequestCount ?> total</span>
+          <div class="card-footer bg-white d-flex justify-content-between align-items-center flex-wrap gap-2 py-3" style="border-top:1px solid var(--line);">
+            <span class="small" style="color:var(--ink-soft);">Page <?= $page ?> of <?= $totalPages ?> &middot; <?= $filteredRequestCount ?> total</span>
             <nav aria-label="Requests pagination">
-              <ul class="pagination pagination-sm mb-0 client-management-pagination">
+              <ul class="pagination pagination-sm mb-0">
                 <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
                   <a class="page-link" href="<?= buildPageUrl($page - 1, 'requests', $searchTerm, $sortOrder, $statusFilter) ?>">Previous</a>
                 </li>
@@ -619,14 +664,14 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
 
       <?php else: ?>
 
-        <section class="client-management-table card border-0 shadow-sm">
+        <section class="card">
           <div class="table-responsive">
             <table class="table align-middle mb-0">
-              <thead class="table-light">
+              <thead>
                 <tr>
-                  <th scope="col" class="small text-uppercase text-secondary">Client</th>
-                  <th scope="col" class="small text-uppercase text-secondary">Total Requests</th>
-                  <th scope="col" class="small text-uppercase text-secondary">Completed</th>
+                  <th scope="col">Client</th>
+                  <th scope="col">Total Requests</th>
+                  <th scope="col">Completed</th>
                 </tr>
               </thead>
               <tbody>
@@ -637,8 +682,8 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
                   ?>
                   <tr>
                     <td class="fw-semibold small"><?= htmlspecialchars($client['company_name']) ?></td>
-                    <td class="small text-secondary"><?= count($clientRequests) ?></td>
-                    <td class="small text-secondary"><?= $clientCompleted ?></td>
+                    <td class="small" style="color:var(--ink-soft);"><?= count($clientRequests) ?></td>
+                    <td class="small" style="color:var(--ink-soft);"><?= $clientCompleted ?></td>
                   </tr>
                 <?php endforeach; ?>
               </tbody>
@@ -666,33 +711,33 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
         <div class="modal-body">
           <div class="row g-3">
             <div class="col-md-6">
-              <label class="form-label fw-semibold">Company Name</label>
+              <label class="form-label">Company Name</label>
               <input type="text" name="company_name" class="form-control" required>
             </div>
             <div class="col-md-6">
-              <label class="form-label fw-semibold">Contact Person</label>
+              <label class="form-label">Contact Person</label>
               <input type="text" name="contact_person" class="form-control" required>
             </div>
             <div class="col-md-6">
-              <label class="form-label fw-semibold">Email Address</label>
+              <label class="form-label">Email Address</label>
               <input type="email" name="email" class="form-control" required>
             </div>
             <div class="col-md-6">
-              <label class="form-label fw-semibold">Contact Number</label>
+              <label class="form-label">Contact Number</label>
               <input type="tel" name="contact_number" class="form-control" inputmode="numeric" pattern="[0-9]*" maxlength="11" oninput="this.value=this.value.replace(/[^0-9]/g,'')" required>
             </div>
             <div class="col-md-6">
-              <label class="form-label fw-semibold">Industry</label>
+              <label class="form-label">Industry</label>
               <input type="text" name="industry" class="form-control" placeholder="Optional">
             </div>
             <div class="col-md-6">
-              <label class="form-label fw-semibold">Address</label>
+              <label class="form-label">Address</label>
               <input type="text" name="address" class="form-control" required>
             </div>
           </div>
         </div>
         <div class="modal-footer">
-          <button type="submit" class="btn" style="background-color:#2F4858; color:#fff;">Save Client</button>
+          <button type="submit" class="btn btn-teal-solid">Save Client</button>
         </div>
       </form>
     </div>
@@ -709,32 +754,30 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
       <div class="modal-body">
         <div class="row g-3">
           <div class="col-md-6">
-            <div class="text-secondary small">Company Name</div>
+            <div class="small" style="color:var(--ink-soft);">Company Name</div>
             <div class="fw-semibold" id="view_company"></div>
           </div>
           <div class="col-md-6">
-            <div class="text-secondary small">Contact Person</div>
+            <div class="small" style="color:var(--ink-soft);">Contact Person</div>
             <div class="fw-semibold" id="view_contact"></div>
           </div>
           <div class="col-md-6">
-            <div class="text-secondary small">Email Address</div>
+            <div class="small" style="color:var(--ink-soft);">Email Address</div>
             <div class="fw-semibold" id="view_email"></div>
           </div>
           <div class="col-md-6">
-            <div class="text-secondary small">Contact Number</div>
+            <div class="small" style="color:var(--ink-soft);">Contact Number</div>
             <div class="fw-semibold" id="view_number"></div>
           </div>
           <div class="col-md-6">
-            <div class="text-secondary small">Industry</div>
+            <div class="small" style="color:var(--ink-soft);">Industry</div>
             <div class="fw-semibold" id="view_industry"></div>
           </div>
           <div class="col-md-6">
-            <div class="text-secondary small">Address</div>
+            <div class="small" style="color:var(--ink-soft);">Address</div>
             <div class="fw-semibold" id="view_address"></div>
           </div>
         </div>
-      </div>
-      <div class="modal-footer">
       </div>
     </div>
   </div>
@@ -752,7 +795,7 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
         <div class="modal-body">
           <div class="row g-3">
             <div class="col-12">
-              <label class="form-label fw-semibold">Client</label>
+              <label class="form-label">Client</label>
               <select name="client_id" class="form-select" required>
                 <option value="" selected disabled>Select client</option>
                 <?php foreach ($allClientsForModal as $client): ?>
@@ -761,11 +804,11 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
               </select>
             </div>
             <div class="col-12">
-              <label class="form-label fw-semibold">Request Title</label>
+              <label class="form-label">Request Title</label>
               <input type="text" name="request_title" class="form-control" required>
             </div>
             <div class="col-12">
-              <label class="form-label fw-semibold">Required Skill</label>
+              <label class="form-label">Required Skill</label>
               <select name="required_skill" class="form-select">
                 <option value="">Not specified / any skill</option>
                 <?php foreach ($existingSkills as $existingSkill): ?>
@@ -775,13 +818,13 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
               <div class="form-text">This determines which staff will be recommended in Resource Matching.</div>
             </div>
             <div class="col-12">
-              <label class="form-label fw-semibold">Details</label>
+              <label class="form-label">Details</label>
               <textarea name="request_details" class="form-control" rows="4"></textarea>
             </div>
           </div>
         </div>
         <div class="modal-footer">
-          <button type="submit" class="btn" style="background-color:#2F4858; color:#fff;">Save Request</button>
+          <button type="submit" class="btn btn-teal-solid">Save Request</button>
         </div>
       </form>
     </div>
