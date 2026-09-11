@@ -227,29 +227,6 @@ body {
 .table td { border-bottom: 1px solid var(--line); vertical-align: middle; font-size: .82rem; color: var(--ink); }
 .table-hover tbody tr:hover { background-color: var(--navy-soft); }
 
-.quick-link {
-  display: flex;
-  align-items: center;
-  gap: .75rem;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  padding: .85rem 1rem;
-  text-decoration: none;
-  color: var(--ink);
-  transition: border-color .15s ease, background-color .15s ease;
-}
-.quick-link:hover { border-color: var(--indigo); background-color: var(--indigo-soft); color: var(--ink); }
-.quick-link-icon {
-  width: 38px; height: 38px; border-radius: 9px;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; font-size: .95rem;
-  background-color: var(--navy-soft);
-  border: 1px solid var(--line);
-  color: var(--indigo-text);
-}
-.quick-link-title { font-weight: 600; font-size: .85rem; }
-.quick-link-sub { font-size: .72rem; color: var(--ink-soft); }
-
 .workload-bar-track {
   background-color: var(--navy-soft);
   border-radius: 999px;
@@ -301,8 +278,6 @@ body {
   .dashboard-main { width: 100% !important; margin: 0 !important; }
   main.dashboard-content { padding: 0 24px 24px !important; }
   .card, .metric-card { border: 1px solid #D8DEE3 !important; box-shadow: none !important; break-inside: avoid; }
-  a.quick-link { display: none !important; }
-  section:has(.quick-link) { display: none !important; }
 }
 </style>
 </head>
@@ -489,56 +464,6 @@ body {
         </div>
 
         <div class="col-lg-4">
-
-          <section class="card mb-3">
-            <div class="card-header">
-              <h2 class="h6 fw-bold mb-0">Quick Actions</h2>
-            </div>
-            <div class="card-body d-flex flex-column gap-2">
-              <a href="client_management.php" class="quick-link">
-                <span class="quick-link-icon"><i class="fa-solid fa-building"></i></span>
-                <div>
-                  <div class="quick-link-title">Client Management</div>
-                  <div class="quick-link-sub">Clients &amp; service requests</div>
-                </div>
-              </a>
-              <a href="cpq_builder.php" class="quick-link">
-                <span class="quick-link-icon"><i class="fa-solid fa-file-invoice-dollar"></i></span>
-                <div>
-                  <div class="quick-link-title">CPQ &amp; Scope Builder</div>
-                  <div class="quick-link-sub">Create client quotations</div>
-                </div>
-              </a>
-              <a href="sow_contract.php" class="quick-link">
-                <span class="quick-link-icon"><i class="fa-solid fa-file-signature"></i></span>
-                <div>
-                  <div class="quick-link-title">SOW &amp; Contracts</div>
-                  <div class="quick-link-sub">Generate &amp; approve contracts</div>
-                </div>
-              </a>
-              <a href="resource_matching.php" class="quick-link">
-                <span class="quick-link-icon"><i class="fa-solid fa-people-arrows"></i></span>
-                <div>
-                  <div class="quick-link-title">Resource Matching</div>
-                  <div class="quick-link-sub">Assign staff to contracts</div>
-                </div>
-              </a>
-              <a href="calendar_schedule.php" class="quick-link">
-                <span class="quick-link-icon"><i class="fa-solid fa-calendar-days"></i></span>
-                <div>
-                  <div class="quick-link-title">Calendar &amp; Schedule</div>
-                  <div class="quick-link-sub">Deadlines &amp; engagement dates</div>
-                </div>
-              </a>
-              <a href="reports_analytics.php" class="quick-link">
-                <span class="quick-link-icon"><i class="fa-solid fa-chart-line"></i></span>
-                <div>
-                  <div class="quick-link-title">Reports &amp; Analytics</div>
-                  <div class="quick-link-sub">Revenue, trends &amp; performance</div>
-                </div>
-              </a>
-            </div>
-          </section>
 
           <section class="card mb-3">
             <div class="card-header">
