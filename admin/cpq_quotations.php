@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$requestId || empty($descriptions)) {
             $_SESSION['alert_type'] = 'error';
             $_SESSION['alert_message'] = 'Please select a service request and add at least one scope item.';
-            header('Location: cpq_builder.php');
+            header('Location: cpq_quotations.php');
             exit;
         }
 
@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$req) {
             $_SESSION['alert_type'] = 'error';
             $_SESSION['alert_message'] = 'Selected service request was not found.';
-            header('Location: cpq_builder.php');
+            header('Location: cpq_quotations.php');
             exit;
         }
 
@@ -69,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (empty($items)) {
             $_SESSION['alert_type'] = 'error';
             $_SESSION['alert_message'] = 'Please add at least one valid scope item.';
-            header('Location: cpq_builder.php');
+            header('Location: cpq_quotations.php');
             exit;
         }
 
@@ -102,14 +102,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $_SESSION['alert_type'] = 'success';
         $_SESSION['alert_message'] = "Quotation {$quotationNumber} created successfully.";
-        header('Location: cpq_builder.php');
+        header('Location: cpq_quotations.php');
         exit;
     }
 
     if ($action === 'update_status') {
         $quotationId = $_POST['quotation_id'] ?? null;
         $newStatus   = $_POST['new_status'] ?? '';
-        $validStatuses = ['Draft', 'Sent', 'Approved', 'Rejected'];
+        $validStatuses = ['Draft', 'Approved', 'Rejected'];
 
         if ($quotationId && in_array($newStatus, $validStatuses, true)) {
             $stmt = $pdo->prepare("UPDATE quotations SET status = ? WHERE quotation_id = ?");
@@ -122,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['alert_message'] = 'Unable to update quotation status.';
         }
 
-        header('Location: cpq_builder.php');
+        header('Location: cpq_quotations.php');
         exit;
     }
 }
@@ -136,27 +136,83 @@ $requestsStmt = $pdo->query(
             c.client_id, c.company_name
      FROM service_requests sr
      INNER JOIN clients c ON sr.client_id = c.client_id
-     WHERE sr.status != 'Cancelled'
+     WHERE sr.status = 'New'
      ORDER BY sr.created_at DESC"
 );
 $serviceRequests = $requestsStmt->fetchAll();
 
-$quotationsStmt = $pdo->query(
-    "SELECT q.quotation_id, q.quotation_number, q.status, q.total_amount, q.valid_until, q.created_at,
-            c.company_name, sr.request_title,
-            u.firstname AS prepared_by_firstname, u.lastname AS prepared_by_lastname
-     FROM quotations q
+$searchTerm  = trim($_GET['search'] ?? '');
+$dateFilter  = trim($_GET['date'] ?? '');
+$perPage     = 8;
+$page        = max(1, (int) ($_GET['page'] ?? 1));
+$offset      = ($page - 1) * $perPage;
+
+$statsStmt = $pdo->query("SELECT status, total_amount FROM quotations");
+$statsRows = $statsStmt->fetchAll();
+
+$statusCounts = ['Draft' => 0, 'Approved' => 0, 'Rejected' => 0];
+$totalApprovedValue = 0.0;
+foreach ($statsRows as $row) {
+    if (isset($statusCounts[$row['status']])) {
+        $statusCounts[$row['status']]++;
+    }
+    if ($row['status'] === 'Approved') {
+        $totalApprovedValue += (float) $row['total_amount'];
+    }
+}
+$totalQuotations = count($statsRows);
+
+$baseQuery = "FROM quotations q
      INNER JOIN clients c ON q.client_id = c.client_id
      INNER JOIN service_requests sr ON q.request_id = sr.request_id
      LEFT JOIN users u ON q.prepared_by = u.user_id
-     ORDER BY q.created_at DESC"
-);
+     WHERE 1=1";
+$queryParams = [];
+
+if ($searchTerm !== '') {
+    $baseQuery .= " AND (q.quotation_number LIKE ? OR c.company_name LIKE ? OR sr.request_title LIKE ?)";
+    $like = '%' . $searchTerm . '%';
+    $queryParams[] = $like;
+    $queryParams[] = $like;
+    $queryParams[] = $like;
+}
+
+if ($dateFilter !== '') {
+    $baseQuery .= " AND DATE(q.created_at) = ?";
+    $queryParams[] = $dateFilter;
+}
+
+$countStmt = $pdo->prepare("SELECT COUNT(*) $baseQuery");
+$countStmt->execute($queryParams);
+$filteredQuotationCount = (int) $countStmt->fetchColumn();
+$totalPages = max(1, (int) ceil($filteredQuotationCount / $perPage));
+
+$listQuery = "SELECT q.quotation_id, q.quotation_number, q.status, q.total_amount, q.valid_until, q.created_at,
+            c.company_name, sr.request_title,
+            u.firstname AS prepared_by_firstname, u.lastname AS prepared_by_lastname
+     $baseQuery
+     ORDER BY q.created_at DESC
+     LIMIT $perPage OFFSET $offset";
+$quotationsStmt = $pdo->prepare($listQuery);
+$quotationsStmt->execute($queryParams);
 $quotations = $quotationsStmt->fetchAll();
 
 $itemsStmt = $pdo->query('SELECT * FROM quotation_items ORDER BY quotation_id ASC, sort_order ASC');
 $itemsByQuotation = [];
 foreach ($itemsStmt->fetchAll() as $row) {
     $itemsByQuotation[$row['quotation_id']][] = $row;
+}
+
+function buildQuotationPageUrl(int $targetPage, string $searchTerm, string $dateFilter): string
+{
+    $params = ['page' => $targetPage];
+    if ($searchTerm !== '') {
+        $params['search'] = $searchTerm;
+    }
+    if ($dateFilter !== '') {
+        $params['date'] = $dateFilter;
+    }
+    return '?' . http_build_query($params);
 }
 
 ?>
@@ -173,21 +229,35 @@ foreach ($itemsStmt->fetchAll() as $row) {
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lexend:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  --navy: #33495C;
-  --navy-soft: #EEF2F5;
-  --teal: #4CA79A;
-  --teal-soft: #E7F5F2;
-  --teal-text: #2E6E63;
-  --amber: #E0A44E;
-  --amber-soft: #FBF1E1;
-  --amber-text: #93662A;
-  --coral: #DB7A66;
-  --coral-soft: #FBECE8;
-  --coral-text: #A2452F;
-  --ink: #2B3540;
-  --ink-soft: #6B7684;
-  --line: #E7EAEE;
-  --canvas: #F6F8F9;
+  /* Enterprise slate / indigo palette */
+  --navy: #1E293B;
+  --navy-deep: #0F172A;
+  --navy-soft: #EEF1F6;
+  --indigo: #3B4E8A;
+  --indigo-soft: #E9ECF6;
+  --indigo-text: #2E3E70;
+  --slate: #475569;
+  --slate-soft: #64748B;
+
+  --success: #157A5F;
+  --success-soft: #E3F3EC;
+  --success-text: #0F5F49;
+  --success-border: #BFE3D3;
+
+  --warn: #B7791F;
+  --warn-soft: #FBF0DD;
+  --warn-text: #8A5A15;
+  --warn-border: #EFD8A8;
+
+  --danger: #B4432F;
+  --danger-soft: #FAECE8;
+  --danger-text: #93382A;
+  --danger-border: #EDC7BC;
+
+  --ink: #1A2233;
+  --ink-soft: #667085;
+  --line: #E2E5EB;
+  --canvas: #FFFFFF;
   --card: #FFFFFF;
 }
 
@@ -197,128 +267,206 @@ body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
+.dashboard-layout, .dashboard-main, .dashboard-content {
+  background-color: var(--canvas) !important;
+}
+
 .dashboard-title, h1, h2, h3 {
   font-family: 'Lexend', 'Inter', sans-serif;
 }
 
-.dashboard-title { color: var(--ink); letter-spacing: -0.01em; }
+.dashboard-title { color: var(--navy-deep); letter-spacing: -0.01em; }
 .dashboard-subtitle { color: var(--ink-soft) !important; }
-.dashboard-topbar { border-bottom: 1px solid var(--line) !important; }
+.dashboard-topbar { border-bottom: 1px solid var(--line) !important; background-color: #fff; }
 
-.card { border-radius: 14px; border: 1px solid var(--line); }
+.card { border-radius: 12px; border: 1px solid var(--line); box-shadow: none; }
 
 .card-header {
   border-bottom: 1px solid var(--line) !important;
   background-color: var(--card) !important;
-  border-radius: 14px 14px 0 0 !important;
+  border-radius: 12px 12px 0 0 !important;
   padding: 1rem 1.15rem;
 }
 
 .card-header h2 { color: var(--ink); letter-spacing: -0.01em; }
 .card-header p { color: var(--ink-soft) !important; }
 
-.form-control:focus, .form-select:focus, .form-control:hover, .form-select:hover {
-  border-color: var(--teal);
-  box-shadow: 0 0 0 .2rem rgba(76,167,154,.15);
+.form-control:focus, .form-select:focus {
+  border-color: var(--indigo);
+  box-shadow: 0 0 0 .2rem rgba(59,78,138,.13);
   outline: none;
 }
 
-.form-label { font-size: .82rem; font-weight: 600; color: var(--ink); }
+.form-control:hover, .form-select:hover { border-color: #C6CCD8; }
+
+.form-label { font-size: .8rem; font-weight: 600; color: var(--slate); text-transform: uppercase; letter-spacing: .02em; }
 
 .btn-primary-solid {
-  background-color: var(--navy);
+  background-color: var(--navy-deep);
   color: #fff;
   border: none;
-  border-radius: 9px;
+  border-radius: 8px;
   font-weight: 600;
 }
-
-.btn-primary-solid:hover { background-color: #263A4A; color: #fff; }
+.btn-primary-solid:hover { background-color: #060B14; color: #fff; }
 
 .btn-teal-solid {
-  background-color: var(--teal);
+  background-color: var(--indigo);
   color: #fff;
   border: none;
-  border-radius: 9px;
+  border-radius: 8px;
   font-weight: 600;
 }
-
-.btn-teal-solid:hover { background-color: var(--teal-text); color: #fff; }
+.btn-teal-solid:hover { background-color: var(--indigo-text); color: #fff; }
 
 .btn-ghost {
   background-color: var(--navy-soft);
   color: var(--navy);
-  border: none;
-  border-radius: 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
   font-weight: 600;
-  font-size: .82rem;
+  font-size: .8rem;
 }
+.btn-ghost:hover { background-color: #E4E8F0; color: var(--navy); }
 
-.btn-ghost:hover { background-color: #E0E7EB; color: var(--navy); }
+.btn-approve {
+  background-color: var(--success);
+  color: #fff;
+  border: 1px solid var(--success);
+  border-radius: 7px;
+  font-weight: 600;
+  font-size: .78rem;
+}
+.btn-approve:hover { background-color: #0F5F49; border-color: #0F5F49; color: #fff; }
+
+.btn-reject {
+  background-color: var(--danger);
+  color: #fff;
+  border: 1px solid var(--danger);
+  border-radius: 7px;
+  font-weight: 600;
+  font-size: .78rem;
+}
+.btn-reject:hover { background-color: #93382A; border-color: #93382A; color: #fff; }
 
 .table thead th {
   border-bottom: 1px solid var(--line) !important;
   color: var(--ink-soft);
-  font-weight: 600;
-  font-size: .72rem;
-  letter-spacing: .04em;
-  background-color: var(--canvas) !important;
+  font-weight: 700;
+  font-size: .7rem;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  background-color: var(--navy-soft) !important;
 }
 
 .table td { border-bottom: 1px solid var(--line); color: var(--ink); vertical-align: middle; }
 .table-hover tbody tr:hover { background-color: var(--navy-soft); }
 
 .status-pill {
-  font-size: .72rem;
-  font-weight: 600;
-  padding: .3rem .65rem;
+  font-size: .7rem;
+  font-weight: 700;
+  padding: .32rem .7rem;
   border-radius: 999px;
   white-space: nowrap;
+  letter-spacing: .01em;
+  border: 1px solid transparent;
 }
 
-.status-draft { background-color: var(--navy-soft); color: var(--navy); }
-.status-sent { background-color: var(--amber-soft); color: var(--amber-text); }
-.status-approved { background-color: var(--teal-soft); color: var(--teal-text); }
-.status-rejected { background-color: var(--coral-soft); color: var(--coral-text); }
+.status-draft { background-color: var(--navy-soft); color: var(--slate); border-color: var(--line); }
+.status-approved { background-color: var(--success-soft); color: var(--success-text); border-color: var(--success-border); }
+.status-rejected { background-color: var(--danger-soft); color: var(--danger-text); border-color: var(--danger-border); }
 
-.item-row { background-color: var(--navy-soft); border-radius: 10px; padding: .75rem; }
+/* Status filter tabs */
+.status-tabs {
+  display: flex;
+  gap: .4rem;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--line);
+  padding: 0 1.15rem;
+  background-color: var(--card);
+  border-radius: 12px 12px 0 0;
+}
+
+.status-tab {
+  border: none;
+  background: none;
+  padding: .8rem .3rem;
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+
+.status-tab:hover { color: var(--navy-deep); }
+.status-tab.active { color: var(--indigo-text); border-bottom-color: var(--indigo); }
+
+.status-tab .count-badge {
+  background-color: var(--navy-soft);
+  color: var(--slate);
+  font-size: .68rem;
+  font-weight: 700;
+  padding: .1rem .45rem;
+  border-radius: 999px;
+}
+
+.status-tab.active .count-badge { background-color: var(--indigo-soft); color: var(--indigo-text); }
+
+.item-row { background-color: var(--navy-soft); border-radius: 10px; padding: .75rem; border: 1px solid var(--line); }
 
 .line-total-display {
-  font-weight: 600;
+  font-weight: 700;
   font-size: .85rem;
-  color: var(--teal-text);
+  color: var(--indigo-text);
 }
 
 .totals-box {
-  background-color: var(--teal-soft);
-  border-radius: 12px;
+  background-color: var(--indigo-soft);
+  border-radius: 10px;
   padding: 1rem 1.15rem;
+  border: 1px solid #DADFEE;
 }
 
 .totals-box .row-line {
   display: flex;
   justify-content: space-between;
   font-size: .85rem;
-  color: var(--ink-soft);
+  color: var(--slate);
   margin-bottom: .35rem;
 }
 
 .totals-box .row-line.grand {
-  color: var(--teal-text);
+  color: var(--indigo-text);
   font-weight: 700;
   font-size: 1.05rem;
   margin-top: .5rem;
   padding-top: .5rem;
-  border-top: 1px solid rgba(76,167,154,.25);
+  border-top: 1px solid #C6CDE6;
 }
 
 .modal-content { border-radius: 14px; border: none; }
 .modal-header { border-bottom: 1px solid var(--line); }
 .modal-footer { border-top: 1px solid var(--line); }
-.btn-close-remove { color: var(--coral-text); background: none; border: none; font-size: .9rem; }
+.btn-close-remove { color: var(--danger-text); background: none; border: none; font-size: .9rem; }
 
 .empty-state { color: var(--ink-soft); }
 .empty-state i { color: #C7D0D6; }
+
+.stat-card {
+  background-color: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1rem 1.15rem;
+}
+.stat-card .stat-label { font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-soft); }
+.stat-card .stat-value { font-family: 'Lexend', sans-serif; font-size: 1.5rem; font-weight: 700; color: var(--navy-deep); margin-top: .15rem; }
+
+.pagination .page-link { color: var(--indigo-text); border-color: var(--line); }
+.pagination .page-item.active .page-link { background-color: var(--indigo); border-color: var(--indigo); color: #fff; }
+.pagination .page-item.disabled .page-link { color: #adb5bd; }
 </style>
 </head>
 <body>
@@ -343,17 +491,80 @@ body {
 
     <main class="dashboard-content p-3 p-md-4">
 
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-          <h2 class="h6 fw-bold mb-0">Quotations</h2>
-          <p class="small mb-0" style="color:var(--ink-soft);">All generated quotations and their approval status.</p>
+      <div class="card mb-3">
+        <div class="card-body p-2 p-md-3">
+          <form method="GET" class="row g-2 align-items-center">
+            <div class="col-12 col-md-5">
+              <div class="input-group">
+                <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass" style="color:var(--ink-soft);"></i></span>
+                <input type="text" name="search" class="form-control" placeholder="Search quotation #, company, or request" value="<?= htmlspecialchars($searchTerm) ?>">
+              </div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="input-group">
+                <span class="input-group-text bg-white"><i class="fa-regular fa-calendar" style="color:var(--ink-soft);"></i></span>
+                <input type="date" name="date" class="form-control" value="<?= htmlspecialchars($dateFilter) ?>">
+              </div>
+            </div>
+            <div class="col-6 col-md-2 d-flex gap-2">
+              <button type="submit" class="btn btn-primary-solid flex-grow-1">
+                <i class="fa-solid fa-filter me-1"></i> Filter
+              </button>
+              <?php if ($searchTerm !== '' || $dateFilter !== ''): ?>
+                <a href="cpq_quotations.php" class="btn btn-ghost"><i class="fa-solid fa-xmark"></i></a>
+              <?php endif; ?>
+            </div>
+            <div class="col-12 col-md-2">
+              <button type="button" class="btn btn-teal-solid w-100" data-bs-toggle="modal" data-bs-target="#newQuotationModal">
+                <i class="fa-solid fa-plus me-1"></i> New Quotation
+              </button>
+            </div>
+          </form>
         </div>
-        <button type="button" class="btn btn-teal-solid px-3" data-bs-toggle="modal" data-bs-target="#newQuotationModal">
-          <i class="fa-solid fa-plus me-1"></i> New Quotation
-        </button>
       </div>
 
-      <section class="card border-0 shadow-sm">
+      <div class="row g-3 mb-3">
+        <div class="col-6 col-lg-3">
+          <div class="stat-card">
+            <div class="stat-label">Total Quotations</div>
+            <div class="stat-value"><?= (int) $totalQuotations ?></div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="stat-card">
+            <div class="stat-label">Pending (Draft)</div>
+            <div class="stat-value"><?= (int) $statusCounts['Draft'] ?></div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="stat-card">
+            <div class="stat-label">Approved</div>
+            <div class="stat-value" style="color:var(--success-text);"><?= (int) $statusCounts['Approved'] ?></div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="stat-card">
+            <div class="stat-label">Approved Value</div>
+            <div class="stat-value" style="font-size:1.15rem; color:var(--success-text);">&#8369;<?= number_format($totalApprovedValue, 2) ?></div>
+          </div>
+        </div>
+      </div>
+
+      <section class="card overflow-hidden">
+        <nav class="status-tabs">
+          <button type="button" class="status-tab active" data-filter="all">
+            All <span class="count-badge"><?= (int) $totalQuotations ?></span>
+          </button>
+          <button type="button" class="status-tab" data-filter="Draft">
+            Draft <span class="count-badge"><?= (int) $statusCounts['Draft'] ?></span>
+          </button>
+          <button type="button" class="status-tab" data-filter="Approved">
+            Approved <span class="count-badge"><?= (int) $statusCounts['Approved'] ?></span>
+          </button>
+          <button type="button" class="status-tab" data-filter="Rejected">
+            Rejected <span class="count-badge"><?= (int) $statusCounts['Rejected'] ?></span>
+          </button>
+        </nav>
         <div class="table-responsive">
           <table class="table table-hover align-middle mb-0">
             <thead>
@@ -367,7 +578,7 @@ body {
                 <th scope="col" class="text-end">Action</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="quotationsTableBody">
               <?php if (empty($quotations)): ?>
                 <tr>
                   <td colspan="7">
@@ -381,11 +592,10 @@ body {
                 <?php foreach ($quotations as $q): ?>
                   <?php
                     $statusClass = 'status-draft';
-                    if ($q['status'] === 'Sent') { $statusClass = 'status-sent'; }
                     if ($q['status'] === 'Approved') { $statusClass = 'status-approved'; }
                     if ($q['status'] === 'Rejected') { $statusClass = 'status-rejected'; }
                   ?>
-                  <tr>
+                  <tr data-status="<?= htmlspecialchars($q['status']) ?>">
                     <td class="small fw-semibold"><?= htmlspecialchars($q['quotation_number']) ?></td>
                     <td class="small">
                       <div class="fw-semibold"><?= htmlspecialchars($q['company_name']) ?></div>
@@ -396,26 +606,44 @@ body {
                     <td class="small d-none d-lg-table-cell" style="color:var(--ink-soft);"><?= $q['valid_until'] ? htmlspecialchars(date('M d, Y', strtotime($q['valid_until']))) : '&mdash;' ?></td>
                     <td><span class="status-pill <?= $statusClass ?>"><?= htmlspecialchars($q['status']) ?></span></td>
                     <td class="text-end">
-                      <button type="button" class="btn btn-ghost btn-sm view-quotation-btn"
-                        data-quotation='<?= htmlspecialchars(json_encode([
-                          "number" => $q["quotation_number"],
-                          "status" => $q["status"],
-                          "company" => $q["company_name"],
-                          "request" => $q["request_title"],
-                          "total" => number_format((float) $q["total_amount"], 2),
-                          "valid_until" => $q["valid_until"] ? date('M d, Y', strtotime($q["valid_until"])) : null,
-                          "items" => array_map(function ($it) {
-                              return [
-                                  "description" => $it["description"],
-                                  "quantity" => rtrim(rtrim(number_format((float) $it["quantity"], 2), '0'), '.'),
-                                  "unit_price" => number_format((float) $it["unit_price"], 2),
-                                  "line_total" => number_format((float) $it["line_total"], 2),
-                              ];
-                          }, $itemsByQuotation[$q["quotation_id"]] ?? []),
-                          "quotation_id" => $q["quotation_id"],
-                        ]), ENT_QUOTES) ?>'>
-                        View
-                      </button>
+                      <div class="d-flex justify-content-end gap-1 flex-wrap">
+                        <button type="button" class="btn btn-ghost btn-sm view-quotation-btn" title="View quotation"
+                          data-quotation='<?= htmlspecialchars(json_encode([
+                            "number" => $q["quotation_number"],
+                            "status" => $q["status"],
+                            "company" => $q["company_name"],
+                            "request" => $q["request_title"],
+                            "total" => number_format((float) $q["total_amount"], 2),
+                            "valid_until" => $q["valid_until"] ? date('M d, Y', strtotime($q["valid_until"])) : null,
+                            "items" => array_map(function ($it) {
+                                return [
+                                    "description" => $it["description"],
+                                    "quantity" => rtrim(rtrim(number_format((float) $it["quantity"], 2), '0'), '.'),
+                                    "unit_price" => number_format((float) $it["unit_price"], 2),
+                                    "line_total" => number_format((float) $it["line_total"], 2),
+                                ];
+                            }, $itemsByQuotation[$q["quotation_id"]] ?? []),
+                            "quotation_id" => $q["quotation_id"],
+                          ]), ENT_QUOTES) ?>'>
+                          <i class="fa-solid fa-eye"></i>
+                        </button>
+                        <?php if ($q['status'] === 'Draft'): ?>
+                          <form method="POST" class="d-inline-block m-0">
+                            <input type="hidden" name="action" value="update_status">
+                            <input type="hidden" name="quotation_id" value="<?= (int) $q['quotation_id'] ?>">
+                            <button type="submit" name="new_status" value="Approved" class="btn btn-approve btn-sm">
+                              <i class="fa-solid fa-check me-1"></i>Approve
+                            </button>
+                          </form>
+                          <form method="POST" class="d-inline-block m-0">
+                            <input type="hidden" name="action" value="update_status">
+                            <input type="hidden" name="quotation_id" value="<?= (int) $q['quotation_id'] ?>">
+                            <button type="submit" name="new_status" value="Rejected" class="btn btn-reject btn-sm">
+                              <i class="fa-solid fa-xmark me-1"></i>Reject
+                            </button>
+                          </form>
+                        <?php endif; ?>
+                      </div>
                     </td>
                   </tr>
                 <?php endforeach; ?>
@@ -423,6 +651,26 @@ body {
             </tbody>
           </table>
         </div>
+        <?php if ($totalPages > 1): ?>
+          <div class="card-footer bg-white d-flex justify-content-between align-items-center flex-wrap gap-2 py-3" style="border-top:1px solid var(--line);">
+            <span class="small" style="color:var(--ink-soft);">Page <?= $page ?> of <?= $totalPages ?> &middot; <?= $filteredQuotationCount ?> total</span>
+            <nav aria-label="Quotations pagination">
+              <ul class="pagination pagination-sm mb-0">
+                <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
+                  <a class="page-link" href="<?= buildQuotationPageUrl($page - 1, $searchTerm, $dateFilter) ?>">Previous</a>
+                </li>
+                <?php for ($i = 1; $i <= $totalPages; $i++): ?>
+                  <li class="page-item <?= $i === $page ? 'active' : '' ?>">
+                    <a class="page-link" href="<?= buildQuotationPageUrl($i, $searchTerm, $dateFilter) ?>"><?= $i ?></a>
+                  </li>
+                <?php endfor; ?>
+                <li class="page-item <?= $page >= $totalPages ? 'disabled' : '' ?>">
+                  <a class="page-link" href="<?= buildQuotationPageUrl($page + 1, $searchTerm, $dateFilter) ?>">Next</a>
+                </li>
+              </ul>
+            </nav>
+          </div>
+        <?php endif; ?>
       </section>
 
     </main>
@@ -525,17 +773,16 @@ body {
         <div class="d-flex justify-content-end">
           <div class="text-end small">
             <div style="color:var(--ink-soft);">Grand Total</div>
-            <div class="fw-bold" style="font-size:1.1rem; color:var(--teal-text);" id="view_total"></div>
+            <div class="fw-bold" style="font-size:1.1rem; color:var(--indigo-text);" id="view_total"></div>
           </div>
         </div>
       </div>
-      <div class="modal-footer flex-wrap gap-2">
+      <div class="modal-footer flex-wrap gap-2" id="view_status_actions">
         <form method="POST" id="statusForm" class="d-flex gap-2 flex-wrap">
           <input type="hidden" name="action" value="update_status">
           <input type="hidden" name="quotation_id" id="status_quotation_id">
-          <button type="submit" name="new_status" value="Sent" class="btn btn-ghost btn-sm">Mark as Sent</button>
-          <button type="submit" name="new_status" value="Approved" class="btn btn-teal-solid btn-sm">Approve</button>
-          <button type="submit" name="new_status" value="Rejected" class="btn btn-sm" style="background-color:var(--coral-soft); color:var(--coral-text); border:none;">Reject</button>
+          <button type="submit" name="new_status" value="Approved" class="btn btn-approve btn-sm px-3">Approve</button>
+          <button type="submit" name="new_status" value="Rejected" class="btn btn-reject btn-sm px-3">Reject</button>
         </form>
       </div>
     </div>
@@ -627,6 +874,9 @@ document.querySelectorAll('.view-quotation-btn').forEach(function (btn) {
     document.getElementById('view_total').textContent = '\u20B1' + data.total;
     document.getElementById('status_quotation_id').value = data.quotation_id;
 
+    const statusActions = document.getElementById('view_status_actions');
+    statusActions.style.display = (data.status === 'Draft') ? '' : 'none';
+
     const body = document.getElementById('view_items_body');
     body.innerHTML = '';
     data.items.forEach(function (item) {
@@ -649,6 +899,17 @@ function escapeHtml(str) {
   div.textContent = str;
   return div.innerHTML;
 }
+
+document.querySelectorAll('.status-tab').forEach(function (tab) {
+  tab.addEventListener('click', function () {
+    document.querySelectorAll('.status-tab').forEach(function (t) { t.classList.remove('active'); });
+    tab.classList.add('active');
+    const filter = tab.dataset.filter;
+    document.querySelectorAll('#quotationsTableBody tr[data-status]').forEach(function (row) {
+      row.style.display = (filter === 'all' || row.dataset.status === filter) ? '' : 'none';
+    });
+  });
+});
 
 <?php if ($alertType && $alertMessage): ?>
 window.addEventListener('DOMContentLoaded', function () {

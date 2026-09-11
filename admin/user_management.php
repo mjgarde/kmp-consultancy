@@ -186,6 +186,15 @@ foreach ($skillsStmt->fetchAll() as $row) {
 $existingSkillsStmt = $pdo->query('SELECT DISTINCT skill_name FROM staff_skills ORDER BY skill_name ASC');
 $existingSkills = $existingSkillsStmt->fetchAll(PDO::FETCH_COLUMN);
 
+$roleCountsStmt = $pdo->query("SELECT role, COUNT(*) AS cnt FROM users GROUP BY role");
+$roleCounts = ['Manager' => 0, 'Supervisor' => 0, 'Staff' => 0];
+foreach ($roleCountsStmt->fetchAll() as $row) {
+    if (isset($roleCounts[$row['role']])) {
+        $roleCounts[$row['role']] = (int) $row['cnt'];
+    }
+}
+$totalUsers = array_sum($roleCounts);
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -200,7 +209,15 @@ $existingSkills = $existingSkillsStmt->fetchAll(PDO::FETCH_COLUMN);
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lexend:wght@500;600;700&display=swap" rel="stylesheet">
 
 <style>
-  body {
+:root {
+  --um-primary: #2F5D8A;
+  --um-primary-dark: #234968;
+  --um-accent: #2F5D8A;
+  --um-danger: #C0553F;
+  --um-danger-dark: #A6432F;
+}
+
+body {
   background-color: var(--canvas);
   color: var(--ink);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -210,15 +227,15 @@ $existingSkills = $existingSkillsStmt->fetchAll(PDO::FETCH_COLUMN);
   font-family: 'Lexend', 'Inter', sans-serif;
 }
 .form-control:focus, .form-select:focus, .form-control:hover, .form-select:hover {
-  border-color:#2F4858;
-  box-shadow:0 0 0 .2rem rgba(47,72,88,.15);
-  outline:none;
+  border-color: var(--um-primary);
+  box-shadow: 0 0 0 .2rem rgba(47,93,138,.15);
+  outline: none;
 }
 .skill-tag {
   display:inline-flex;
   align-items:center;
   gap:.4rem;
-  background-color:#2F4858;
+  background-color: var(--um-primary);
   color:#fff;
   padding:.3rem .6rem;
   border-radius:999px;
@@ -236,7 +253,7 @@ $existingSkills = $existingSkillsStmt->fetchAll(PDO::FETCH_COLUMN);
   opacity:1;
 }
 .skill-badge {
-  background-color:#3AA394;
+  background-color: var(--um-primary);
   color:#fff;
   font-size:.7rem;
   padding:.25rem .5rem;
@@ -244,6 +261,21 @@ $existingSkills = $existingSkillsStmt->fetchAll(PDO::FETCH_COLUMN);
   margin:0 .25rem .25rem 0;
   display:inline-block;
 }
+
+.um-stat-strip {
+  display: flex;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.um-stat-item {
+  flex: 1;
+  padding: 1.1rem 1.2rem;
+  border-right: 1px solid rgba(0,0,0,.06);
+  text-align: center;
+}
+.um-stat-item:last-child { border-right: none; }
+.um-stat-label { font-size: .68rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #8a94a3; }
+.um-stat-value { font-size: 1.6rem; font-weight: 700; font-family: 'Lexend', sans-serif; color: #1A2233; margin-top: .3rem; line-height: 1; }
 </style>
 </head>
 <body class="bg-light">
@@ -268,13 +300,34 @@ $existingSkills = $existingSkillsStmt->fetchAll(PDO::FETCH_COLUMN);
 
     <main class="dashboard-content p-3 p-md-4">
 
+      <section class="card border-0 shadow-sm mb-3">
+        <div class="um-stat-strip">
+          <div class="um-stat-item">
+            <div class="um-stat-label">Total Users</div>
+            <div class="um-stat-value"><?= $totalUsers ?></div>
+          </div>
+          <div class="um-stat-item">
+            <div class="um-stat-label">Manager</div>
+            <div class="um-stat-value"><?= $roleCounts['Manager'] ?></div>
+          </div>
+          <div class="um-stat-item">
+            <div class="um-stat-label">Supervisor</div>
+            <div class="um-stat-value"><?= $roleCounts['Supervisor'] ?></div>
+          </div>
+          <div class="um-stat-item">
+            <div class="um-stat-label">Staff</div>
+            <div class="um-stat-value"><?= $roleCounts['Staff'] ?></div>
+          </div>
+        </div>
+      </section>
+
       <section class="user-management-toolbar card border-0 shadow-sm mb-3">
         <div class="card-body p-2 p-md-3">
-          <form class="user-management-filter-form row g-2 align-items-center" method="GET">
-            <div class="col-12 col-md-5">
+          <form class="user-management-filter-form row g-2 align-items-center" method="GET" id="filterForm">
+            <div class="col-12 col-md-7">
               <div class="input-group">
                 <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass text-secondary"></i></span>
-                <input type="text" name="search" class="form-control" placeholder="Search by name or email" value="<?= htmlspecialchars($searchTerm) ?>">
+                <input type="text" name="search" id="searchInput" class="form-control" placeholder="Search by name or email" value="<?= htmlspecialchars($searchTerm) ?>">
               </div>
             </div>
             <div class="col-6 col-md-3">
@@ -285,13 +338,8 @@ $existingSkills = $existingSkillsStmt->fetchAll(PDO::FETCH_COLUMN);
                 <option value="Staff" <?= $roleFilter === 'Staff' ? 'selected' : '' ?>>Staff</option>
               </select>
             </div>
-            <div class="col-6 col-md-2">
-              <button type="submit" class="btn w-100" style="background-color:#3AA394; color:#fff;">
-                <i class="fa-solid fa-filter"></i> <span class="d-none d-sm-inline">Filter</span>
-              </button>
-            </div>
-            <div class="col-12 col-md-2 text-md-end">
-              <button type="button" class="btn w-100" style="background-color:#2F4858; color:#fff;" data-bs-toggle="modal" data-bs-target="#addUserModal">
+            <div class="col-6 col-md-2 text-md-end">
+              <button type="button" class="btn w-100" style="background-color:var(--um-primary); color:#fff;" data-bs-toggle="modal" data-bs-target="#addUserModal">
                 <i class="fa-solid fa-plus"></i> Add User
               </button>
             </div>
@@ -346,7 +394,7 @@ $existingSkills = $existingSkillsStmt->fetchAll(PDO::FETCH_COLUMN);
                       </span>
                     </td>
                     <td class="text-end" onclick="event.stopPropagation();">
-                      <button type="button" class="btn btn-sm" style="background-color:#2F4858; color:#fff;" title="Edit"
+                      <button type="button" class="btn btn-sm" style="background-color:var(--um-primary); color:#fff;" title="Edit"
                         data-bs-toggle="modal" data-bs-target="#editUserModal"
                         data-id="<?= $user['user_id'] ?>"
                         data-firstname="<?= htmlspecialchars($user['firstname']) ?>"
@@ -361,7 +409,7 @@ $existingSkills = $existingSkillsStmt->fetchAll(PDO::FETCH_COLUMN);
                         data-skills="<?= htmlspecialchars(json_encode($userSkills)) ?>">
                         <i class="fa-regular fa-pen-to-square"></i>
                       </button>
-                      <button type="button" class="btn btn-sm" style="background-color:#DF6E4F; color:#fff;" title="Delete"
+                      <button type="button" class="btn btn-sm" style="background-color:var(--um-danger); color:#fff;" title="Delete"
                         data-bs-toggle="modal" data-bs-target="#deleteUserModal"
                         data-id="<?= $user['user_id'] ?>"
                         data-name="<?= htmlspecialchars($user['firstname'] . ' ' . $user['lastname']) ?>">
@@ -469,7 +517,7 @@ $existingSkills = $existingSkillsStmt->fetchAll(PDO::FETCH_COLUMN);
           </div>
         </div>
         <div class="modal-footer">
-          <button type="submit" class="btn" style="background-color:#2F4858; color:#fff;">Save User</button>
+          <button type="submit" class="btn" style="background-color:var(--um-primary); color:#fff;">Save User</button>
         </div>
       </form>
     </div>
@@ -562,7 +610,7 @@ $existingSkills = $existingSkillsStmt->fetchAll(PDO::FETCH_COLUMN);
           </div>
         </div>
         <div class="modal-footer">
-          <button type="submit" class="btn" style="background-color:#2F4858; color:#fff;">Update User</button>
+          <button type="submit" class="btn" style="background-color:var(--um-primary); color:#fff;">Update User</button>
         </div>
       </form>
     </div>
@@ -645,7 +693,7 @@ $existingSkills = $existingSkillsStmt->fetchAll(PDO::FETCH_COLUMN);
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-danger">Delete User</button>
+          <button type="submit" class="btn" style="background-color:var(--um-danger); color:#fff;">Delete User</button>
         </div>
       </form>
     </div>
@@ -841,6 +889,12 @@ document.getElementById('deleteUserModal').addEventListener('show.bs.modal', fun
   const btn = event.relatedTarget;
   document.getElementById('delete_user_id').value = btn.dataset.id;
   document.getElementById('delete_user_name').textContent = btn.dataset.name;
+});
+
+let userSearchDebounce;
+document.getElementById('searchInput').addEventListener('input', function () {
+  clearTimeout(userSearchDebounce);
+  userSearchDebounce = setTimeout(() => document.getElementById('filterForm').submit(), 500);
 });
 
 <?php if ($alertType && $alertMessage): ?>

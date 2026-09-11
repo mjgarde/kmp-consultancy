@@ -43,9 +43,11 @@ unset($_SESSION['alert_type'], $_SESSION['alert_message']);
 
 $pendingStmt = $pdo->query(
     "SELECT sr.request_id, sr.request_title, sr.request_details, sr.required_skill, sr.status, sr.created_at,
-            c.company_name, c.contact_person
+            c.company_name, c.contact_person,
+            ct.contract_number, ct.total_amount, ct.scope_summary
      FROM service_requests sr
      INNER JOIN clients c ON sr.client_id = c.client_id
+     INNER JOIN contracts ct ON ct.request_id = sr.request_id AND ct.status = 'Approved'
      WHERE sr.assigned_to IS NULL AND sr.status = 'New'
      ORDER BY sr.created_at ASC"
 );
@@ -93,7 +95,191 @@ $assignedRequests = $assignedStmt->fetchAll();
 <link rel="stylesheet" href="../assets/css/dashboard.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lexend:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/resource_matching.css">
+<style>
+:root {
+  --navy: #1E293B;
+  --navy-deep: #0F172A;
+  --navy-soft: #EEF1F6;
+  --indigo: #3B4E8A;
+  --indigo-soft: #E9ECF6;
+  --indigo-text: #2E3E70;
+  --slate: #475569;
+  --slate-soft: #64748B;
+
+  --success: #157A5F;
+  --success-soft: #E3F3EC;
+  --success-text: #0F5F49;
+  --success-border: #BFE3D3;
+
+  --warn: #B7791F;
+  --warn-soft: #FBF0DD;
+  --warn-text: #8A5A15;
+  --warn-border: #EFD8A8;
+
+  --danger: #B4432F;
+  --danger-soft: #FAECE8;
+  --danger-text: #93382A;
+  --danger-border: #EDC7BC;
+
+  --ink: #1A2233;
+  --ink-soft: #667085;
+  --line: #E2E5EB;
+  --canvas: #FFFFFF;
+  --card: #FFFFFF;
+}
+
+body {
+  background-color: var(--canvas);
+  color: var(--ink);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.dashboard-layout, .dashboard-main, .dashboard-content {
+  background-color: var(--canvas) !important;
+}
+
+.dashboard-title, h1, h2, h3 {
+  font-family: 'Lexend', 'Inter', sans-serif;
+}
+
+.dashboard-title { color: var(--navy-deep); letter-spacing: -0.01em; }
+.dashboard-subtitle { color: var(--ink-soft) !important; }
+.dashboard-topbar { border-bottom: 1px solid var(--line) !important; background-color: #fff; }
+
+.card { border-radius: 12px; border: 1px solid var(--line); box-shadow: none; }
+
+.card-header {
+  border-bottom: 1px solid var(--line) !important;
+  background-color: var(--card) !important;
+  border-radius: 12px 12px 0 0 !important;
+  padding: 1rem 1.15rem;
+}
+
+.card-header h2 { color: var(--ink); letter-spacing: -0.01em; }
+.card-header p { color: var(--ink-soft) !important; }
+
+.form-control:focus, .form-select:focus {
+  border-color: var(--indigo);
+  box-shadow: 0 0 0 .2rem rgba(59,78,138,.13);
+  outline: none;
+}
+.form-control:hover, .form-select:hover { border-color: #C6CCD8; }
+
+.request-card {
+  cursor: pointer;
+  transition: border-color .15s ease, background-color .15s ease;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background-color: var(--card);
+  box-shadow: none;
+}
+.request-card:hover { border-color: var(--indigo); }
+.request-card.active { border-color: var(--indigo); background-color: var(--indigo-soft); }
+.request-card .card-body { padding: .9rem 1rem; }
+
+.badge-new {
+  background-color: var(--warn-soft);
+  color: var(--warn-text);
+  font-size: .68rem;
+  font-weight: 700;
+  padding: .32rem .65rem;
+  border-radius: 999px;
+  border: 1px solid var(--warn-border);
+}
+
+.skill-badge {
+  background-color: var(--navy-soft);
+  color: var(--slate);
+  font-size: .7rem;
+  font-weight: 600;
+  padding: .3rem .65rem;
+  border-radius: 999px;
+  margin: 0 .35rem .35rem 0;
+  display: inline-block;
+  border: 1px solid var(--line);
+}
+.skill-badge.matched {
+  background-color: var(--success-soft);
+  color: var(--success-text);
+  border-color: var(--success-border);
+}
+.skill-badge.unmatched {
+  background-color: var(--navy-soft);
+  color: var(--ink-soft);
+  border-color: var(--line);
+}
+
+.staff-match-row {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background-color: var(--card);
+  transition: border-color .15s ease;
+}
+.staff-match-row:hover { border-color: var(--indigo); }
+
+.match-score-pill {
+  font-size: .7rem;
+  font-weight: 700;
+  padding: .3rem .65rem;
+  border-radius: 999px;
+  letter-spacing: .01em;
+  border: 1px solid transparent;
+}
+.match-score-high { background-color: var(--success-soft); color: var(--success-text); border-color: var(--success-border); }
+.match-score-mid { background-color: var(--warn-soft); color: var(--warn-text); border-color: var(--warn-border); }
+.match-score-none { background-color: var(--danger-soft); color: var(--danger-text); border-color: var(--danger-border); }
+
+.btn-assign {
+  background-color: var(--indigo);
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  font-weight: 600;
+  font-size: .82rem;
+  padding: .4rem .9rem;
+}
+.btn-assign:hover:not(:disabled) { background-color: var(--indigo-text); color: #fff; }
+.btn-assign:disabled { background-color: var(--navy-soft); color: var(--ink-soft); }
+
+#matching_empty_state { color: var(--ink-soft); }
+#matching_empty_state i { color: #C7D0D6; }
+
+.table thead th {
+  border-bottom: 1px solid var(--line) !important;
+  color: var(--ink-soft);
+  font-weight: 700;
+  font-size: .7rem;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  background-color: var(--navy-soft) !important;
+}
+.table td { border-bottom: 1px solid var(--line); color: var(--ink); }
+.table-hover tbody tr:hover { background-color: var(--navy-soft); }
+
+.status-pill {
+  font-size: .7rem;
+  font-weight: 700;
+  padding: .32rem .7rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+.status-in-progress { background-color: var(--warn-soft); color: var(--warn-text); border-color: var(--warn-border); }
+.status-completed { background-color: var(--success-soft); color: var(--success-text); border-color: var(--success-border); }
+.status-default { background-color: var(--navy-soft); color: var(--slate); border-color: var(--line); }
+
+.modal-content { border-radius: 14px; border: none; }
+.modal-header { border-bottom: 1px solid var(--line); }
+.modal-footer { border-top: 1px solid var(--line); }
+
+.btn-confirm {
+  background-color: var(--navy-deep);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+}
+.btn-confirm:hover { background-color: #060B14; color: #fff; }
+</style>
 </head>
 <body>
 
@@ -120,7 +306,7 @@ $assignedRequests = $assignedStmt->fetchAll();
       <div class="row g-3">
 
         <div class="col-lg-5">
-          <section class="card border-0 shadow-sm h-100">
+          <section class="card h-100">
             <div class="card-header">
               <h2 class="h6 fw-bold mb-0">Pending Service Requests</h2>
               <p class="small mb-0">Select a request to find recommended staff.</p>
@@ -144,6 +330,10 @@ $assignedRequests = $assignedStmt->fetchAll();
                         </div>
                         <span class="badge-new">New</span>
                       </div>
+                      <div class="mt-2 small" style="color:var(--indigo-text);">
+                        <i class="fa-solid fa-file-signature me-1"></i><?= htmlspecialchars($request['contract_number']) ?>
+                        &middot; &#8369;<?= number_format((float) $request['total_amount'], 2) ?>
+                      </div>
                       <?php if (!empty($request['required_skill'])): ?>
                         <div class="mt-2"><span class="skill-badge"><?= htmlspecialchars($request['required_skill']) ?></span></div>
                       <?php endif; ?>
@@ -156,7 +346,7 @@ $assignedRequests = $assignedStmt->fetchAll();
         </div>
 
         <div class="col-lg-7">
-          <section class="card border-0 shadow-sm h-100">
+          <section class="card h-100">
             <div class="card-header">
               <h2 class="h6 fw-bold mb-0">Recommended Staff</h2>
               <p class="small mb-0" id="matching_subtitle">Select a service request first.</p>
@@ -176,7 +366,7 @@ $assignedRequests = $assignedStmt->fetchAll();
                   <input type="hidden" name="user_id" id="assign_user_id">
                 </form>
 
-                <div class="mb-3 p-3" style="background-color:var(--navy-soft); border-radius:12px;">
+                <div class="mb-3 p-3" style="background-color:var(--navy-soft); border-radius:10px; border:1px solid var(--line);">
                   <div class="fw-semibold small" id="selected_request_title"></div>
                   <div class="small" id="selected_request_company" style="color:var(--ink-soft);"></div>
                   <p class="small mt-2 mb-0" id="selected_request_details" style="color:var(--ink-soft);"></p>
@@ -199,7 +389,7 @@ $assignedRequests = $assignedStmt->fetchAll();
 
       </div>
 
-      <section class="card border-0 shadow-sm mt-3">
+      <section class="card mt-3">
         <div class="card-header">
           <h2 class="h6 fw-bold mb-0">Recently Assigned</h2>
         </div>
@@ -259,7 +449,6 @@ $assignedRequests = $assignedStmt->fetchAll();
         <p class="mb-0">Assign <strong id="confirm_staff_name"></strong> to <strong id="confirm_request_title"></strong>?</p>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn btn-confirm" id="confirm_assign_btn">Confirm Assign</button>
       </div>
     </div>
