@@ -23,14 +23,16 @@ $newRequests        = (int) $pdo->query("SELECT COUNT(*) FROM service_requests W
 $inProgressRequests = (int) $pdo->query("SELECT COUNT(*) FROM service_requests WHERE status = 'In Progress'")->fetchColumn();
 $completedRequests  = (int) $pdo->query("SELECT COUNT(*) FROM service_requests WHERE status = 'Completed'")->fetchColumn();
 
+// Quotation pipeline aligned to current statuses: Draft, Approved, Rejected ('Sent' retired)
 $draftQuotations    = (int) $pdo->query("SELECT COUNT(*) FROM quotations WHERE status = 'Draft'")->fetchColumn();
-$sentQuotations      = (int) $pdo->query("SELECT COUNT(*) FROM quotations WHERE status = 'Sent'")->fetchColumn();
-$approvedQuotations  = (int) $pdo->query("SELECT COUNT(*) FROM quotations WHERE status = 'Approved'")->fetchColumn();
+$approvedQuotations = (int) $pdo->query("SELECT COUNT(*) FROM quotations WHERE status = 'Approved'")->fetchColumn();
+$rejectedQuotations = (int) $pdo->query("SELECT COUNT(*) FROM quotations WHERE status = 'Rejected'")->fetchColumn();
 $quotationValue      = (float) $pdo->query("SELECT COALESCE(SUM(total_amount),0) FROM quotations WHERE status = 'Approved'")->fetchColumn();
 
+// Contract pipeline aligned to current statuses: Draft, Approved, Rejected ('Pending Approval' retired)
 $draftContracts     = (int) $pdo->query("SELECT COUNT(*) FROM contracts WHERE status = 'Draft'")->fetchColumn();
-$pendingContracts   = (int) $pdo->query("SELECT COUNT(*) FROM contracts WHERE status = 'Pending Approval'")->fetchColumn();
 $approvedContracts  = (int) $pdo->query("SELECT COUNT(*) FROM contracts WHERE status = 'Approved'")->fetchColumn();
+$rejectedContracts  = (int) $pdo->query("SELECT COUNT(*) FROM contracts WHERE status = 'Rejected'")->fetchColumn();
 $contractValue      = (float) $pdo->query("SELECT COALESCE(SUM(total_amount),0) FROM contracts WHERE status = 'Approved'")->fetchColumn();
 
 $awaitingAssignment = (int) $pdo->query(
@@ -80,11 +82,11 @@ function requestStatusClass(string $status): string
     };
 }
 
+// Quotation status classes aligned to current pipeline: Draft, Approved, Rejected ('Sent' retired)
 function quotationStatusClass(string $status): string
 {
     return match ($status) {
         'Draft' => 'status-new',
-        'Sent' => 'status-progress',
         'Approved' => 'status-approved',
         'Rejected' => 'status-rejected',
         default => 'status-new',
@@ -105,21 +107,34 @@ function quotationStatusClass(string $status): string
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lexend:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  --navy: #33495C;
-  --navy-soft: #EEF2F5;
-  --teal: #4CA79A;
-  --teal-soft: #E7F5F2;
-  --teal-text: #2E6E63;
-  --amber: #E0A44E;
-  --amber-soft: #FBF1E1;
-  --amber-text: #93662A;
-  --coral: #DB7A66;
-  --coral-soft: #FBECE8;
-  --coral-text: #A2452F;
-  --ink: #2B3540;
-  --ink-soft: #6B7684;
-  --line: #E7EAEE;
-  --canvas: #F6F8F9;
+  --navy: #1E293B;
+  --navy-deep: #0F172A;
+  --navy-soft: #EEF1F6;
+  --indigo: #3B4E8A;
+  --indigo-soft: #E9ECF6;
+  --indigo-text: #2E3E70;
+  --slate: #475569;
+  --slate-soft: #64748B;
+
+  --success: #157A5F;
+  --success-soft: #E3F3EC;
+  --success-text: #0F5F49;
+  --success-border: #BFE3D3;
+
+  --warn: #B7791F;
+  --warn-soft: #FBF0DD;
+  --warn-text: #8A5A15;
+  --warn-border: #EFD8A8;
+
+  --danger: #B4432F;
+  --danger-soft: #FAECE8;
+  --danger-text: #93382A;
+  --danger-border: #EDC7BC;
+
+  --ink: #1A2233;
+  --ink-soft: #667085;
+  --line: #E2E5EB;
+  --canvas: #FFFFFF;
   --card: #FFFFFF;
 }
 
@@ -129,94 +144,108 @@ body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
+.dashboard-layout, .dashboard-main, .dashboard-content {
+  background-color: var(--canvas) !important;
+}
+
 .dashboard-title, h1, h2, h3 {
   font-family: 'Lexend', 'Inter', sans-serif;
 }
 
-.dashboard-title { color: var(--ink); letter-spacing: -0.01em; }
+.dashboard-title { color: var(--navy-deep); letter-spacing: -0.01em; }
 .dashboard-subtitle { color: var(--ink-soft) !important; }
-.dashboard-topbar { border-bottom: 1px solid var(--line) !important; }
+.dashboard-topbar { border-bottom: 1px solid var(--line) !important; background-color: #fff; }
 
-.card { border-radius: 14px; border: 1px solid var(--line); }
+.card { border-radius: 12px; border: 1px solid var(--line); box-shadow: none; }
 
 .card-header {
   border-bottom: 1px solid var(--line) !important;
   background-color: var(--card) !important;
-  border-radius: 14px 14px 0 0 !important;
+  border-radius: 12px 12px 0 0 !important;
   padding: 1rem 1.15rem;
 }
 .card-header h2 { color: var(--ink); letter-spacing: -0.01em; }
 .card-header p { color: var(--ink-soft) !important; }
 
 .metric-card {
-  border-radius: 14px;
+  border-radius: 12px;
   border: 1px solid var(--line);
   background-color: var(--card);
   padding: 1.1rem 1.2rem;
   height: 100%;
 }
 .metric-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 11px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.05rem;
+  font-size: 1rem;
   flex-shrink: 0;
+  background-color: var(--navy-soft);
+  border: 1px solid var(--line);
+  color: var(--indigo-text);
 }
-.metric-label { font-size: .75rem; color: var(--ink-soft); font-weight: 600; }
-.metric-value { font-size: 1.5rem; font-weight: 700; font-family: 'Lexend', sans-serif; color: var(--ink); }
+.metric-label { font-size: .72rem; color: var(--ink-soft); font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
+.metric-value { font-size: 1.4rem; font-weight: 700; font-family: 'Lexend', sans-serif; color: var(--navy-deep); }
 .metric-sub { font-size: .72rem; color: var(--ink-soft); }
 
 .pipeline-box {
-  border-radius: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background-color: var(--card);
   padding: .9rem 1rem;
   height: 100%;
 }
-.pipeline-count { font-size: 1.35rem; font-weight: 700; font-family: 'Lexend', sans-serif; }
-.pipeline-label { font-size: .72rem; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; }
+.pipeline-count { font-size: 1.35rem; font-weight: 700; font-family: 'Lexend', sans-serif; color: var(--navy-deep); }
+.pipeline-label { font-size: .72rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--ink-soft); }
 
 .status-pill {
-  font-size: .68rem;
-  font-weight: 600;
-  padding: .28rem .6rem;
+  font-size: .7rem;
+  font-weight: 700;
+  padding: .32rem .7rem;
   border-radius: 999px;
   white-space: nowrap;
+  letter-spacing: .01em;
+  border: 1px solid transparent;
 }
-.status-new { background-color: var(--navy-soft); color: var(--navy); }
-.status-progress { background-color: var(--amber-soft); color: var(--amber-text); }
-.status-approved { background-color: var(--teal-soft); color: var(--teal-text); }
-.status-rejected { background-color: var(--coral-soft); color: var(--coral-text); }
+.status-new { background-color: var(--navy-soft); color: var(--slate); border-color: var(--line); }
+.status-progress { background-color: var(--warn-soft); color: var(--warn-text); border-color: var(--warn-border); }
+.status-approved { background-color: var(--success-soft); color: var(--success-text); border-color: var(--success-border); }
+.status-rejected { background-color: var(--danger-soft); color: var(--danger-text); border-color: var(--danger-border); }
 
 .table thead th {
   border-bottom: 1px solid var(--line) !important;
   color: var(--ink-soft);
-  font-weight: 600;
-  font-size: .68rem;
-  letter-spacing: .04em;
+  font-weight: 700;
+  font-size: .7rem;
+  letter-spacing: .05em;
   text-transform: uppercase;
-  background-color: var(--canvas) !important;
+  background-color: var(--navy-soft) !important;
 }
-.table td { border-bottom: 1px solid var(--line); vertical-align: middle; font-size: .82rem; }
+.table td { border-bottom: 1px solid var(--line); vertical-align: middle; font-size: .82rem; color: var(--ink); }
 .table-hover tbody tr:hover { background-color: var(--navy-soft); }
 
 .quick-link {
   display: flex;
   align-items: center;
   gap: .75rem;
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid var(--line);
   padding: .85rem 1rem;
   text-decoration: none;
   color: var(--ink);
   transition: border-color .15s ease, background-color .15s ease;
 }
-.quick-link:hover { border-color: var(--teal); background-color: var(--teal-soft); color: var(--ink); }
+.quick-link:hover { border-color: var(--indigo); background-color: var(--indigo-soft); color: var(--ink); }
 .quick-link-icon {
-  width: 38px; height: 38px; border-radius: 10px;
+  width: 38px; height: 38px; border-radius: 9px;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0; font-size: .95rem;
+  background-color: var(--navy-soft);
+  border: 1px solid var(--line);
+  color: var(--indigo-text);
 }
 .quick-link-title { font-weight: 600; font-size: .85rem; }
 .quick-link-sub { font-size: .72rem; color: var(--ink-soft); }
@@ -228,19 +257,20 @@ body {
   overflow: hidden;
   width: 100%;
 }
-.workload-bar-fill { background-color: var(--teal); height: 100%; border-radius: 999px; }
+.workload-bar-fill { background-color: var(--indigo); height: 100%; border-radius: 999px; }
 
 .empty-state { color: var(--ink-soft); }
 .empty-state i { color: #C7D0D6; }
 
-.btn-print {
-  background-color: var(--navy);
-  color: #fff;
-  border: none;
-  border-radius: 9px;
+.btn-view-all {
+  background-color: var(--navy-soft);
+  color: var(--navy-deep);
+  border: 1px solid var(--line);
+  border-radius: 7px;
   font-weight: 600;
+  font-size: .78rem;
 }
-.btn-print:hover { background-color: #263A4A; color: #fff; }
+.btn-view-all:hover { background-color: #E4E8F0; color: var(--navy-deep); }
 
 .print-header { display: none; }
 
@@ -308,9 +338,7 @@ body {
       <div class="row g-3 mb-3">
         <div class="col-6 col-lg-3">
           <div class="metric-card d-flex align-items-center gap-3">
-            <span class="metric-icon" style="background-color:var(--navy-soft);">
-              <i class="fa-solid fa-building" style="color:var(--navy);"></i>
-            </span>
+            <span class="metric-icon"><i class="fa-solid fa-building"></i></span>
             <div>
               <div class="metric-label">Total Clients</div>
               <div class="metric-value"><?= $totalClients ?></div>
@@ -319,9 +347,7 @@ body {
         </div>
         <div class="col-6 col-lg-3">
           <div class="metric-card d-flex align-items-center gap-3">
-            <span class="metric-icon" style="background-color:var(--amber-soft);">
-              <i class="fa-solid fa-clipboard-list" style="color:var(--amber-text);"></i>
-            </span>
+            <span class="metric-icon"><i class="fa-solid fa-clipboard-list"></i></span>
             <div>
               <div class="metric-label">Pending Requests</div>
               <div class="metric-value"><?= $newRequests ?></div>
@@ -330,9 +356,7 @@ body {
         </div>
         <div class="col-6 col-lg-3">
           <div class="metric-card d-flex align-items-center gap-3">
-            <span class="metric-icon" style="background-color:var(--teal-soft);">
-              <i class="fa-solid fa-sack-dollar" style="color:var(--teal-text);"></i>
-            </span>
+            <span class="metric-icon"><i class="fa-solid fa-sack-dollar"></i></span>
             <div>
               <div class="metric-label">Approved Contracts Value</div>
               <div class="metric-value" style="font-size:1.15rem;">&#8369;<?= number_format($contractValue, 2) ?></div>
@@ -341,9 +365,7 @@ body {
         </div>
         <div class="col-6 col-lg-3">
           <div class="metric-card d-flex align-items-center gap-3">
-            <span class="metric-icon" style="background-color:var(--coral-soft);">
-              <i class="fa-solid fa-user-clock" style="color:var(--coral-text);"></i>
-            </span>
+            <span class="metric-icon"><i class="fa-solid fa-user-clock"></i></span>
             <div>
               <div class="metric-label">Awaiting Assignment</div>
               <div class="metric-value"><?= $awaitingAssignment ?></div>
@@ -356,7 +378,7 @@ body {
 
         <div class="col-lg-8">
 
-          <section class="card border-0 shadow-sm mb-3">
+          <section class="card mb-3">
             <div class="card-header">
               <h2 class="h6 fw-bold mb-0">Pipeline Overview</h2>
               <p class="small mb-0">Service requests, quotations, and contracts across every stage.</p>
@@ -365,21 +387,21 @@ body {
               <div class="row g-2 mb-2">
                 <div class="col-12"><span class="small fw-semibold" style="color:var(--ink-soft);">Service Requests</span></div>
                 <div class="col-4">
-                  <div class="pipeline-box" style="background-color:var(--navy-soft);">
-                    <div class="pipeline-count" style="color:var(--navy);"><?= $newRequests ?></div>
-                    <div class="pipeline-label" style="color:var(--navy);">New</div>
+                  <div class="pipeline-box">
+                    <div class="pipeline-count"><?= $newRequests ?></div>
+                    <div class="pipeline-label">New</div>
                   </div>
                 </div>
                 <div class="col-4">
-                  <div class="pipeline-box" style="background-color:var(--amber-soft);">
-                    <div class="pipeline-count" style="color:var(--amber-text);"><?= $inProgressRequests ?></div>
-                    <div class="pipeline-label" style="color:var(--amber-text);">In Progress</div>
+                  <div class="pipeline-box">
+                    <div class="pipeline-count" style="color:var(--warn-text);"><?= $inProgressRequests ?></div>
+                    <div class="pipeline-label" style="color:var(--warn-text);">In Progress</div>
                   </div>
                 </div>
                 <div class="col-4">
-                  <div class="pipeline-box" style="background-color:var(--teal-soft);">
-                    <div class="pipeline-count" style="color:var(--teal-text);"><?= $completedRequests ?></div>
-                    <div class="pipeline-label" style="color:var(--teal-text);">Completed</div>
+                  <div class="pipeline-box">
+                    <div class="pipeline-count" style="color:var(--success-text);"><?= $completedRequests ?></div>
+                    <div class="pipeline-label" style="color:var(--success-text);">Completed</div>
                   </div>
                 </div>
               </div>
@@ -387,21 +409,21 @@ body {
               <div class="row g-2 mb-2 mt-1">
                 <div class="col-12"><span class="small fw-semibold" style="color:var(--ink-soft);">Quotations</span></div>
                 <div class="col-4">
-                  <div class="pipeline-box" style="background-color:var(--navy-soft);">
-                    <div class="pipeline-count" style="color:var(--navy);"><?= $draftQuotations ?></div>
-                    <div class="pipeline-label" style="color:var(--navy);">Draft</div>
+                  <div class="pipeline-box">
+                    <div class="pipeline-count"><?= $draftQuotations ?></div>
+                    <div class="pipeline-label">Draft</div>
                   </div>
                 </div>
                 <div class="col-4">
-                  <div class="pipeline-box" style="background-color:var(--amber-soft);">
-                    <div class="pipeline-count" style="color:var(--amber-text);"><?= $sentQuotations ?></div>
-                    <div class="pipeline-label" style="color:var(--amber-text);">Sent</div>
+                  <div class="pipeline-box">
+                    <div class="pipeline-count" style="color:var(--success-text);"><?= $approvedQuotations ?></div>
+                    <div class="pipeline-label" style="color:var(--success-text);">Approved</div>
                   </div>
                 </div>
                 <div class="col-4">
-                  <div class="pipeline-box" style="background-color:var(--teal-soft);">
-                    <div class="pipeline-count" style="color:var(--teal-text);"><?= $approvedQuotations ?></div>
-                    <div class="pipeline-label" style="color:var(--teal-text);">Approved</div>
+                  <div class="pipeline-box">
+                    <div class="pipeline-count" style="color:var(--danger-text);"><?= $rejectedQuotations ?></div>
+                    <div class="pipeline-label" style="color:var(--danger-text);">Rejected</div>
                   </div>
                 </div>
               </div>
@@ -409,34 +431,34 @@ body {
               <div class="row g-2 mt-1">
                 <div class="col-12"><span class="small fw-semibold" style="color:var(--ink-soft);">Contracts</span></div>
                 <div class="col-4">
-                  <div class="pipeline-box" style="background-color:var(--navy-soft);">
-                    <div class="pipeline-count" style="color:var(--navy);"><?= $draftContracts ?></div>
-                    <div class="pipeline-label" style="color:var(--navy);">Draft</div>
+                  <div class="pipeline-box">
+                    <div class="pipeline-count"><?= $draftContracts ?></div>
+                    <div class="pipeline-label">Draft</div>
                   </div>
                 </div>
                 <div class="col-4">
-                  <div class="pipeline-box" style="background-color:var(--amber-soft);">
-                    <div class="pipeline-count" style="color:var(--amber-text);"><?= $pendingContracts ?></div>
-                    <div class="pipeline-label" style="color:var(--amber-text);">Pending Approval</div>
+                  <div class="pipeline-box">
+                    <div class="pipeline-count" style="color:var(--success-text);"><?= $approvedContracts ?></div>
+                    <div class="pipeline-label" style="color:var(--success-text);">Approved</div>
                   </div>
                 </div>
                 <div class="col-4">
-                  <div class="pipeline-box" style="background-color:var(--teal-soft);">
-                    <div class="pipeline-count" style="color:var(--teal-text);"><?= $approvedContracts ?></div>
-                    <div class="pipeline-label" style="color:var(--teal-text);">Approved</div>
+                  <div class="pipeline-box">
+                    <div class="pipeline-count" style="color:var(--danger-text);"><?= $rejectedContracts ?></div>
+                    <div class="pipeline-label" style="color:var(--danger-text);">Rejected</div>
                   </div>
                 </div>
               </div>
             </div>
           </section>
 
-          <section class="card border-0 shadow-sm mb-3">
+          <section class="card mb-3">
             <div class="card-header d-flex justify-content-between align-items-center">
               <div>
                 <h2 class="h6 fw-bold mb-0">Recent Service Requests</h2>
                 <p class="small mb-0">Latest requests recorded across all clients.</p>
               </div>
-              <a href="client_management.php?tab=requests" class="btn btn-sm" style="background-color:var(--navy-soft); color:var(--navy); font-weight:600;">View All</a>
+              <a href="client_management.php?tab=requests" class="btn btn-view-all btn-sm">View All</a>
             </div>
             <div class="table-responsive">
               <table class="table table-hover align-middle mb-0">
@@ -468,48 +490,48 @@ body {
 
         <div class="col-lg-4">
 
-          <section class="card border-0 shadow-sm mb-3">
+          <section class="card mb-3">
             <div class="card-header">
               <h2 class="h6 fw-bold mb-0">Quick Actions</h2>
             </div>
             <div class="card-body d-flex flex-column gap-2">
               <a href="client_management.php" class="quick-link">
-                <span class="quick-link-icon" style="background-color:var(--navy-soft);"><i class="fa-solid fa-building" style="color:var(--navy);"></i></span>
+                <span class="quick-link-icon"><i class="fa-solid fa-building"></i></span>
                 <div>
                   <div class="quick-link-title">Client Management</div>
                   <div class="quick-link-sub">Clients &amp; service requests</div>
                 </div>
               </a>
               <a href="cpq_builder.php" class="quick-link">
-                <span class="quick-link-icon" style="background-color:var(--teal-soft);"><i class="fa-solid fa-file-invoice-dollar" style="color:var(--teal-text);"></i></span>
+                <span class="quick-link-icon"><i class="fa-solid fa-file-invoice-dollar"></i></span>
                 <div>
                   <div class="quick-link-title">CPQ &amp; Scope Builder</div>
                   <div class="quick-link-sub">Create client quotations</div>
                 </div>
               </a>
               <a href="sow_contract.php" class="quick-link">
-                <span class="quick-link-icon" style="background-color:var(--amber-soft);"><i class="fa-solid fa-file-signature" style="color:var(--amber-text);"></i></span>
+                <span class="quick-link-icon"><i class="fa-solid fa-file-signature"></i></span>
                 <div>
                   <div class="quick-link-title">SOW &amp; Contracts</div>
                   <div class="quick-link-sub">Generate &amp; approve contracts</div>
                 </div>
               </a>
               <a href="resource_matching.php" class="quick-link">
-                <span class="quick-link-icon" style="background-color:var(--coral-soft);"><i class="fa-solid fa-people-arrows" style="color:var(--coral-text);"></i></span>
+                <span class="quick-link-icon"><i class="fa-solid fa-people-arrows"></i></span>
                 <div>
                   <div class="quick-link-title">Resource Matching</div>
                   <div class="quick-link-sub">Assign staff to contracts</div>
                 </div>
               </a>
               <a href="calendar_schedule.php" class="quick-link">
-                <span class="quick-link-icon" style="background-color:var(--amber-soft);"><i class="fa-solid fa-calendar-days" style="color:var(--amber-text);"></i></span>
+                <span class="quick-link-icon"><i class="fa-solid fa-calendar-days"></i></span>
                 <div>
                   <div class="quick-link-title">Calendar &amp; Schedule</div>
                   <div class="quick-link-sub">Deadlines &amp; engagement dates</div>
                 </div>
               </a>
               <a href="reports_analytics.php" class="quick-link">
-                <span class="quick-link-icon" style="background-color:var(--navy-soft);"><i class="fa-solid fa-chart-line" style="color:var(--navy);"></i></span>
+                <span class="quick-link-icon"><i class="fa-solid fa-chart-line"></i></span>
                 <div>
                   <div class="quick-link-title">Reports &amp; Analytics</div>
                   <div class="quick-link-sub">Revenue, trends &amp; performance</div>
@@ -518,7 +540,7 @@ body {
             </div>
           </section>
 
-          <section class="card border-0 shadow-sm mb-3">
+          <section class="card mb-3">
             <div class="card-header">
               <h2 class="h6 fw-bold mb-0">Staff Workload</h2>
               <p class="small mb-0"><?= $activeStaffCount ?> active staff members</p>
@@ -546,7 +568,7 @@ body {
             </div>
           </section>
 
-          <section class="card border-0 shadow-sm">
+          <section class="card">
             <div class="card-header">
               <h2 class="h6 fw-bold mb-0">Recent Quotations</h2>
             </div>
@@ -561,7 +583,7 @@ body {
                       <div class="small" style="color:var(--ink-soft);"><?= htmlspecialchars($q['company_name']) ?></div>
                     </div>
                     <div class="text-end">
-                      <div class="small fw-semibold" style="color:var(--teal-text);">&#8369;<?= number_format((float) $q['total_amount'], 2) ?></div>
+                      <div class="small fw-semibold" style="color:var(--success-text);">&#8369;<?= number_format((float) $q['total_amount'], 2) ?></div>
                       <span class="status-pill <?= quotationStatusClass($q['status']) ?>"><?= htmlspecialchars($q['status']) ?></span>
                     </div>
                   </div>

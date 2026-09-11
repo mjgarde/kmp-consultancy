@@ -110,7 +110,9 @@ $requestStatusStmt = $pdo->prepare(
 $requestStatusStmt->execute(['from' => $rangeFrom, 'to' => $rangeTo]);
 $requestStatusCounts = ['New' => 0, 'In Progress' => 0, 'Completed' => 0, 'Cancelled' => 0];
 foreach ($requestStatusStmt->fetchAll() as $row) {
-    $requestStatusCounts[$row['status']] = (int) $row['cnt'];
+    if (isset($requestStatusCounts[$row['status']])) {
+        $requestStatusCounts[$row['status']] = (int) $row['cnt'];
+    }
 }
 
 $requestsByIndustryStmt = $pdo->prepare(
@@ -125,13 +127,16 @@ $requestsByIndustryStmt = $pdo->prepare(
 $requestsByIndustryStmt->execute(['from' => $rangeFrom, 'to' => $rangeTo]);
 $requestsByIndustry = $requestsByIndustryStmt->fetchAll();
 
+// Quotation statuses aligned to current pipeline: Draft, Approved, Rejected only ('Sent' retired)
 $quotationConversionStmt = $pdo->prepare(
     "SELECT status, COUNT(*) AS cnt FROM quotations WHERE created_at BETWEEN :from AND :to GROUP BY status"
 );
 $quotationConversionStmt->execute(['from' => $rangeFrom, 'to' => $rangeTo]);
-$quotationStatusCounts = ['Draft' => 0, 'Sent' => 0, 'Approved' => 0, 'Rejected' => 0];
+$quotationStatusCounts = ['Draft' => 0, 'Approved' => 0, 'Rejected' => 0];
 foreach ($quotationConversionStmt->fetchAll() as $row) {
-    $quotationStatusCounts[$row['status']] = (int) $row['cnt'];
+    if (isset($quotationStatusCounts[$row['status']])) {
+        $quotationStatusCounts[$row['status']] = (int) $row['cnt'];
+    }
 }
 $totalQuotationsInRange = array_sum($quotationStatusCounts);
 $conversionRate = $totalQuotationsInRange > 0
@@ -144,13 +149,15 @@ $avgDealSizeStmt = $pdo->prepare(
 $avgDealSizeStmt->execute(['from' => $rangeFrom, 'to' => $rangeTo]);
 $avgDealSize = (float) $avgDealSizeStmt->fetchColumn();
 
-$pendingContractValueStmt = $pdo->prepare(
-    "SELECT COALESCE(SUM(total_amount),0), COUNT(*) FROM contracts WHERE status = 'Pending Approval' AND created_at BETWEEN :from AND :to"
+// "Pending Approval" status retired for contracts; contracts are now Draft, Approved, or Rejected.
+// This metric now reflects Draft contracts awaiting review instead.
+$draftContractValueStmt = $pdo->prepare(
+    "SELECT COALESCE(SUM(total_amount),0), COUNT(*) FROM contracts WHERE status = 'Draft' AND created_at BETWEEN :from AND :to"
 );
-$pendingContractValueStmt->execute(['from' => $rangeFrom, 'to' => $rangeTo]);
-$pendingContractRow = $pendingContractValueStmt->fetch(PDO::FETCH_NUM);
-$pendingContractValue = (float) $pendingContractRow[0];
-$pendingContractCount = (int) $pendingContractRow[1];
+$draftContractValueStmt->execute(['from' => $rangeFrom, 'to' => $rangeTo]);
+$draftContractRow = $draftContractValueStmt->fetch(PDO::FETCH_NUM);
+$draftContractValue = (float) $draftContractRow[0];
+$draftContractCount = (int) $draftContractRow[1];
 
 $topClientsStmt = $pdo->prepare(
     "SELECT c.company_name, c.industry, COALESCE(SUM(ct.total_amount),0) AS total_value, COUNT(ct.contract_id) AS contract_count
@@ -196,11 +203,13 @@ $completedRequestsAllTime = (int) $completedRequestsStmt->fetchColumn();
 
 $completionRate = $totalRequestsAllTime > 0 ? round(($completedRequestsAllTime / $totalRequestsAllTime) * 100, 1) : 0.0;
 
+// Status classes aligned to current pipeline: New/Draft, In Progress, Completed/Approved, Cancelled/Rejected.
+// 'Sent' and 'Pending Approval' removed — no longer valid statuses.
 function statusClass(string $status): string
 {
     return match ($status) {
         'New', 'Draft' => 'status-new',
-        'In Progress', 'Sent', 'Pending Approval' => 'status-progress',
+        'In Progress' => 'status-progress',
         'Completed', 'Approved' => 'status-approved',
         'Cancelled', 'Rejected' => 'status-rejected',
         default => 'status-new',
@@ -222,21 +231,34 @@ function statusClass(string $status): string
 <script src="../assets/vendor/chartjs/chart.umd.js"></script>
 <style>
 :root {
-  --navy: #33495C;
-  --navy-soft: #EEF2F5;
-  --teal: #4CA79A;
-  --teal-soft: #E7F5F2;
-  --teal-text: #2E6E63;
-  --amber: #E0A44E;
-  --amber-soft: #FBF1E1;
-  --amber-text: #93662A;
-  --coral: #DB7A66;
-  --coral-soft: #FBECE8;
-  --coral-text: #A2452F;
-  --ink: #2B3540;
-  --ink-soft: #6B7684;
-  --line: #E7EAEE;
-  --canvas: #F6F8F9;
+  --navy: #1E293B;
+  --navy-deep: #0F172A;
+  --navy-soft: #EEF1F6;
+  --indigo: #3B4E8A;
+  --indigo-soft: #E9ECF6;
+  --indigo-text: #2E3E70;
+  --slate: #475569;
+  --slate-soft: #64748B;
+
+  --success: #157A5F;
+  --success-soft: #E3F3EC;
+  --success-text: #0F5F49;
+  --success-border: #BFE3D3;
+
+  --warn: #B7791F;
+  --warn-soft: #FBF0DD;
+  --warn-text: #8A5A15;
+  --warn-border: #EFD8A8;
+
+  --danger: #B4432F;
+  --danger-soft: #FAECE8;
+  --danger-text: #93382A;
+  --danger-border: #EDC7BC;
+
+  --ink: #1A2233;
+  --ink-soft: #667085;
+  --line: #E2E5EB;
+  --canvas: #FFFFFF;
   --card: #FFFFFF;
 }
 
@@ -246,116 +268,91 @@ body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
+.dashboard-layout, .dashboard-main, .dashboard-content {
+  background-color: var(--canvas) !important;
+}
+
 .dashboard-title, h1, h2, h3 {
   font-family: 'Lexend', 'Inter', sans-serif;
 }
 
-.dashboard-title { color: var(--ink); letter-spacing: -0.01em; }
+.dashboard-title { color: var(--navy-deep); letter-spacing: -0.01em; }
 .dashboard-subtitle { color: var(--ink-soft) !important; }
-.dashboard-topbar { border-bottom: 1px solid var(--line) !important; }
+.dashboard-topbar { border-bottom: 1px solid var(--line) !important; background-color: #fff; }
 
-.card { border-radius: 14px; border: 1px solid var(--line); }
+.card { border-radius: 12px; border: 1px solid var(--line); box-shadow: none; }
 
 .card-header {
   border-bottom: 1px solid var(--line) !important;
   background-color: var(--card) !important;
-  border-radius: 14px 14px 0 0 !important;
+  border-radius: 12px 12px 0 0 !important;
   padding: 1rem 1.15rem;
 }
 .card-header h2 { color: var(--ink); letter-spacing: -0.01em; }
 .card-header p { color: var(--ink-soft) !important; }
 
 .metric-card {
-  border-radius: 14px;
+  border-radius: 12px;
   border: 1px solid var(--line);
   background-color: var(--card);
   padding: 1.1rem 1.2rem;
   height: 100%;
 }
-.metric-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 11px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.05rem;
-  flex-shrink: 0;
-}
-.metric-label { font-size: .75rem; color: var(--ink-soft); font-weight: 600; }
-.metric-value { font-size: 1.5rem; font-weight: 700; font-family: 'Lexend', sans-serif; color: var(--ink); }
+.metric-label { font-size: .72rem; color: var(--ink-soft); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.metric-value { font-size: 1.5rem; font-weight: 700; font-family: 'Lexend', sans-serif; color: var(--navy-deep); }
 .metric-sub { font-size: .72rem; color: var(--ink-soft); }
-.metric-trend { font-size: .72rem; font-weight: 600; }
-.metric-trend.up { color: var(--teal-text); }
-.metric-trend.down { color: var(--coral-text); }
 
 .status-pill {
-  font-size: .68rem;
-  font-weight: 600;
-  padding: .28rem .6rem;
+  font-size: .7rem;
+  font-weight: 700;
+  padding: .32rem .7rem;
   border-radius: 999px;
   white-space: nowrap;
+  letter-spacing: .01em;
+  border: 1px solid transparent;
 }
-.status-new { background-color: var(--navy-soft); color: var(--navy); }
-.status-progress { background-color: var(--amber-soft); color: var(--amber-text); }
-.status-approved { background-color: var(--teal-soft); color: var(--teal-text); }
-.status-rejected { background-color: var(--coral-soft); color: var(--coral-text); }
+.status-new { background-color: var(--navy-soft); color: var(--slate); border-color: var(--line); }
+.status-progress { background-color: var(--warn-soft); color: var(--warn-text); border-color: var(--warn-border); }
+.status-approved { background-color: var(--success-soft); color: var(--success-text); border-color: var(--success-border); }
+.status-rejected { background-color: var(--danger-soft); color: var(--danger-text); border-color: var(--danger-border); }
 
 .table thead th {
   border-bottom: 1px solid var(--line) !important;
   color: var(--ink-soft);
-  font-weight: 600;
-  font-size: .68rem;
-  letter-spacing: .04em;
+  font-weight: 700;
+  font-size: .7rem;
+  letter-spacing: .05em;
   text-transform: uppercase;
-  background-color: var(--canvas) !important;
+  background-color: var(--navy-soft) !important;
 }
-.table td { border-bottom: 1px solid var(--line); vertical-align: middle; font-size: .82rem; }
+.table td { border-bottom: 1px solid var(--line); vertical-align: middle; font-size: .82rem; color: var(--ink); }
 .table-hover tbody tr:hover { background-color: var(--navy-soft); }
-
-.workload-bar-track {
-  background-color: var(--navy-soft);
-  border-radius: 999px;
-  height: 6px;
-  overflow: hidden;
-  width: 100%;
-}
-.workload-bar-fill { background-color: var(--teal); height: 100%; border-radius: 999px; }
 
 .empty-state { color: var(--ink-soft); }
 .empty-state i { color: #C7D0D6; }
 
-.btn-print {
-  background-color: var(--navy);
+.btn-outline-print {
+  background-color: #fff;
+  color: var(--indigo-text);
+  border: 1px solid var(--indigo);
+  border-radius: 8px;
+  font-weight: 600;
+}
+.btn-outline-print:hover { background-color: var(--indigo-soft); color: var(--indigo-text); }
+
+.btn-apply {
+  background-color: var(--navy-deep);
   color: #fff;
   border: none;
-  border-radius: 9px;
+  border-radius: 8px;
   font-weight: 600;
 }
-.btn-print:hover { background-color: #263A4A; color: #fff; }
+.btn-apply:hover { background-color: #060B14; color: #fff; }
 
-.range-toggle {
-  display: flex;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  overflow: hidden;
-}
-.range-toggle a {
-  padding: .4rem .85rem;
-  font-size: .78rem;
-  font-weight: 600;
-  color: var(--ink-soft);
-  text-decoration: none;
-  background-color: var(--card);
-}
-.range-toggle a.active { background-color: var(--navy); color: #fff; }
-.range-toggle a:not(:last-child) { border-right: 1px solid var(--line); }
+.form-control:focus { border-color: var(--indigo); box-shadow: 0 0 0 .2rem rgba(59,78,138,.13); }
+.form-control:hover { border-color: #C6CCD8; }
 
 .chart-wrap { position: relative; }
-
-.legend-dot {
-  width: 9px; height: 9px; border-radius: 999px; display: inline-block; margin-right: 6px;
-}
 
 .print-header { display: none; }
 
@@ -375,11 +372,7 @@ body {
     color: var(--navy);
     margin-bottom: 2px;
   }
-  .print-header p {
-    font-size: 12px;
-    color: var(--ink-soft);
-    margin: 0;
-  }
+  .print-header p { font-size: 12px; color: var(--ink-soft); margin: 0; }
   body { background-color: #fff !important; }
   .dashboard-layout { display: block !important; }
   .dashboard-layout > *:not(.dashboard-main) { display: none !important; }
@@ -414,9 +407,9 @@ body {
           <input type="date" name="from" value="<?= htmlspecialchars($fromDate->format('Y-m-d')) ?>" class="form-control form-control-sm" style="width:150px;">
           <span class="small" style="color:var(--ink-soft);">to</span>
           <input type="date" name="to" value="<?= htmlspecialchars($toDate->format('Y-m-d')) ?>" class="form-control form-control-sm" style="width:150px;">
-          <button type="submit" class="btn btn-sm px-3" style="background-color:var(--navy); color:#fff; font-weight:600;">Apply</button>
+          <button type="submit" class="btn btn-apply btn-sm px-3">Apply</button>
         </form>
-        <button type="button" class="btn btn-print btn-sm px-3" onclick="window.print()">
+        <button type="button" class="btn btn-outline-print btn-sm px-3" onclick="window.print()">
           <i class="fa-solid fa-print me-1"></i> Print
         </button>
       </div>
@@ -460,9 +453,9 @@ body {
         </div>
         <div class="col-6 col-lg-3">
           <div class="metric-card">
-            <div class="metric-label mb-1">Pending Approval Value</div>
-            <div class="metric-value" style="font-size:1.25rem;">&#8369;<?= number_format($pendingContractValue, 2) ?></div>
-            <div class="metric-sub mt-1"><?= $pendingContractCount ?> contract<?= $pendingContractCount === 1 ? '' : 's' ?> awaiting approval</div>
+            <div class="metric-label mb-1">Draft Contract Value</div>
+            <div class="metric-value" style="font-size:1.25rem;">&#8369;<?= number_format($draftContractValue, 2) ?></div>
+            <div class="metric-sub mt-1"><?= $draftContractCount ?> contract<?= $draftContractCount === 1 ? '' : 's' ?> awaiting review</div>
           </div>
         </div>
       </div>
@@ -471,7 +464,7 @@ body {
 
         <div class="col-lg-8">
 
-          <section class="card border-0 shadow-sm mb-3">
+          <section class="card mb-3">
             <div class="card-header">
               <h2 class="h6 fw-bold mb-0">Revenue Over Time</h2>
               <p class="small mb-0">Approved contract value versus quotation value issued per month.</p>
@@ -483,7 +476,7 @@ body {
             </div>
           </section>
 
-          <section class="card border-0 shadow-sm mb-3">
+          <section class="card mb-3">
             <div class="card-header">
               <h2 class="h6 fw-bold mb-0">Service Requests by Industry</h2>
               <p class="small mb-0">Where client demand is concentrated across sectors.</p>
@@ -499,7 +492,7 @@ body {
             </div>
           </section>
 
-          <section class="card border-0 shadow-sm">
+          <section class="card">
             <div class="card-header">
               <h2 class="h6 fw-bold mb-0">Top Clients by Contract Value</h2>
               <p class="small mb-0">Highest-value client relationships to date.</p>
@@ -523,7 +516,7 @@ body {
                         <td class="fw-semibold"><?= htmlspecialchars($c['company_name']) ?></td>
                         <td class="d-none d-md-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars($c['industry'] ?? '—') ?></td>
                         <td><?= (int) $c['contract_count'] ?></td>
-                        <td class="fw-semibold" style="color:var(--teal-text);">&#8369;<?= number_format((float) $c['total_value'], 2) ?></td>
+                        <td class="fw-semibold" style="color:var(--success-text);">&#8369;<?= number_format((float) $c['total_value'], 2) ?></td>
                       </tr>
                     <?php endforeach; ?>
                   <?php endif; ?>
@@ -536,7 +529,7 @@ body {
 
         <div class="col-lg-4">
 
-          <section class="card border-0 shadow-sm mb-3">
+          <section class="card mb-3">
             <div class="card-header">
               <h2 class="h6 fw-bold mb-0">Request Status Breakdown</h2>
             </div>
@@ -551,9 +544,10 @@ body {
             </div>
           </section>
 
-          <section class="card border-0 shadow-sm mb-3">
+          <section class="card mb-3">
             <div class="card-header">
               <h2 class="h6 fw-bold mb-0">Quotation Pipeline</h2>
+              <p class="small mb-0">Draft, Approved, Rejected.</p>
             </div>
             <div class="card-body">
               <?php if ($totalQuotationsInRange === 0): ?>
@@ -566,7 +560,7 @@ body {
             </div>
           </section>
 
-          <section class="card border-0 shadow-sm">
+          <section class="card">
             <div class="card-header">
               <h2 class="h6 fw-bold mb-0">Staff Performance</h2>
               <p class="small mb-0">Completed vs. active service requests.</p>
@@ -609,7 +603,7 @@ body {
 <script>
 const chartFont = { family: 'Inter', size: 11 };
 Chart.defaults.font = chartFont;
-Chart.defaults.color = '#6B7684';
+Chart.defaults.color = '#667085';
 
 const monthLabels = <?= json_encode(array_values($monthLabels)) ?>;
 const contractRevenue = <?= json_encode(array_values($revenueByMonth)) ?>;
@@ -623,8 +617,8 @@ new Chart(document.getElementById('revenueChart'), {
       {
         label: 'Approved Contract Value',
         data: contractRevenue,
-        borderColor: '#4CA79A',
-        backgroundColor: 'rgba(76,167,154,0.12)',
+        borderColor: '#157A5F',
+        backgroundColor: 'rgba(21,122,95,0.10)',
         fill: true,
         tension: 0.35,
         pointRadius: 3,
@@ -632,8 +626,8 @@ new Chart(document.getElementById('revenueChart'), {
       {
         label: 'Quotation Value Issued',
         data: quotationValue,
-        borderColor: '#33495C',
-        backgroundColor: 'rgba(51,73,92,0.06)',
+        borderColor: '#3B4E8A',
+        backgroundColor: 'rgba(59,78,138,0.06)',
         fill: true,
         tension: 0.35,
         pointRadius: 3,
@@ -645,7 +639,7 @@ new Chart(document.getElementById('revenueChart'), {
     maintainAspectRatio: false,
     plugins: { legend: { position: 'top', align: 'end', labels: { boxWidth: 10, boxHeight: 10 } } },
     scales: {
-      y: { beginAtZero: true, grid: { color: '#E7EAEE' }, ticks: { callback: (v) => '\u20B1' + v.toLocaleString() } },
+      y: { beginAtZero: true, grid: { color: '#E2E5EB' }, ticks: { callback: (v) => '\u20B1' + v.toLocaleString() } },
       x: { grid: { display: false } }
     }
   }
@@ -662,7 +656,7 @@ new Chart(document.getElementById('industryChart'), {
     datasets: [{
       label: 'Service Requests',
       data: industryCounts,
-      backgroundColor: '#4CA79A',
+      backgroundColor: '#3B4E8A',
       borderRadius: 6,
       maxBarThickness: 34,
     }]
@@ -672,13 +666,14 @@ new Chart(document.getElementById('industryChart'), {
     maintainAspectRatio: false,
     plugins: { legend: { display: false } },
     scales: {
-      y: { beginAtZero: true, grid: { color: '#E7EAEE' }, ticks: { precision: 0 } },
+      y: { beginAtZero: true, grid: { color: '#E2E5EB' }, ticks: { precision: 0 } },
       x: { grid: { display: false } }
     }
   }
 });
 }
 
+// Request statuses: New, In Progress, Completed, Cancelled
 if (document.getElementById('requestStatusChart')) {
 new Chart(document.getElementById('requestStatusChart'), {
   type: 'doughnut',
@@ -686,7 +681,7 @@ new Chart(document.getElementById('requestStatusChart'), {
     labels: <?= json_encode(array_keys($requestStatusCounts)) ?>,
     datasets: [{
       data: <?= json_encode(array_values($requestStatusCounts)) ?>,
-      backgroundColor: ['#33495C', '#E0A44E', '#4CA79A', '#DB7A66'],
+      backgroundColor: ['#64748B', '#B7791F', '#157A5F', '#B4432F'],
       borderWidth: 0,
     }]
   },
@@ -706,7 +701,7 @@ new Chart(document.getElementById('quotationStatusChart'), {
     labels: <?= json_encode(array_keys($quotationStatusCounts)) ?>,
     datasets: [{
       data: <?= json_encode(array_values($quotationStatusCounts)) ?>,
-      backgroundColor: ['#33495C', '#E0A44E', '#4CA79A', '#DB7A66'],
+      backgroundColor: ['#64748B', '#157A5F', '#B4432F'],
       borderWidth: 0,
     }]
   },

@@ -336,25 +336,44 @@ body {
 }
 .btn-teal-solid:hover { background-color: var(--indigo-text); color: #fff; }
 
-.btn-ghost {
-  background-color: var(--navy-soft);
-  color: var(--navy);
-  border: 1px solid var(--line);
+.btn-icon-neutral {
+  background-color: var(--indigo);
+  color: #fff;
+  border: none;
   border-radius: 7px;
-  font-weight: 600;
-  font-size: .8rem;
+  font-size: .85rem;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
 }
-.btn-ghost:hover { background-color: #E4E8F0; color: var(--navy); }
+.btn-icon-neutral:hover { background-color: var(--indigo-text); color: #fff; }
 
-.btn-danger-soft {
-  background-color: var(--danger-soft);
-  color: var(--danger-text);
-  border: 1px solid var(--danger-border);
+.btn-icon-danger {
+  background-color: var(--danger);
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  font-size: .85rem;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.btn-icon-danger:hover { background-color: #93382A; color: #fff; }
+
+.btn-text-danger {
+  background-color: var(--danger);
+  color: #fff;
+  border: none;
   border-radius: 7px;
   font-weight: 600;
-  font-size: .8rem;
 }
-.btn-danger-soft:hover { background-color: var(--danger); color: #fff; border-color: var(--danger); }
+.btn-text-danger:hover { background-color: #93382A; color: #fff; }
 
 .stat-card {
   background-color: var(--card);
@@ -594,7 +613,7 @@ body {
                       <td class="small d-none d-lg-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars($client['email']) ?></td>
                       <td class="small d-none d-lg-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars($client['contact_number']) ?></td>
                       <td class="text-end" onclick="event.stopPropagation();">
-                        <button type="button" class="btn btn-ghost btn-sm" title="Edit"
+                        <button type="button" class="btn btn-icon-neutral" title="Edit"
                           data-bs-toggle="modal" data-bs-target="#editClientModal"
                           data-id="<?= $client['client_id'] ?>"
                           data-company="<?= htmlspecialchars($client['company_name']) ?>"
@@ -605,7 +624,7 @@ body {
                           data-industry="<?= htmlspecialchars($client['industry'] ?? '') ?>">
                           <i class="fa-regular fa-pen-to-square"></i>
                         </button>
-                        <button type="button" class="btn btn-danger-soft btn-sm" title="Delete"
+                        <button type="button" class="btn btn-icon-danger" title="Delete"
                           data-bs-toggle="modal" data-bs-target="#deleteClientModal"
                           data-id="<?= $client['client_id'] ?>"
                           data-name="<?= htmlspecialchars($client['company_name']) ?>">
@@ -711,7 +730,7 @@ body {
                         <span class="status-pill <?= statusBadgeClass($request['status']) ?>"><?= htmlspecialchars($request['status']) ?></span>
                       </td>
                       <td class="text-end">
-                        <button type="button" class="btn btn-ghost btn-sm" title="Manage"
+                        <button type="button" class="btn btn-icon-neutral" title="Manage"
                           data-bs-toggle="modal" data-bs-target="#manageRequestModal"
                           data-id="<?= $request['request_id'] ?>"
                           data-title="<?= htmlspecialchars($request['request_title']) ?>"
@@ -719,7 +738,7 @@ body {
                           data-status="<?= htmlspecialchars($request['status']) ?>">
                           <i class="fa-regular fa-pen-to-square"></i>
                         </button>
-                        <button type="button" class="btn btn-danger-soft btn-sm" title="Delete"
+                        <button type="button" class="btn btn-icon-danger" title="Delete"
                           data-bs-toggle="modal" data-bs-target="#deleteRequestModal"
                           data-id="<?= $request['request_id'] ?>"
                           data-title="<?= htmlspecialchars($request['request_title']) ?>">
@@ -970,7 +989,7 @@ body {
           <p class="mb-0">Are you sure you want to delete <strong id="delete_client_name"></strong>? This will also remove all related service requests.</p>
         </div>
         <div class="modal-footer">
-          <button type="submit" class="btn btn-danger-soft">Delete Client</button>
+          <button type="submit" class="btn btn-text-danger">Delete Client</button>
         </div>
       </form>
     </div>
@@ -1068,7 +1087,7 @@ body {
           <p class="mb-0">Are you sure you want to delete <strong id="delete_request_title"></strong>?</p>
         </div>
         <div class="modal-footer">
-          <button type="submit" class="btn btn-danger-soft">Delete Request</button>
+          <button type="submit" class="btn btn-text-danger">Delete Request</button>
         </div>
       </form>
     </div>
