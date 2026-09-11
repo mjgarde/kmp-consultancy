@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost
--- Generation Time: Aug 30, 2026 at 05:34 AM
+-- Generation Time: Sep 11, 2026 at 01:38 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.1.25
 
@@ -111,7 +111,9 @@ CREATE TABLE `contracts` (
 --
 
 INSERT INTO `contracts` (`contract_id`, `contract_number`, `quotation_id`, `request_id`, `client_id`, `scope_summary`, `terms_conditions`, `total_amount`, `start_date`, `end_date`, `status`, `prepared_by`, `approved_by`, `approved_at`, `created_at`, `updated_at`) VALUES
-(1, 'SOW-2026-0001', 2, 7, 5, 'Review of quarterly tax filings prior to submission, covering VAT, withholding tax, and income tax computations.', 'g', 13440.00, '2027-02-15', '2027-02-16', 'Pending Approval', 4, 4, '2026-08-21 23:18:07', '2026-08-21 23:16:24', '2026-08-22 13:38:33');
+(1, 'SOW-2026-0001', 2, 7, 5, 'Review of quarterly tax filings prior to submission, covering VAT, withholding tax, and income tax computations.', 'g', 13440.00, '2027-02-15', '2027-02-16', 'Approved', 4, 4, '2026-09-09 07:17:10', '2026-08-21 23:16:24', '2026-09-09 07:17:10'),
+(3, 'SOW-2026-0002', 4, 17, 1, 'Full audit of FY2025 financial statements covering accounts payable, accounts receivable, inventory valuation, and internal controls in preparation for BIR filing.', '1. SCOPE OF SERVICES\r\nThe Consultant shall perform a full audit of the Client\'s FY2025 financial statements, covering accounts payable, accounts receivable, inventory valuation, and internal controls, in accordance with the agreed project scope.\r\n\r\n2. PAYMENT TERMS\r\n- 50% downpayment upon signing of this contract.\r\n- 50% balance upon completion and delivery of the final audit report.\r\n- All payments shall be made via bank transfer within fifteen (15) days from receipt of invoice.\r\n\r\n3. PROJECT TIMELINE\r\nThe engagement shall commence on the Start Date and be completed on or before the End Date. Any extension shall require written approval from both parties.\r\n\r\n4. DELIVERABLES\r\n- Audited financial statements\r\n- Management letter with findings and recommendations\r\n- Final audit report presented to the Client\'s management team\r\n\r\n5. CONFIDENTIALITY\r\nBoth parties agree to keep all financial and business information disclosed during this engagement strictly confidential and shall not disclose such information to any third party without prior written consent.\r\n\r\n6. REVISIONS\r\nThe Client is entitled to two (2) rounds of revisions on the draft report. Additional revisions shall be billed separately.\r\n\r\n7. TERMINATION\r\nEither party may terminate this contract with thirty (30) days written notice. Fees for services rendered prior to termination shall remain payable.\r\n\r\n8. GOVERNING LAW\r\nThis contract shall be governed by the laws of the Republic of the Philippines.', 58240.00, '2026-09-25', '2026-09-29', 'Approved', 4, 4, '2026-09-11 11:18:40', '2026-09-11 11:18:27', '2026-09-11 11:18:40'),
+(4, 'SOW-2026-0003', 5, 18, 7, 'Assess the client\'s current manual inventory process and implement a digital inventory system integrated with their existing POS for real-time stock visibility across all warehouses.', '1. SCOPE OF SERVICES\r\nThe Consultant shall assess the Client\'s current manual warehouse inventory process, recommend and implement a digital inventory system integrated with the Client\'s existing POS, migrate existing inventory records, and provide staff training.\r\n\r\n2. PAYMENT TERMS\r\n- 50% downpayment upon signing of this contract.\r\n- 50% balance upon completion of system setup, data migration, and staff training.\r\n- All payments shall be made via bank transfer within fifteen (15) days from receipt of invoice.\r\n\r\n3. PROJECT TIMELINE\r\nThe engagement shall commence on the Start Date and be completed on or before the End Date. Any extension shall require written approval from both parties.\r\n\r\n4. DELIVERABLES\r\n- Systems assessment report\r\n- Software recommendation document\r\n- Migrated inventory data\r\n- Configured warehouse inventory system with POS integration\r\n- Staff training sessions\r\n- Post-implementation support for thirty (30) days\r\n\r\n5. CLIENT RESPONSIBILITIES\r\nThe Client shall provide warehouse access for on-site assessment, existing inventory records in digital or physical format, and a designated point of contact for coordination throughout the engagement.\r\n\r\n6. EXCLUSIONS\r\n- Software license fees (billed separately by vendor)\r\n- Hardware procurement costs (scanners, terminals, servers)\r\n- Internet or network infrastructure upgrades\r\n- Extended support beyond the 30-day post-implementation period\r\n\r\n7. DATA PRIVACY\r\nThe Consultant shall comply with the Data Privacy Act of 2012 (RA 10173) in handling all Client data throughout the engagement. All inventory and operational data shall remain the sole property of the Client.\r\n\r\n8. REVISIONS\r\nSystem configuration revisions within the agreed scope are unlimited during the project duration. Additional features or functionality beyond the original scope shall be quoted separately.\r\n\r\n9. CONFIDENTIALITY\r\nBoth parties agree to keep all business, operational, and technical information disclosed during this engagement strictly confidential and shall not disclose such information to any third party without prior written consent.\r\n\r\n10. TERMINATION\r\nEither party may terminate this contract with thirty (30) days written notice. Fees for services rendered prior to termination shall remain payable based on the milestone completion percentage.\r\n\r\n11. GOVERNING LAW\r\nThis contract shall be governed by the laws of the Republic of the Philippines.', 39200.00, '2026-09-24', '2026-09-30', 'Draft', 2, NULL, NULL, '2026-09-11 11:24:08', '2026-09-11 11:24:08');
 
 -- --------------------------------------------------------
 
@@ -188,8 +190,10 @@ CREATE TABLE `quotations` (
 --
 
 INSERT INTO `quotations` (`quotation_id`, `quotation_number`, `request_id`, `client_id`, `project_scope`, `status`, `subtotal`, `tax_rate`, `tax_amount`, `total_amount`, `valid_until`, `notes`, `prepared_by`, `created_at`, `updated_at`) VALUES
-(1, 'QT-2026-0001', 6, 4, 'Assistance with DTI and BIR registration requirements for a new branch, including document preparation and submission support.', 'Sent', 15000.00, 12.00, 1800.00, 16800.00, '2026-09-30', 'Client requested expedited processing.', 4, '2026-08-21 23:02:47', '2026-08-22 13:35:30'),
-(2, 'QT-2026-0002', 7, 5, 'Review of quarterly tax filings prior to submission, covering VAT, withholding tax, and income tax computations.', 'Approved', 12000.00, 12.00, 1440.00, 13440.00, '2026-09-15', 'Approved by client via email confirmation.', 4, '2026-08-21 23:02:47', '2026-08-21 23:02:47');
+(1, 'QT-2026-0001', 6, 4, 'Assistance with DTI and BIR registration requirements for a new branch, including document preparation and submission support.', 'Sent', 15000.00, 12.00, 1800.00, 16800.00, '2026-09-30', 'Client requested expedited processing.', 4, '2026-08-21 23:02:47', '2026-09-09 01:21:45'),
+(2, 'QT-2026-0002', 7, 5, 'Review of quarterly tax filings prior to submission, covering VAT, withholding tax, and income tax computations.', 'Approved', 12000.00, 12.00, 1440.00, 13440.00, '2026-09-15', 'Approved by client via email confirmation.', 4, '2026-08-21 23:02:47', '2026-09-09 01:09:32'),
+(4, 'QT-2026-0003', 17, 1, 'Full audit of FY2025 financial statements covering accounts payable, accounts receivable, inventory valuation, and internal controls in preparation for BIR filing.', 'Approved', 52000.00, 12.00, 6240.00, 58240.00, '2026-09-25', 'Quotation valid for 30 days. 50% downpayment upon signing, balance upon completion. Includes two (2) on-site visits. Excludes government filing fees.', 4, '2026-09-11 11:17:07', '2026-09-11 11:17:17'),
+(5, 'QT-2026-0004', 18, 7, 'Assess the client\'s current manual inventory process and implement a digital inventory system integrated with their existing POS for real-time stock visibility across all warehouses.', 'Approved', 35000.00, 12.00, 4200.00, 39200.00, '2026-09-24', 'Timeline: 10–12 weeks from kickoff. Software license fees are excluded and will be billed separately by the vendor. Includes 30-day post-launch support via email and phone. Client must provide warehouse access for on-site assessment (up to 3 days).', 2, '2026-09-11 11:23:16', '2026-09-11 11:23:24');
 
 -- --------------------------------------------------------
 
@@ -217,7 +221,10 @@ INSERT INTO `quotation_items` (`item_id`, `quotation_id`, `description`, `quanti
 (3, 1, 'Business Permit Filing Assistance', 1.00, 5000.00, 5000.00, 2),
 (4, 2, 'VAT Filing Review', 1.00, 4000.00, 4000.00, 0),
 (5, 2, 'Withholding Tax Review', 1.00, 3500.00, 3500.00, 1),
-(6, 2, 'Income Tax Computation Check', 1.00, 4500.00, 4500.00, 2);
+(6, 2, 'Income Tax Computation Check', 1.00, 4500.00, 4500.00, 2),
+(8, 4, 'Financial statements review and verification', 1.00, 50000.00, 50000.00, 0),
+(9, 4, 'Inventory valuation audit', 1.00, 2000.00, 2000.00, 1),
+(10, 5, 'Systems assessment and requirements gathering', 1.00, 35000.00, 35000.00, 0);
 
 -- --------------------------------------------------------
 
@@ -243,21 +250,20 @@ CREATE TABLE `service_requests` (
 --
 
 INSERT INTO `service_requests` (`request_id`, `client_id`, `request_title`, `request_details`, `required_skill`, `status`, `assigned_to`, `assigned_by`, `created_at`, `updated_at`) VALUES
-(1, 1, 'Initial Business Consultation', 'Client requested an initial consultation regarding financial planning.', NULL, 'New', NULL, NULL, '2026-08-10 07:35:32', '2026-08-10 07:35:32'),
 (2, 2, 'Process Improvement Review', 'Client requested a review of current business processes.', NULL, 'In Progress', NULL, NULL, '2026-08-10 07:35:32', '2026-08-10 07:35:32'),
 (3, 3, 'IT Infrastructure Assessment', 'Client requested an assessment of their current IT infrastructure.', NULL, 'Completed', NULL, NULL, '2026-08-10 07:35:32', '2026-08-10 07:35:32'),
-(4, 3, 'hi', 'hello', NULL, 'New', 1, NULL, '2026-08-12 05:51:02', '2026-08-17 02:15:48'),
-(5, 3, 'm', 'm', NULL, 'New', 1, NULL, '2026-08-17 02:21:42', '2026-08-17 02:28:43'),
-(6, 4, 'Business Registration Assistance', 'Client needs help completing DTI and BIR registration requirements for a new branch.', 'Business Registration', 'New', NULL, NULL, '2026-08-20 02:56:59', '2026-08-20 02:56:59'),
-(7, 5, 'Quarterly Tax Filing Review', 'Client requested a review of their quarterly tax filings before submission.', 'Tax Advisory', 'New', NULL, NULL, '2026-08-20 02:56:59', '2026-08-20 02:56:59'),
-(8, 6, 'Inventory Bookkeeping Setup', 'Client wants a proper bookkeeping system set up for their retail inventory.', 'Bookkeeping', 'New', NULL, NULL, '2026-08-20 02:56:59', '2026-08-20 02:56:59'),
-(9, 7, 'Warehouse Systems Assessment', 'Client requested an assessment of their current warehouse and logistics IT systems.', 'IT Infrastructure Assessment', 'New', NULL, NULL, '2026-08-20 02:56:59', '2026-08-20 02:56:59'),
+(6, 4, 'Business Registration Assistance', 'Client needs help completing DTI and BIR registration requirements for a new branch.', 'Business Registration', 'In Progress', 1, 2, '2026-08-20 02:56:59', '2026-09-06 02:36:02'),
+(7, 5, 'Quarterly Tax Filing Review', 'Client requested a review of their quarterly tax filings before submission.', 'Tax Advisory', 'In Progress', 1, 4, '2026-08-20 02:56:59', '2026-08-30 04:55:04'),
+(8, 6, 'Inventory Bookkeeping Setup', 'Client wants a proper bookkeeping system set up for their retail inventory.', 'Bookkeeping', 'New', 1, 2, '2026-08-20 02:56:59', '2026-09-06 02:49:46'),
+(9, 7, 'Warehouse Systems Assessment', 'Client requested an assessment of their current warehouse and logistics IT systems.', 'IT Infrastructure Assessment', 'New', 1, 2, '2026-08-20 02:56:59', '2026-09-08 05:29:45'),
 (10, 8, 'Enrollment Process Improvement', 'Client wants to streamline their student enrollment and records process.', 'Business Process Improvement', 'New', NULL, NULL, '2026-08-20 02:56:59', '2026-08-20 02:56:59'),
 (11, 9, 'Data Privacy Compliance Check', 'Client needs a compliance review of their customer data handling practices.', 'Data Privacy Compliance', 'New', NULL, NULL, '2026-08-20 02:56:59', '2026-08-20 02:56:59'),
 (12, 10, 'Marketing Strategy Development', 'Client wants a marketing plan to expand their IT services to new areas.', 'Marketing Strategy', 'New', NULL, NULL, '2026-08-20 02:56:59', '2026-08-20 02:56:59'),
 (13, 11, 'Supplier Contract Drafting', 'Client needs a standard supplier contract template drafted for their rice mill operations.', 'Contract Drafting', 'New', NULL, NULL, '2026-08-20 02:56:59', '2026-08-20 02:56:59'),
-(14, 12, 'Client Relations Audit', 'Client wants an audit of their patient/client relations and feedback handling process.', 'Client Relations Management', 'New', NULL, NULL, '2026-08-20 02:56:59', '2026-08-20 02:56:59'),
-(15, 13, 'Fleet Risk Assessment', 'Client requested a risk assessment covering their vehicle rental and transport operations.', 'Risk Assessment', 'New', NULL, NULL, '2026-08-20 02:56:59', '2026-08-20 02:56:59');
+(14, 12, 'Client Relations Audit', 'Client wants an audit of their patient/client relations and feedback handling process.', 'Client Relations Management', 'In Progress', 1, 2, '2026-08-20 02:56:59', '2026-09-08 05:30:25'),
+(15, 13, 'Fleet Risk Assessment', 'Client requested a risk assessment covering their vehicle rental and transport operations.', 'Risk Assessment', 'New', NULL, NULL, '2026-08-20 02:56:59', '2026-08-20 02:56:59'),
+(17, 1, 'ABC Manufacturing Corp.', 'Client is requesting a full audit of their FY2025 financial statements in preparation for BIR filing and bank loan application. Scope includes review of accounts payable, accounts receivable, inventory valuation, and internal controls. Target completion before March 31, 2026.', 'Audit Assistance', 'New', NULL, NULL, '2026-09-11 11:14:24', '2026-09-11 11:14:24'),
+(18, 7, 'Warehouse Inventory System Setup', 'Client wants to digitize their warehouse inventory tracking. Need assessment of current manual process, recommendation of suitable inventory software, data migration support, and staff training. Integration with existing POS system is required.', 'IT Infrastructure Assessment', 'New', NULL, NULL, '2026-09-11 11:21:19', '2026-09-11 11:21:19');
 
 -- --------------------------------------------------------
 
@@ -432,7 +438,7 @@ ALTER TABLE `clients`
 -- AUTO_INCREMENT for table `contracts`
 --
 ALTER TABLE `contracts`
-  MODIFY `contract_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `contract_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `contract_revisions`
@@ -444,25 +450,25 @@ ALTER TABLE `contract_revisions`
 -- AUTO_INCREMENT for table `knowledge_documents`
 --
 ALTER TABLE `knowledge_documents`
-  MODIFY `document_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `document_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT for table `quotations`
 --
 ALTER TABLE `quotations`
-  MODIFY `quotation_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `quotation_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `quotation_items`
 --
 ALTER TABLE `quotation_items`
-  MODIFY `item_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `item_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT for table `service_requests`
 --
 ALTER TABLE `service_requests`
-  MODIFY `request_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `request_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
 
 --
 -- AUTO_INCREMENT for table `staff_skills`

@@ -97,16 +97,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: client_management.php?tab=requests');
         exit;
 
-    } elseif ($action === 'update_request') {
+    } elseif ($action === 'edit_request') {
 
-        $requestId = $_POST['request_id'] ?? null;
-        $status    = $_POST['status'] ?? 'New';
+        $requestId      = $_POST['request_id'] ?? null;
+        $clientId       = $_POST['client_id'] ?? '';
+        $requestTitle   = trim($_POST['request_title'] ?? '');
+        $requestDetails = trim($_POST['request_details'] ?? '');
+        $requiredSkill  = trim($_POST['required_skill'] ?? '');
 
-        $stmt = $pdo->prepare('UPDATE service_requests SET status = ? WHERE request_id = ?');
-        $stmt->execute([$status, $requestId]);
+        $errors = [];
+        if ($clientId === '') $errors[] = 'Please select a client.';
+        if ($requestTitle === '') $errors[] = 'Request title is required.';
 
-        $_SESSION['alert_type'] = 'success';
-        $_SESSION['alert_message'] = 'Service request updated successfully.';
+        if (empty($errors)) {
+            $stmt = $pdo->prepare(
+                'UPDATE service_requests SET client_id = ?, request_title = ?, request_details = ?, required_skill = ? WHERE request_id = ?'
+            );
+            $stmt->execute([$clientId, $requestTitle, $requestDetails, $requiredSkill !== '' ? $requiredSkill : null, $requestId]);
+            $_SESSION['alert_type'] = 'success';
+            $_SESSION['alert_message'] = 'Service request updated successfully.';
+        } else {
+            $_SESSION['alert_type'] = 'error';
+            $_SESSION['alert_message'] = implode(' ', $errors);
+        }
+
         header('Location: client_management.php?tab=requests');
         exit;
 
@@ -584,13 +598,12 @@ body {
                   <th scope="col" class="d-none d-md-table-cell">Contact Person</th>
                   <th scope="col" class="d-none d-lg-table-cell">Email</th>
                   <th scope="col" class="d-none d-lg-table-cell">Contact Number</th>
-                  <th scope="col" class="text-end">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 <?php if (empty($clients)): ?>
                   <tr>
-                    <td colspan="5" class="text-center py-5" style="color:var(--ink-soft);">
+                    <td colspan="4" class="text-center py-5" style="color:var(--ink-soft);">
                       <i class="fa-regular fa-folder-open fs-3 d-block mb-2"></i>
                       No clients found.
                     </td>
@@ -599,6 +612,7 @@ body {
                   <?php foreach ($clients as $client): ?>
                     <tr class="client-management-row"
                       data-bs-toggle="modal" data-bs-target="#viewClientModal"
+                      data-id="<?= $client['client_id'] ?>"
                       data-company="<?= htmlspecialchars($client['company_name']) ?>"
                       data-contact="<?= htmlspecialchars($client['contact_person']) ?>"
                       data-email="<?= htmlspecialchars($client['email']) ?>"
@@ -612,25 +626,6 @@ body {
                       <td class="small d-none d-md-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars($client['contact_person']) ?></td>
                       <td class="small d-none d-lg-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars($client['email']) ?></td>
                       <td class="small d-none d-lg-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars($client['contact_number']) ?></td>
-                      <td class="text-end" onclick="event.stopPropagation();">
-                        <button type="button" class="btn btn-icon-neutral" title="Edit"
-                          data-bs-toggle="modal" data-bs-target="#editClientModal"
-                          data-id="<?= $client['client_id'] ?>"
-                          data-company="<?= htmlspecialchars($client['company_name']) ?>"
-                          data-contact="<?= htmlspecialchars($client['contact_person']) ?>"
-                          data-email="<?= htmlspecialchars($client['email']) ?>"
-                          data-number="<?= htmlspecialchars($client['contact_number']) ?>"
-                          data-address="<?= htmlspecialchars($client['address']) ?>"
-                          data-industry="<?= htmlspecialchars($client['industry'] ?? '') ?>">
-                          <i class="fa-regular fa-pen-to-square"></i>
-                        </button>
-                        <button type="button" class="btn btn-icon-danger" title="Delete"
-                          data-bs-toggle="modal" data-bs-target="#deleteClientModal"
-                          data-id="<?= $client['client_id'] ?>"
-                          data-name="<?= htmlspecialchars($client['company_name']) ?>">
-                          <i class="fa-regular fa-trash-can"></i>
-                        </button>
-                      </td>
                     </tr>
                   <?php endforeach; ?>
                 <?php endif; ?>
@@ -704,20 +699,26 @@ body {
                   <th scope="col" class="d-none d-md-table-cell">Client</th>
                   <th scope="col" class="d-none d-lg-table-cell">Assigned To</th>
                   <th scope="col">Status</th>
-                  <th scope="col" class="text-end">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 <?php if (empty($requests)): ?>
                   <tr>
-                    <td colspan="5" class="text-center py-5" style="color:var(--ink-soft);">
+                    <td colspan="4" class="text-center py-5" style="color:var(--ink-soft);">
                       <i class="fa-regular fa-folder-open fs-3 d-block mb-2"></i>
                       No service requests found.
                     </td>
                   </tr>
                 <?php else: ?>
                   <?php foreach ($requests as $request): ?>
-                    <tr>
+                    <tr class="client-management-row"
+                      data-bs-toggle="modal" data-bs-target="#manageRequestModal"
+                      data-id="<?= $request['request_id'] ?>"
+                      data-client-id="<?= $request['client_id'] ?>"
+                      data-title="<?= htmlspecialchars($request['request_title']) ?>"
+                      data-details="<?= htmlspecialchars($request['request_details'] ?? '') ?>"
+                      data-skill="<?= htmlspecialchars($request['required_skill'] ?? '') ?>"
+                      data-status="<?= htmlspecialchars($request['status']) ?>">
                       <td>
                         <div class="fw-semibold small"><?= htmlspecialchars($request['request_title']) ?></div>
                         <div class="d-md-none" style="font-size:.72rem; color:var(--ink-soft);"><?= htmlspecialchars($request['company_name']) ?></div>
@@ -728,22 +729,6 @@ body {
                       </td>
                       <td>
                         <span class="status-pill <?= statusBadgeClass($request['status']) ?>"><?= htmlspecialchars($request['status']) ?></span>
-                      </td>
-                      <td class="text-end">
-                        <button type="button" class="btn btn-icon-neutral" title="Manage"
-                          data-bs-toggle="modal" data-bs-target="#manageRequestModal"
-                          data-id="<?= $request['request_id'] ?>"
-                          data-title="<?= htmlspecialchars($request['request_title']) ?>"
-                          data-details="<?= htmlspecialchars($request['request_details'] ?? '') ?>"
-                          data-status="<?= htmlspecialchars($request['status']) ?>">
-                          <i class="fa-regular fa-pen-to-square"></i>
-                        </button>
-                        <button type="button" class="btn btn-icon-danger" title="Delete"
-                          data-bs-toggle="modal" data-bs-target="#deleteRequestModal"
-                          data-id="<?= $request['request_id'] ?>"
-                          data-title="<?= htmlspecialchars($request['request_title']) ?>">
-                          <i class="fa-regular fa-trash-can"></i>
-                        </button>
                       </td>
                     </tr>
                   <?php endforeach; ?>
@@ -971,6 +956,14 @@ body {
           </div>
         </div>
       </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-icon-danger" title="Delete" id="view_delete_btn" data-bs-dismiss="modal">
+          <i class="fa-regular fa-trash-can"></i>
+        </button>
+        <button type="button" class="btn btn-teal-solid" id="view_edit_btn" data-bs-dismiss="modal">
+          <i class="fa-regular fa-pen-to-square"></i> Edit
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -1048,25 +1041,52 @@ body {
   <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content">
       <form method="POST" novalidate>
-        <input type="hidden" name="action" value="update_request">
+        <input type="hidden" name="action" value="edit_request">
         <input type="hidden" name="request_id" id="manage_request_id">
         <div class="modal-header">
-          <h2 class="modal-title h5 fw-bold" id="manage_request_title">Manage Request</h2>
+          <h2 class="modal-title h5 fw-bold">Service Request Details</h2>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <p class="small mb-3" id="manage_request_details" style="color:var(--ink-soft);"></p>
-          <label class="form-label">Status</label>
-          <select name="status" id="manage_status" class="form-select">
-            <option value="New">New</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Completed">Completed</option>
-            <option value="Cancelled">Cancelled</option>
-          </select>
-          <div class="form-text">Staff assignment is handled in Resource Matching, once the request has an approved contract.</div>
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label">Client</label>
+              <select name="client_id" id="manage_client_id" class="form-select" required>
+                <?php foreach ($allClientsForModal as $client): ?>
+                  <option value="<?= $client['client_id'] ?>"><?= htmlspecialchars($client['company_name']) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Request Title</label>
+              <input type="text" name="request_title" id="manage_request_title" class="form-control" required>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Required Skill</label>
+              <select name="required_skill" id="manage_required_skill" class="form-select">
+                <option value="">Not specified / any skill</option>
+                <?php foreach ($existingSkills as $existingSkill): ?>
+                  <option value="<?= htmlspecialchars($existingSkill) ?>"><?= htmlspecialchars($existingSkill) ?></option>
+                <?php endforeach; ?>
+              </select>
+              <div class="form-text">This determines which staff will be recommended in Resource Matching.</div>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Details</label>
+              <textarea name="request_details" id="manage_request_details" class="form-control" rows="4"></textarea>
+            </div>
+            <div class="col-12">
+              <div class="small" style="color:var(--ink-soft);">Status</div>
+              <span class="status-pill" id="manage_status_pill"></span>
+              <div class="form-text mt-2">Status is updated once the request has an approved contract, in Resource Matching.</div>
+            </div>
+          </div>
         </div>
         <div class="modal-footer">
-          <button type="submit" class="btn btn-teal-solid">Update Request</button>
+          <button type="button" class="btn btn-icon-danger" title="Delete" id="manage_delete_btn" data-bs-dismiss="modal">
+            <i class="fa-regular fa-trash-can"></i>
+          </button>
+          <button type="submit" class="btn btn-teal-solid">Save Changes</button>
         </div>
       </form>
     </div>
@@ -1096,45 +1116,62 @@ body {
 
 <script src="../assets/vendor/bootstrap-5.3.8/js/bootstrap.bundle.min.js"></script>
 <script>
-document.getElementById('editClientModal').addEventListener('show.bs.modal', function (event) {
-  const btn = event.relatedTarget;
-  document.getElementById('edit_client_id').value = btn.dataset.id;
-  document.getElementById('edit_company_name').value = btn.dataset.company;
-  document.getElementById('edit_contact_person').value = btn.dataset.contact;
-  document.getElementById('edit_email').value = btn.dataset.email;
-  document.getElementById('edit_contact_number').value = btn.dataset.number;
-  document.getElementById('edit_industry').value = btn.dataset.industry;
-  document.getElementById('edit_address').value = btn.dataset.address;
-});
-
 document.getElementById('viewClientModal').addEventListener('show.bs.modal', function (event) {
   const btn = event.relatedTarget;
-  document.getElementById('view_company').textContent = btn.dataset.company;
-  document.getElementById('view_contact').textContent = btn.dataset.contact;
-  document.getElementById('view_email').textContent = btn.dataset.email;
-  document.getElementById('view_number').textContent = btn.dataset.number;
-  document.getElementById('view_industry').textContent = btn.dataset.industry || '-';
-  document.getElementById('view_address').textContent = btn.dataset.address;
-});
+  const data = btn.dataset;
+  document.getElementById('view_company').textContent = data.company;
+  document.getElementById('view_contact').textContent = data.contact;
+  document.getElementById('view_email').textContent = data.email;
+  document.getElementById('view_number').textContent = data.number;
+  document.getElementById('view_industry').textContent = data.industry || '-';
+  document.getElementById('view_address').textContent = data.address;
 
-document.getElementById('deleteClientModal').addEventListener('show.bs.modal', function (event) {
-  const btn = event.relatedTarget;
-  document.getElementById('delete_client_id').value = btn.dataset.id;
-  document.getElementById('delete_client_name').textContent = btn.dataset.name;
+  const editBtn = document.getElementById('view_edit_btn');
+  editBtn.onclick = function () {
+    document.getElementById('edit_client_id').value = data.id;
+    document.getElementById('edit_company_name').value = data.company;
+    document.getElementById('edit_contact_person').value = data.contact;
+    document.getElementById('edit_email').value = data.email;
+    document.getElementById('edit_contact_number').value = data.number;
+    document.getElementById('edit_industry').value = data.industry;
+    document.getElementById('edit_address').value = data.address;
+    const editModal = new bootstrap.Modal(document.getElementById('editClientModal'));
+    editModal.show();
+  };
+
+  const deleteBtn = document.getElementById('view_delete_btn');
+  deleteBtn.onclick = function () {
+    document.getElementById('delete_client_id').value = data.id;
+    document.getElementById('delete_client_name').textContent = data.company;
+    const deleteModal = new bootstrap.Modal(document.getElementById('deleteClientModal'));
+    deleteModal.show();
+  };
 });
 
 document.getElementById('manageRequestModal').addEventListener('show.bs.modal', function (event) {
   const btn = event.relatedTarget;
-  document.getElementById('manage_request_id').value = btn.dataset.id;
-  document.getElementById('manage_request_title').textContent = btn.dataset.title;
-  document.getElementById('manage_request_details').textContent = btn.dataset.details;
-  document.getElementById('manage_status').value = btn.dataset.status;
-});
+  const data = btn.dataset;
+  document.getElementById('manage_request_id').value = data.id;
+  document.getElementById('manage_client_id').value = data.clientId;
+  document.getElementById('manage_request_title').value = data.title;
+  document.getElementById('manage_required_skill').value = data.skill;
+  document.getElementById('manage_request_details').value = data.details;
+  const statusPill = document.getElementById('manage_status_pill');
+  statusPill.textContent = data.status;
+  statusPill.className = 'status-pill ' + ({
+    'New': 'status-draft',
+    'In Progress': 'status-warn',
+    'Completed': 'status-approved',
+    'Cancelled': 'status-rejected'
+  }[data.status] || 'status-draft');
 
-document.getElementById('deleteRequestModal').addEventListener('show.bs.modal', function (event) {
-  const btn = event.relatedTarget;
-  document.getElementById('delete_request_id').value = btn.dataset.id;
-  document.getElementById('delete_request_title').textContent = btn.dataset.title;
+  const deleteBtn = document.getElementById('manage_delete_btn');
+  deleteBtn.onclick = function () {
+    document.getElementById('delete_request_id').value = data.id;
+    document.getElementById('delete_request_title').textContent = data.title;
+    const deleteModal = new bootstrap.Modal(document.getElementById('deleteRequestModal'));
+    deleteModal.show();
+  };
 });
 
 <?php if ($alertType && $alertMessage): ?>
