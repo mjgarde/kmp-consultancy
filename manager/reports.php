@@ -57,9 +57,11 @@ $skillDemandStmt = $pdo->query(
 $skillDemand = $skillDemandStmt->fetchAll();
 
 $contractStatusStmt = $pdo->query("SELECT status, COUNT(*) AS cnt FROM contracts GROUP BY status");
-$contractStatusCounts = ['Draft' => 0, 'Pending Approval' => 0, 'Approved' => 0, 'Rejected' => 0];
+$contractStatusCounts = ['Draft' => 0, 'Approved' => 0, 'Rejected' => 0];
 foreach ($contractStatusStmt->fetchAll() as $row) {
-    $contractStatusCounts[$row['status']] = (int) $row['cnt'];
+    if (isset($contractStatusCounts[$row['status']])) {
+        $contractStatusCounts[$row['status']] = (int) $row['cnt'];
+    }
 }
 
 $upcomingExpirationsStmt = $pdo->query(
@@ -91,68 +93,157 @@ $avgApprovalHours = $avgApprovalHours !== null ? round((float) $avgApprovalHours
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lexend:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  --navy: #33495C;
-  --navy-soft: #EEF2F5;
-  --teal: #4CA79A;
-  --teal-soft: #E7F5F2;
-  --teal-text: #2E6E63;
-  --amber: #E0A44E;
-  --amber-soft: #FBF1E1;
-  --amber-text: #93662A;
-  --coral: #DB7A66;
-  --coral-soft: #FBECE8;
-  --coral-text: #A2452F;
-  --ink: #2B3540;
-  --ink-soft: #6B7684;
-  --line: #E7EAEE;
-  --canvas: #F6F8F9;
+  --navy: #1E293B;
+  --navy-deep: #0F172A;
+  --navy-soft: #EEF1F6;
+  --indigo: #3B4E8A;
+  --indigo-soft: #E9ECF6;
+  --indigo-text: #2E3E70;
+  --slate: #475569;
+  --slate-soft: #64748B;
+
+  --success: #157A5F;
+  --success-soft: #E3F3EC;
+  --success-text: #0F5F49;
+  --success-border: #BFE3D3;
+
+  --warn: #B7791F;
+  --warn-soft: #FBF0DD;
+  --warn-text: #8A5A15;
+  --warn-border: #EFD8A8;
+
+  --danger: #B4432F;
+  --danger-soft: #FAECE8;
+  --danger-text: #93382A;
+  --danger-border: #EDC7BC;
+
+  --ink: #1A2233;
+  --ink-soft: #667085;
+  --line: #E2E5EB;
+  --canvas: #FFFFFF;
   --card: #FFFFFF;
 }
 
-body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
-.dashboard-title, h1, h2, h3 { font-family: 'Lexend', 'Inter', sans-serif; }
-.dashboard-title { color: var(--ink); letter-spacing: -0.01em; }
+body {
+  background-color: var(--canvas);
+  color: var(--ink);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.dashboard-layout, .dashboard-main, .dashboard-content {
+  background-color: var(--canvas) !important;
+}
+
+.dashboard-title, h1, h2, h3 {
+  font-family: 'Lexend', 'Inter', sans-serif;
+}
+
+.dashboard-title { color: var(--navy-deep); letter-spacing: -0.01em; }
 .dashboard-subtitle { color: var(--ink-soft) !important; }
-.dashboard-topbar { border-bottom: 1px solid var(--line) !important; }
-.card { border-radius: 14px; border: 1px solid var(--line); }
+.dashboard-topbar { border-bottom: 1px solid var(--line) !important; background-color: #fff; }
+
+.card { border-radius: 12px; border: 1px solid var(--line); box-shadow: none; }
+
 .card-header {
   border-bottom: 1px solid var(--line) !important;
   background-color: var(--card) !important;
-  border-radius: 14px 14px 0 0 !important;
+  border-radius: 12px 12px 0 0 !important;
   padding: 1rem 1.15rem;
 }
+
 .card-header h2 { color: var(--ink); letter-spacing: -0.01em; }
 .card-header p { color: var(--ink-soft) !important; }
 
-.metric-card { border-radius: 14px; border: 1px solid var(--line); background-color: var(--card); padding: 1.1rem 1.2rem; height: 100%; }
-.metric-icon { width: 42px; height: 42px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; flex-shrink: 0; }
-.metric-label { font-size: .75rem; color: var(--ink-soft); font-weight: 600; }
-.metric-value { font-size: 1.4rem; font-weight: 700; font-family: 'Lexend', sans-serif; color: var(--ink); }
-
-.report-tabs .nav-link {
-  font-size: .82rem; padding: .5rem .95rem; font-weight: 600; border-radius: 9px;
-  color: var(--ink-soft); background-color: var(--card); border: 1px solid var(--line);
+.stat-card {
+  background-color: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1rem 1.15rem;
 }
-.report-tabs .nav-link.active { background-color: var(--navy); color: #fff; border-color: var(--navy); }
+.stat-card .stat-label { font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-soft); }
+.stat-card .stat-value { font-family: 'Lexend', sans-serif; font-size: 1.5rem; font-weight: 700; color: var(--navy-deep); margin-top: .15rem; }
+.stat-card .stat-icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; flex-shrink: 0;
+  background-color: var(--navy-soft);
+  border: 1px solid var(--line);
+  color: var(--indigo-text);
+}
+
+.status-tabs {
+  display: flex;
+  gap: .4rem;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--line);
+  padding: 0 1.15rem;
+  background-color: var(--card);
+  border-radius: 12px 12px 0 0;
+}
+
+.status-tab {
+  border: none;
+  background: none;
+  padding: .8rem .3rem;
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+.status-tab:hover { color: var(--navy-deep); }
+.status-tab.active { color: var(--indigo-text); border-bottom-color: var(--indigo); }
 
 .table thead th {
-  border-bottom: 1px solid var(--line) !important; color: var(--ink-soft); font-weight: 600;
-  font-size: .68rem; letter-spacing: .04em; text-transform: uppercase; background-color: var(--canvas) !important;
+  border-bottom: 1px solid var(--line) !important;
+  color: var(--ink-soft);
+  font-weight: 700;
+  font-size: .7rem;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  background-color: var(--navy-soft) !important;
 }
-.table td { border-bottom: 1px solid var(--line); vertical-align: middle; font-size: .82rem; }
+.table td { border-bottom: 1px solid var(--line); color: var(--ink); vertical-align: middle; font-size: .82rem; }
 .table-hover tbody tr:hover { background-color: var(--navy-soft); }
 
-.status-pill { font-size: .68rem; font-weight: 600; padding: .28rem .6rem; border-radius: 999px; white-space: nowrap; }
-.status-new { background-color: var(--navy-soft); color: var(--navy); }
-.status-progress { background-color: var(--amber-soft); color: var(--amber-text); }
-.status-approved { background-color: var(--teal-soft); color: var(--teal-text); }
-.status-rejected { background-color: var(--coral-soft); color: var(--coral-text); }
+.status-pill {
+  font-size: .7rem;
+  font-weight: 700;
+  padding: .32rem .7rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  letter-spacing: .01em;
+  border: 1px solid transparent;
+}
+.status-draft { background-color: var(--navy-soft); color: var(--slate); border-color: var(--line); }
+.status-approved { background-color: var(--success-soft); color: var(--success-text); border-color: var(--success-border); }
+.status-rejected { background-color: var(--danger-soft); color: var(--danger-text); border-color: var(--danger-border); }
+.status-progress { background-color: var(--warn-soft); color: var(--warn-text); border-color: var(--warn-border); }
 
 .bar-track { background-color: var(--navy-soft); border-radius: 999px; height: 8px; overflow: hidden; width: 100%; }
-.bar-fill { height: 100%; border-radius: 999px; }
+.bar-fill { height: 100%; border-radius: 999px; background-color: var(--indigo); }
 
-.btn-print { background-color: var(--navy); color: #fff; border: none; border-radius: 9px; font-weight: 600; }
-.btn-print:hover { background-color: #263A4A; color: #fff; }
+.btn-ghost {
+  background-color: var(--navy-soft);
+  color: var(--navy);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font-weight: 600;
+  font-size: .8rem;
+}
+.btn-ghost:hover { background-color: #E4E8F0; color: var(--navy); }
+
+.btn-outline-print {
+  background-color: #fff;
+  color: var(--indigo-text);
+  border: 1px solid var(--indigo);
+  border-radius: 8px;
+  font-weight: 600;
+}
+.btn-outline-print:hover { background-color: var(--indigo-soft); color: var(--indigo-text); }
 
 .empty-state { color: var(--ink-soft); }
 .empty-state i { color: #C7D0D6; }
@@ -180,7 +271,7 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
   .dashboard-layout > *:not(.dashboard-main) { display: none !important; }
   .dashboard-main { width: 100% !important; margin: 0 !important; }
   main.dashboard-content { padding: 0 24px 24px !important; }
-  .card, .metric-card { border: 1px solid #D8DEE3 !important; box-shadow: none !important; break-inside: avoid; }
+  .card, .stat-card { border: 1px solid #D8DEE3 !important; box-shadow: none !important; break-inside: avoid; }
   .tab-pane { display: block !important; opacity: 1 !important; }
 }
 </style>
@@ -205,26 +296,9 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
         </div>
       </div>
       <div class="dashboard-topbar-actions d-flex align-items-center gap-3 gap-md-4">
-        <button type="button" class="btn btn-print btn-sm px-3" onclick="window.print()">
+        <button type="button" class="btn btn-outline-print btn-sm px-3" onclick="window.print()">
           <i class="fa-solid fa-print me-1"></i> Print
         </button>
-        <button type="button" class="btn btn-link text-secondary p-0">
-          <i class="fa-regular fa-bell fs-5"></i>
-        </button>
-        <div class="dropdown">
-          <button type="button" class="btn btn-link p-0 border-0" data-bs-toggle="dropdown" aria-expanded="false">
-            <span class="dashboard-user-icon d-flex align-items-center justify-content-center rounded-circle bg-secondary bg-opacity-10 flex-shrink-0" style="width:36px; height:36px;">
-              <i class="fa-solid fa-user text-secondary"></i>
-            </span>
-          </button>
-          <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-            <li>
-              <a href="../config/logout.php?role=manager" class="dropdown-item d-flex align-items-center gap-2 text-danger">
-                <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout
-              </a>
-            </li>
-          </ul>
-        </div>
       </div>
     </header>
 
@@ -236,48 +310,48 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
 
       <div class="row g-3 mb-3">
         <div class="col-6 col-lg-4">
-          <div class="metric-card d-flex align-items-center gap-3">
-            <span class="metric-icon" style="background-color:var(--teal-soft);"><i class="fa-solid fa-clock" style="color:var(--teal-text);"></i></span>
+          <div class="stat-card d-flex align-items-center gap-3">
+            <span class="stat-icon"><i class="fa-solid fa-clock"></i></span>
             <div>
-              <div class="metric-label">Avg. Response Time</div>
-              <div class="metric-value"><?= $overallAvgResponse !== null ? $overallAvgResponse . ' hrs' : '&mdash;' ?></div>
+              <div class="stat-label">Avg. Response Time</div>
+              <div class="stat-value" style="font-size:1.2rem;"><?= $overallAvgResponse !== null ? $overallAvgResponse . ' hrs' : '&mdash;' ?></div>
             </div>
           </div>
         </div>
         <div class="col-6 col-lg-4">
-          <div class="metric-card d-flex align-items-center gap-3">
-            <span class="metric-icon" style="background-color:var(--amber-soft);"><i class="fa-solid fa-clipboard-list" style="color:var(--amber-text);"></i></span>
+          <div class="stat-card d-flex align-items-center gap-3">
+            <span class="stat-icon"><i class="fa-solid fa-clipboard-list"></i></span>
             <div>
-              <div class="metric-label">In Progress Requests</div>
-              <div class="metric-value"><?= $inProgressRequests ?></div>
+              <div class="stat-label">In Progress Requests</div>
+              <div class="stat-value" style="font-size:1.2rem;"><?= $inProgressRequests ?></div>
             </div>
           </div>
         </div>
         <div class="col-6 col-lg-4">
-          <div class="metric-card d-flex align-items-center gap-3">
-            <span class="metric-icon" style="background-color:var(--coral-soft);"><i class="fa-solid fa-hourglass-half" style="color:var(--coral-text);"></i></span>
+          <div class="stat-card d-flex align-items-center gap-3">
+            <span class="stat-icon"><i class="fa-solid fa-hourglass-half"></i></span>
             <div>
-              <div class="metric-label">Avg. Contract Approval</div>
-              <div class="metric-value"><?= $avgApprovalHours !== null ? $avgApprovalHours . ' hrs' : '&mdash;' ?></div>
+              <div class="stat-label">Avg. Contract Approval</div>
+              <div class="stat-value" style="font-size:1.2rem;"><?= $avgApprovalHours !== null ? $avgApprovalHours . ' hrs' : '&mdash;' ?></div>
             </div>
           </div>
         </div>
       </div>
 
-      <nav class="report-tabs mb-3 no-print">
-        <ul class="nav gap-2" id="reportTabs" role="tablist">
+      <nav class="status-tabs mb-3 no-print" style="border-radius:12px; border:1px solid var(--line);">
+        <ul class="nav gap-2 p-2" id="reportTabs" role="tablist" style="border-bottom:none;">
           <li class="nav-item">
-            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-client" type="button">
+            <button class="status-tab active" data-bs-toggle="tab" data-bs-target="#tab-client" type="button">
               <i class="fa-solid fa-building me-1"></i> Client Service
             </button>
           </li>
           <li class="nav-item">
-            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-staff" type="button">
+            <button class="status-tab" data-bs-toggle="tab" data-bs-target="#tab-staff" type="button">
               <i class="fa-solid fa-users me-1"></i> Staff Performance
             </button>
           </li>
           <li class="nav-item">
-            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-contracts" type="button">
+            <button class="status-tab" data-bs-toggle="tab" data-bs-target="#tab-contracts" type="button">
               <i class="fa-solid fa-file-signature me-1"></i> Contracts
             </button>
           </li>
@@ -287,7 +361,7 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
       <div class="tab-content">
 
         <div class="tab-pane fade show active" id="tab-client">
-          <section class="card border-0 shadow-sm">
+          <section class="card">
             <div class="card-header">
               <h2 class="h6 fw-bold mb-0">Service Requests by Client</h2>
               <p class="small mb-0">Volume, completion, and cancellation per client.</p>
@@ -311,8 +385,8 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
                       <tr>
                         <td class="fw-semibold"><?= htmlspecialchars($c['company_name']) ?></td>
                         <td><?= (int) $c['total_requests'] ?></td>
-                        <td style="color:var(--teal-text);"><?= (int) $c['completed'] ?></td>
-                        <td style="color:var(--coral-text);"><?= (int) $c['cancelled'] ?></td>
+                        <td style="color:var(--success-text);"><?= (int) $c['completed'] ?></td>
+                        <td style="color:var(--danger-text);"><?= (int) $c['cancelled'] ?></td>
                         <td class="d-none d-md-table-cell" style="color:var(--ink-soft);">
                           <?= $c['avg_response_hours'] !== null ? round((float) $c['avg_response_hours'], 1) . ' hrs' : '&mdash;' ?>
                         </td>
@@ -328,7 +402,7 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
         <div class="tab-pane fade" id="tab-staff">
           <div class="row g-3">
             <div class="col-lg-8">
-              <section class="card border-0 shadow-sm h-100">
+              <section class="card h-100">
                 <div class="card-header">
                   <h2 class="h6 fw-bold mb-0">Staff Performance</h2>
                   <p class="small mb-0">Assigned, active, and completed tasks per staff member.</p>
@@ -353,8 +427,8 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
                             <td class="fw-semibold"><?= htmlspecialchars($s['firstname'] . ' ' . $s['lastname']) ?></td>
                             <td><span class="status-pill <?= $s['status'] === 'Active' ? 'status-approved' : 'status-rejected' ?>"><?= htmlspecialchars($s['status']) ?></span></td>
                             <td><?= (int) $s['total_assigned'] ?></td>
-                            <td style="color:var(--amber-text);"><?= (int) $s['active_tasks'] ?></td>
-                            <td style="color:var(--teal-text);"><?= (int) $s['completed_tasks'] ?></td>
+                            <td style="color:var(--warn-text);"><?= (int) $s['active_tasks'] ?></td>
+                            <td style="color:var(--success-text);"><?= (int) $s['completed_tasks'] ?></td>
                           </tr>
                         <?php endforeach; ?>
                       <?php endif; ?>
@@ -364,7 +438,7 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
               </section>
             </div>
             <div class="col-lg-4">
-              <section class="card border-0 shadow-sm h-100">
+              <section class="card h-100">
                 <div class="card-header">
                   <h2 class="h6 fw-bold mb-0">Most Requested Skills</h2>
                 </div>
@@ -379,7 +453,7 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
                           <span class="small fw-semibold"><?= htmlspecialchars($sk['required_skill']) ?></span>
                           <span class="small" style="color:var(--ink-soft);"><?= (int) $sk['demand'] ?></span>
                         </div>
-                        <div class="bar-track"><div class="bar-fill" style="width:<?= round(($sk['demand']/$maxDemand)*100) ?>%; background-color:var(--amber);"></div></div>
+                        <div class="bar-track"><div class="bar-fill" style="width:<?= round(($sk['demand']/$maxDemand)*100) ?>%;"></div></div>
                       </div>
                     <?php endforeach; ?>
                   <?php endif; ?>
@@ -392,7 +466,7 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
         <div class="tab-pane fade" id="tab-contracts">
           <div class="row g-3">
             <div class="col-lg-5">
-              <section class="card border-0 shadow-sm h-100">
+              <section class="card h-100">
                 <div class="card-header">
                   <h2 class="h6 fw-bold mb-0">Contracts by Status</h2>
                 </div>
@@ -402,7 +476,7 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
               </section>
             </div>
             <div class="col-lg-7">
-              <section class="card border-0 shadow-sm h-100">
+              <section class="card h-100">
                 <div class="card-header">
                   <h2 class="h6 fw-bold mb-0">Upcoming Contract Expirations</h2>
                   <p class="small mb-0">Approved contracts nearing their end date.</p>
@@ -452,15 +526,14 @@ if (contractStatusCanvas) {
   new Chart(contractStatusCanvas, {
     type: 'doughnut',
     data: {
-      labels: ['Draft', 'Pending Approval', 'Approved', 'Rejected'],
+      labels: ['Draft', 'Approved', 'Rejected'],
       datasets: [{
         data: [
           <?= $contractStatusCounts['Draft'] ?>,
-          <?= $contractStatusCounts['Pending Approval'] ?>,
           <?= $contractStatusCounts['Approved'] ?>,
           <?= $contractStatusCounts['Rejected'] ?>
         ],
-        backgroundColor: ['#33495C', '#E0A44E', '#4CA79A', '#DB7A66'],
+        backgroundColor: ['#64748B', '#157A5F', '#B4432F'],
         borderWidth: 0,
       }]
     },
