@@ -4,8 +4,8 @@ session_name('SUPERVISOR_SESSION');
 session_start();
 require_once __DIR__ . '/../config/database.php';
 
-if (!isset($_SESSION['supervisor_id']) || ($_SESSION['role'] ?? '') !== 'supervisor') {
-    header('Location: login.php');
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'supervisor') {
+    header('Location: ../login.php');
     exit;
 }
 

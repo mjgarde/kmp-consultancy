@@ -3,13 +3,13 @@ session_name('SUPERVISOR_SESSION');
 session_start();
 require_once __DIR__ . '/../config/database.php';
 
-if (!isset($_SESSION['supervisor_id']) || ($_SESSION['role'] ?? '') !== 'supervisor') {
-    header('Location: login.php');
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'supervisor') {
+    header('Location: ../login.php');
     exit;
 }
 
 $pdo = getConnection();
-$currentUserId = $_SESSION['supervisor_id'];
+$currentUserId = $_SESSION['user_id'];
 
 $uploadDir = __DIR__ . '/../uploads/knowledge_documents/';
 if (!is_dir($uploadDir)) {
@@ -164,10 +164,12 @@ unset($_SESSION['alert_type'], $_SESSION['alert_message']);
 $searchTerm     = trim($_GET['search'] ?? '');
 $categoryFilter = $_GET['category'] ?? '';
 
-$query = 'SELECT kd.*, u.firstname AS uploader_firstname, u.lastname AS uploader_lastname, a.fullname AS uploader_admin_name
+$query = 'SELECT kd.*,
+                 u.firstname AS uploader_firstname,
+                 u.lastname  AS uploader_lastname,
+                 CONCAT(u.firstname, " ", u.lastname) AS uploader_admin_name
           FROM knowledge_documents kd
-          LEFT JOIN users u ON kd.uploaded_by = u.user_id AND kd.uploaded_by_role IN ("manager","supervisor")
-          LEFT JOIN administrator a ON kd.uploaded_by = a.admin_id AND kd.uploaded_by_role = "admin"
+          LEFT JOIN users u ON kd.uploaded_by = u.user_id
           WHERE 1=1';
 $params = [];
 

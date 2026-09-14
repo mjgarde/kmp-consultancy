@@ -4,8 +4,8 @@ session_name('SUPERVISOR_SESSION');
 session_start();
 require_once __DIR__ . '/../config/database.php';
 
-if (!isset($_SESSION['supervisor_id']) || ($_SESSION['role'] ?? '') !== 'supervisor') {
-    header('Location: login.php');
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'supervisor') {
+    header('Location: ../login.php');
     exit;
 }
 
@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare(
                 "UPDATE service_requests SET assigned_to = ?, assigned_by = ? WHERE request_id = ?"
             );
-            $stmt->execute([$userId, $_SESSION['supervisor_id'], $requestId]);
+            $stmt->execute([$userId, $_SESSION['user_id'], $requestId]);
 
             $_SESSION['alert_type'] = 'success';
             $_SESSION['alert_message'] = 'Staff assigned successfully.';
