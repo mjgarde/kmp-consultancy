@@ -4,8 +4,8 @@ session_name('ADMIN_SESSION');
 session_start();
 require_once __DIR__ . '/../config/database.php';
 
-if (!isset($_SESSION['admin_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
-    header('Location: login.php');
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
+    header('Location: ../login.php');
     exit;
 }
 
@@ -127,7 +127,6 @@ $requestsByIndustryStmt = $pdo->prepare(
 $requestsByIndustryStmt->execute(['from' => $rangeFrom, 'to' => $rangeTo]);
 $requestsByIndustry = $requestsByIndustryStmt->fetchAll();
 
-// Quotation statuses aligned to current pipeline: Draft, Approved, Rejected only ('Sent' retired)
 $quotationConversionStmt = $pdo->prepare(
     "SELECT status, COUNT(*) AS cnt FROM quotations WHERE created_at BETWEEN :from AND :to GROUP BY status"
 );
@@ -149,8 +148,6 @@ $avgDealSizeStmt = $pdo->prepare(
 $avgDealSizeStmt->execute(['from' => $rangeFrom, 'to' => $rangeTo]);
 $avgDealSize = (float) $avgDealSizeStmt->fetchColumn();
 
-// "Pending Approval" status retired for contracts; contracts are now Draft, Approved, or Rejected.
-// This metric now reflects Draft contracts awaiting review instead.
 $draftContractValueStmt = $pdo->prepare(
     "SELECT COALESCE(SUM(total_amount),0), COUNT(*) FROM contracts WHERE status = 'Draft' AND created_at BETWEEN :from AND :to"
 );
@@ -203,8 +200,6 @@ $completedRequestsAllTime = (int) $completedRequestsStmt->fetchColumn();
 
 $completionRate = $totalRequestsAllTime > 0 ? round(($completedRequestsAllTime / $totalRequestsAllTime) * 100, 1) : 0.0;
 
-// Status classes aligned to current pipeline: New/Draft, In Progress, Completed/Approved, Cancelled/Rejected.
-// 'Sent' and 'Pending Approval' removed — no longer valid statuses.
 function statusClass(string $status): string
 {
     return match ($status) {

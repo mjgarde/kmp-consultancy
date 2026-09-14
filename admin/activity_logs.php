@@ -4,18 +4,15 @@ session_name('ADMIN_SESSION');
 session_start();
 require_once __DIR__ . '/../config/database.php';
 
-if (!isset($_SESSION['admin_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
-    header('Location: login.php');
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
+    header('Location: ../login.php');
     exit;
 }
 
 $pdo = getConnection();
 
-$adminId = $_SESSION['admin_id'];
-$adminStmt = $pdo->prepare('SELECT firstname, lastname FROM users WHERE user_id = ?');
-$adminStmt->execute([$adminId]);
-$adminRow = $adminStmt->fetch();
-$adminFullname = $adminRow ? trim($adminRow['firstname'] . ' ' . $adminRow['lastname']) : 'Admin';
+$adminId = $_SESSION['user_id'];
+$adminFullname = $_SESSION['fullname'] ?? 'Admin';
 
 $roleFilter   = $_GET['role'] ?? '';
 $actionFilter = $_GET['action'] ?? '';
@@ -80,11 +77,11 @@ $unionQuery = "
 
     UNION ALL
 
-    SELECT a.admin_id, a.fullname, '', 'Admin',
+    SELECT u.user_id, u.firstname, u.lastname, 'Admin' AS role,
            'Repository', 'Uploaded document',
            CONCAT(kd.title, ' (', kd.category, ')'), kd.created_at, NULL
     FROM knowledge_documents kd
-    INNER JOIN administrator a ON a.admin_id = kd.uploaded_by
+    INNER JOIN users u ON u.user_id = kd.uploaded_by
     WHERE kd.uploaded_by_role = 'admin'
 
     UNION ALL
@@ -98,11 +95,11 @@ $unionQuery = "
 
     UNION ALL
 
-    SELECT a.admin_id, a.fullname, '', 'Admin',
+    SELECT u.user_id, u.firstname, u.lastname, 'Admin' AS role,
            'Repository', 'Updated document',
            CONCAT(kd.title, ' (', kd.category, ')'), kd.updated_at, NULL
     FROM knowledge_documents kd
-    INNER JOIN administrator a ON a.admin_id = kd.uploaded_by
+    INNER JOIN users u ON u.user_id = kd.uploaded_by
     WHERE kd.uploaded_by_role = 'admin' AND kd.updated_at != kd.created_at
 
     UNION ALL

@@ -4,8 +4,8 @@ session_name('ADMIN_SESSION');
 session_start();
 require_once __DIR__ . '/../config/database.php';
 
-if (!isset($_SESSION['admin_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
-    header('Location: login.php');
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
+    header('Location: ../login.php');
     exit;
 }
 
@@ -86,7 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
         $insertQuotation->execute([
             $quotationNumber, $requestId, $req['client_id'], $projectScope,
-            $subtotal, $taxRate, $taxAmount, $totalAmount, $validUntil, $notes, $_SESSION['admin_id'],
+            $subtotal, $taxRate, $taxAmount, $totalAmount, $validUntil, $notes, $_SESSION['user_id'],
         ]);
         $quotationId = (int) $pdo->lastInsertId();
 

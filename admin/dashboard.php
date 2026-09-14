@@ -4,18 +4,15 @@ session_name('ADMIN_SESSION');
 session_start();
 require_once __DIR__ . '/../config/database.php';
 
-if (!isset($_SESSION['admin_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
-    header('Location: login.php');
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
+    header('Location: ../login.php');
     exit;
 }
 
 $pdo = getConnection();
 
-$adminId = $_SESSION['admin_id'];
-$adminStmt = $pdo->prepare('SELECT firstname, lastname FROM users WHERE user_id = ?');
-$adminStmt->execute([$adminId]);
-$adminRow = $adminStmt->fetch();
-$adminFullname = $adminRow ? trim($adminRow['firstname'] . ' ' . $adminRow['lastname']) : 'Admin';
+$adminId = $_SESSION['user_id'];
+$adminFullname = $_SESSION['fullname'] ?? 'Admin';
 
 $totalClients = (int) $pdo->query('SELECT COUNT(*) FROM clients')->fetchColumn();
 
@@ -23,13 +20,11 @@ $newRequests        = (int) $pdo->query("SELECT COUNT(*) FROM service_requests W
 $inProgressRequests = (int) $pdo->query("SELECT COUNT(*) FROM service_requests WHERE status = 'In Progress'")->fetchColumn();
 $completedRequests  = (int) $pdo->query("SELECT COUNT(*) FROM service_requests WHERE status = 'Completed'")->fetchColumn();
 
-// Quotation pipeline aligned to current statuses: Draft, Approved, Rejected ('Sent' retired)
 $draftQuotations    = (int) $pdo->query("SELECT COUNT(*) FROM quotations WHERE status = 'Draft'")->fetchColumn();
 $approvedQuotations = (int) $pdo->query("SELECT COUNT(*) FROM quotations WHERE status = 'Approved'")->fetchColumn();
 $rejectedQuotations = (int) $pdo->query("SELECT COUNT(*) FROM quotations WHERE status = 'Rejected'")->fetchColumn();
 $quotationValue      = (float) $pdo->query("SELECT COALESCE(SUM(total_amount),0) FROM quotations WHERE status = 'Approved'")->fetchColumn();
 
-// Contract pipeline aligned to current statuses: Draft, Approved, Rejected ('Pending Approval' retired)
 $draftContracts     = (int) $pdo->query("SELECT COUNT(*) FROM contracts WHERE status = 'Draft'")->fetchColumn();
 $approvedContracts  = (int) $pdo->query("SELECT COUNT(*) FROM contracts WHERE status = 'Approved'")->fetchColumn();
 $rejectedContracts  = (int) $pdo->query("SELECT COUNT(*) FROM contracts WHERE status = 'Rejected'")->fetchColumn();
@@ -82,7 +77,6 @@ function requestStatusClass(string $status): string
     };
 }
 
-// Quotation status classes aligned to current pipeline: Draft, Approved, Rejected ('Sent' retired)
 function quotationStatusClass(string $status): string
 {
     return match ($status) {

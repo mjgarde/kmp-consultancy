@@ -44,12 +44,5 @@ if (ini_get('session.use_cookies')) {
 
 session_destroy();
 
-$redirects = [
-    'admin'      => '../admin/login.php',
-    'manager'    => '../manager/login.php',
-    'supervisor' => '../supervisor/login.php',
-    'staff'      => '../staff/login.php',
-];
-
-header('Location: ' . ($redirects[$role] ?? '../admin/login.php'));
+header('Location: ../login.php');
 exit;

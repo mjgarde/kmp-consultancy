@@ -4,8 +4,8 @@ session_name('ADMIN_SESSION');
 session_start();
 require_once __DIR__ . '/../config/database.php';
 
-if (!isset($_SESSION['admin_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
-    header('Location: login.php');
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
+    header('Location: ../login.php');
     exit;
 }
 
@@ -69,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
         $insertStmt->execute([
             $contractNumber, $quote['quotation_id'], $quote['request_id'], $quote['client_id'],
-            $quote['project_scope'], $termsConditions, $quote['total_amount'], $startDate, $endDate, $_SESSION['admin_id'],
+            $quote['project_scope'], $termsConditions, $quote['total_amount'], $startDate, $endDate, $_SESSION['user_id'],
         ]);
 
         $_SESSION['alert_type'] = 'success';
@@ -88,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $pdo->prepare(
                     "UPDATE contracts SET status = ?, approved_by = ?, approved_at = NOW() WHERE contract_id = ?"
                 );
-                $stmt->execute([$newStatus, $_SESSION['admin_id'], $contractId]);
+                $stmt->execute([$newStatus, $_SESSION['user_id'], $contractId]);
             } else {
                 $stmt = $pdo->prepare('UPDATE contracts SET status = ? WHERE contract_id = ?');
                 $stmt->execute([$newStatus, $contractId]);
@@ -115,7 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $insertRevision = $pdo->prepare(
                 'INSERT INTO contract_revisions (contract_id, revision_note, revised_by) VALUES (?, ?, ?)'
             );
-            $insertRevision->execute([$contractId, $revisionNote, $_SESSION['admin_id']]);
+            $insertRevision->execute([$contractId, $revisionNote, $_SESSION['user_id']]);
 
             $updateContract = $pdo->prepare("UPDATE contracts SET status = 'Draft' WHERE contract_id = ?");
             $updateContract->execute([$contractId]);
