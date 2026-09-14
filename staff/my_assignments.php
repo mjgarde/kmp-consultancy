@@ -3,13 +3,13 @@ session_name('STAFF_SESSION');
 session_start();
 require_once __DIR__ . '/../config/database.php';
 
-if (!isset($_SESSION['staff_id']) || ($_SESSION['role'] ?? '') !== 'staff') {
-    header('Location: login.php');
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'staff') {
+    header('Location: ../login.php');
     exit;
 }
 
 $pdo = getConnection();
-$staffId = $_SESSION['staff_id'];
+$staffId = $_SESSION['user_id'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 

@@ -3,8 +3,8 @@
 session_name('STAFF_SESSION');
 session_start();
 
-if (!isset($_SESSION['staff_id']) || ($_SESSION['role'] ?? '') !== 'staff') {
-    header('Location: login.php');
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'staff') {
+    header('Location: ../login.php');
     exit;
 }
 
@@ -20,10 +20,12 @@ $searchTerm     = trim($_GET['search'] ?? '');
 $categoryFilter = $_GET['category'] ?? '';
 $validCategories = ['SOW Template', 'Contract Template', 'Best Practice', 'Proposal Template', 'Reference Material', 'Other'];
 
-$query = 'SELECT kd.*, u.firstname AS uploader_firstname, u.lastname AS uploader_lastname, a.fullname AS uploader_admin_name
+$query = 'SELECT kd.*,
+                 u.firstname AS uploader_firstname,
+                 u.lastname  AS uploader_lastname,
+                 CONCAT(u.firstname, " ", u.lastname) AS uploader_admin_name
           FROM knowledge_documents kd
-          LEFT JOIN users u ON kd.uploaded_by = u.user_id AND kd.uploaded_by_role IN ("manager","supervisor")
-          LEFT JOIN administrator a ON kd.uploaded_by = a.admin_id AND kd.uploaded_by_role = "admin"
+          LEFT JOIN users u ON kd.uploaded_by = u.user_id
           WHERE 1=1';
 $params = [];
 

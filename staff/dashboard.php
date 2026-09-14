@@ -3,15 +3,15 @@
 session_name('STAFF_SESSION');
 session_start();
 
-if (!isset($_SESSION['staff_id']) || ($_SESSION['role'] ?? '') !== 'staff') {
-    header('Location: login.php');
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'staff') {
+    header('Location: ../login.php');
     exit;
 }
 
 require_once __DIR__ . '/../config/database.php';
 
 $pdo = getConnection();
-$staffId = (int) $_SESSION['staff_id'];
+$staffId = (int) $_SESSION['user_id'];
 
 $statusCountsStmt = $pdo->prepare(
     "SELECT status, COUNT(*) AS cnt FROM service_requests WHERE assigned_to = :staff_id GROUP BY status"
