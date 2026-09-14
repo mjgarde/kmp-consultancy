@@ -4,8 +4,8 @@ session_name('MANAGER_SESSION');
 session_start();
 require_once __DIR__ . '/../config/database.php';
 
-if (!isset($_SESSION['manager_id']) || ($_SESSION['role'] ?? '') !== 'manager') {
-    header('Location: login.php');
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'manager') {
+    header('Location: ../login.php');
     exit;
 }
 
@@ -86,7 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
         $insertQuotation->execute([
             $quotationNumber, $requestId, $req['client_id'], $projectScope,
-            $subtotal, $taxRate, $taxAmount, $totalAmount, $validUntil, $notes, $_SESSION['manager_id'],
+            $subtotal, $taxRate, $taxAmount, $totalAmount, $validUntil, $notes, $_SESSION['user_id'],
         ]);
         $quotationId = (int) $pdo->lastInsertId();
 
@@ -112,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $validStatuses = ['Draft', 'Approved', 'Rejected'];
 
         if ($quotationId && in_array($newStatus, $validStatuses, true)) {
-    $stmt = $pdo->prepare("UPDATE quotations SET status = ? WHERE quotation_id = ?");
+            $stmt = $pdo->prepare("UPDATE quotations SET status = ? WHERE quotation_id = ?");
             $stmt->execute([$newStatus, $quotationId]);
 
             $_SESSION['alert_type'] = 'success';
@@ -229,7 +229,6 @@ function buildQuotationPageUrl(int $targetPage, string $searchTerm, string $date
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lexend:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  /* Enterprise slate / indigo palette */
   --navy: #1E293B;
   --navy-deep: #0F172A;
   --navy-soft: #EEF1F6;
@@ -376,7 +375,6 @@ body {
 .status-approved { background-color: var(--success-soft); color: var(--success-text); border-color: var(--success-border); }
 .status-rejected { background-color: var(--danger-soft); color: var(--danger-text); border-color: var(--danger-border); }
 
-/* Status filter tabs */
 .status-tabs {
   display: flex;
   gap: .4rem;

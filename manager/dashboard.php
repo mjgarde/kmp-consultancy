@@ -1,12 +1,11 @@
-
 <?php
 
 session_name('MANAGER_SESSION');
 session_start();
 require_once __DIR__ . '/../config/database.php';
 
-if (!isset($_SESSION['manager_id']) || ($_SESSION['role'] ?? '') !== 'manager') {
-    header('Location: login.php');
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'manager') {
+    header('Location: ../login.php');
     exit;
 }
 
