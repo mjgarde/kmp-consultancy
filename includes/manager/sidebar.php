@@ -1,6 +1,6 @@
 <?php
-$managerFullname = $_SESSION['manager_fullname'] ?? 'Manager';
-$managerEmail    = $_SESSION['manager_email'] ?? '';
+$managerFullname = $_SESSION['fullname'] ?? 'Manager';
+$managerEmail    = $_SESSION['email'] ?? '';
 $currentPage     = basename($_SERVER['PHP_SELF']);
 
 function maskEmail(string $email): string

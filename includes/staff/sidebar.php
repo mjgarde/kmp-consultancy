@@ -1,12 +1,12 @@
 <?php
 require_once __DIR__ . '/../../config/database.php';
 
-$staffFullname = $_SESSION['staff_fullname'] ?? 'Staff';
-$staffEmail    = $_SESSION['staff_email'] ?? '';
+$staffFullname = $_SESSION['fullname'] ?? 'Staff';
+$staffEmail    = $_SESSION['email'] ?? '';
 $currentPage   = basename($_SERVER['PHP_SELF']);
 
 $pdo = getConnection();
-$staffId = $_SESSION['staff_id'] ?? 0;
+$staffId = $_SESSION['user_id'] ?? 0;
 
 $newCountStmt = $pdo->prepare('SELECT COUNT(*) FROM service_requests WHERE assigned_to = ? AND status = ?');
 $newCountStmt->execute([$staffId, 'New']);
