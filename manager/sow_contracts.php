@@ -11,6 +11,13 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'manager') {
 
 $pdo = getConnection();
 
+$contractUploadDir = __DIR__ . '/../uploads/contracts/';
+if (!is_dir($contractUploadDir)) {
+    mkdir($contractUploadDir, 0755, true);
+}
+$allowedContractExtensions = ['pdf', 'doc', 'docx'];
+$maxContractFileSize = 20 * 1024 * 1024;
+
 function generateContractNumber(PDO $pdo): string
 {
     $year = date('Y');
@@ -132,6 +139,100 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: sow_contracts.php');
         exit;
     }
+
+    if ($action === 'upload_contract_file') {
+        $contractId = $_POST['contract_id'] ?? null;
+
+        $checkStmt = $pdo->prepare('SELECT contract_id, contract_file_path FROM contracts WHERE contract_id = ?');
+        $checkStmt->execute([$contractId]);
+        $contractRow = $checkStmt->fetch();
+
+        if (!$contractId || !$contractRow) {
+            $_SESSION['alert_type'] = 'error';
+            $_SESSION['alert_message'] = 'Contract not found.';
+            header('Location: sow_contracts.php');
+            exit;
+        }
+
+        if (!isset($_FILES['contract_file']) || $_FILES['contract_file']['error'] !== UPLOAD_ERR_OK) {
+            $_SESSION['alert_type'] = 'error';
+            $_SESSION['alert_message'] = 'Please select a file to upload.';
+            header('Location: sow_contracts.php');
+            exit;
+        }
+
+        $fileSize = $_FILES['contract_file']['size'];
+        $originalName = $_FILES['contract_file']['name'];
+        $fileExt = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+
+        if ($fileSize > $maxContractFileSize) {
+            $_SESSION['alert_type'] = 'error';
+            $_SESSION['alert_message'] = 'File size must not exceed 20MB.';
+            header('Location: sow_contracts.php');
+            exit;
+        }
+        if (!in_array($fileExt, $allowedContractExtensions)) {
+            $_SESSION['alert_type'] = 'error';
+            $_SESSION['alert_message'] = 'File type not allowed. Accepted: ' . implode(', ', $allowedContractExtensions);
+            header('Location: sow_contracts.php');
+            exit;
+        }
+
+        $storedName = 'contract_' . $contractId . '_' . uniqid() . '.' . $fileExt;
+        $destination = $contractUploadDir . $storedName;
+
+        if (move_uploaded_file($_FILES['contract_file']['tmp_name'], $destination)) {
+
+            if (!empty($contractRow['contract_file_path'])) {
+                $oldPath = __DIR__ . '/../' . $contractRow['contract_file_path'];
+                if (file_exists($oldPath)) {
+                    unlink($oldPath);
+                }
+            }
+
+            $stmt = $pdo->prepare(
+                'UPDATE contracts SET contract_file_name = ?, contract_file_path = ?, contract_file_size = ? WHERE contract_id = ?'
+            );
+            $stmt->execute([
+                $originalName,
+                'uploads/contracts/' . $storedName,
+                $fileSize,
+                $contractId,
+            ]);
+
+            $_SESSION['alert_type'] = 'success';
+            $_SESSION['alert_message'] = 'Signed contract file uploaded successfully.';
+        } else {
+            $_SESSION['alert_type'] = 'error';
+            $_SESSION['alert_message'] = 'Failed to upload the file. Please try again.';
+        }
+
+        header('Location: sow_contracts.php');
+        exit;
+    }
+
+    if ($action === 'delete_contract_file') {
+        $contractId = $_POST['contract_id'] ?? null;
+
+        $stmt = $pdo->prepare('SELECT contract_file_path FROM contracts WHERE contract_id = ?');
+        $stmt->execute([$contractId]);
+        $row = $stmt->fetch();
+
+        if ($row && !empty($row['contract_file_path'])) {
+            $fullPath = __DIR__ . '/../' . $row['contract_file_path'];
+            if (file_exists($fullPath)) {
+                unlink($fullPath);
+            }
+            $clearStmt = $pdo->prepare('UPDATE contracts SET contract_file_name = NULL, contract_file_path = NULL, contract_file_size = NULL WHERE contract_id = ?');
+            $clearStmt->execute([$contractId]);
+
+            $_SESSION['alert_type'] = 'success';
+            $_SESSION['alert_message'] = 'Signed contract file removed.';
+        }
+
+        header('Location: sow_contracts.php');
+        exit;
+    }
 }
 
 $alertType    = $_SESSION['alert_type'] ?? null;
@@ -200,6 +301,7 @@ $totalPages = max(1, (int) ceil($filteredContractCount / $perPage));
 
 $listQuery = "SELECT ct.contract_id, ct.contract_number, ct.status, ct.total_amount, ct.start_date, ct.end_date,
             ct.scope_summary, ct.terms_conditions, ct.created_at,
+            ct.contract_file_name, ct.contract_file_path, ct.contract_file_size,
             c.company_name, sr.request_title, q.quotation_number,
             pb.firstname AS prepared_firstname, pb.lastname AS prepared_lastname,
             ab.firstname AS approved_firstname, ab.lastname AS approved_lastname
@@ -228,6 +330,14 @@ function contractStatusClass(string $status): string
         'Rejected' => 'status-rejected',
         default => 'status-draft',
     };
+}
+
+function formatContractFileSize(?int $bytes): string
+{
+    if (!$bytes) return '';
+    if ($bytes >= 1048576) return round($bytes / 1048576, 1) . ' MB';
+    if ($bytes >= 1024) return round($bytes / 1024, 1) . ' KB';
+    return $bytes . ' B';
 }
 
 function buildContractPageUrl(int $targetPage, string $searchTerm, string $dateFilter): string
@@ -467,6 +577,30 @@ body {
   background-color: var(--warn);
 }
 
+.contract-file-box {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background-color: var(--navy-soft);
+  padding: .75rem .9rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .6rem;
+}
+
+.dropzone-upload-sm {
+  border: 1.5px dashed var(--line);
+  border-radius: 10px;
+  padding: 1rem;
+  text-align: center;
+  cursor: pointer;
+  background-color: var(--navy-soft);
+}
+.dropzone-upload-sm:hover { border-color: var(--indigo); background-color: var(--indigo-soft); }
+.dropzone-upload-sm.has-file { border-color: var(--success); background-color: var(--success-soft); }
+
+#view_contract_scope, #view_contract_terms { white-space: pre-line; }
+
 .empty-state { color: var(--ink-soft); }
 .empty-state i { color: #C7D0D6; }
 
@@ -637,6 +771,9 @@ body {
                             "terms_conditions" => $ct["terms_conditions"],
                             "prepared_by" => trim(($ct["prepared_firstname"] ?? '') . ' ' . ($ct["prepared_lastname"] ?? '')),
                             "approved_by" => $ct["approved_firstname"] ? trim($ct["approved_firstname"] . ' ' . $ct["approved_lastname"]) : null,
+                            "file_name" => $ct["contract_file_name"],
+                            "file_path" => $ct["contract_file_path"] ? '../' . $ct["contract_file_path"] : null,
+                            "file_size" => formatContractFileSize($ct["contract_file_size"]),
                             "revisions" => array_map(function ($r) {
                                 return [
                                     "note" => $r["revision_note"],
@@ -798,6 +935,35 @@ body {
           <div class="small" id="view_contract_approved_wrap" style="color:var(--ink-soft);">Approved by <span id="view_contract_approved" class="fw-semibold" style="color:var(--ink);"></span></div>
         </div>
 
+        <div class="mb-3">
+          <div class="small fw-semibold mb-2">Signed Contract File</div>
+          <div id="view_contract_file_present" class="contract-file-box d-none">
+            <div class="small">
+              <i class="fa-solid fa-file-pdf me-1" style="color:var(--danger-text);"></i>
+              <span id="view_contract_file_name" class="fw-semibold"></span>
+              <span id="view_contract_file_size" style="color:var(--ink-soft);"></span>
+            </div>
+            <div class="d-flex gap-2">
+              <a href="#" id="view_contract_file_download" download class="btn btn-ghost btn-sm"><i class="fa-solid fa-download"></i></a>
+              <form method="POST" id="deleteContractFileForm" class="m-0">
+                <input type="hidden" name="action" value="delete_contract_file">
+                <input type="hidden" name="contract_id" id="delete_contract_file_id">
+                <button type="submit" class="btn btn-reject btn-sm"><i class="fa-solid fa-trash-can"></i></button>
+              </form>
+            </div>
+          </div>
+          <form method="POST" enctype="multipart/form-data" id="uploadContractFileForm" class="d-none">
+            <input type="hidden" name="action" value="upload_contract_file">
+            <input type="hidden" name="contract_id" id="upload_contract_file_id">
+            <div class="dropzone-upload-sm" id="contractFileDropzone">
+              <i class="fa-solid fa-cloud-arrow-up mb-1 d-block" style="color:var(--ink-soft);"></i>
+              <p class="small mb-1" id="contractFileDropzoneText">Click to upload the signed contract (PDF, DOC, DOCX)</p>
+              <input type="file" name="contract_file" id="contract_file_input" class="d-none" accept=".pdf,.doc,.docx" required>
+            </div>
+            <button type="submit" class="btn btn-teal-solid btn-sm mt-2" id="contractFileSubmitBtn" disabled>Upload File</button>
+          </form>
+        </div>
+
         <div id="view_revisions_wrap" class="mb-1">
           <div class="small fw-semibold mb-2">Revision History</div>
           <div id="view_revisions_list" class="d-flex flex-column gap-2" style="max-height:150px; overflow-y:auto;"></div>
@@ -863,6 +1029,22 @@ document.getElementById('generateContractModal').addEventListener('hidden.bs.mod
   document.getElementById('generateContractSubmitBtn').disabled = true;
 });
 
+const contractFileDropzone = document.getElementById('contractFileDropzone');
+const contractFileInput = document.getElementById('contract_file_input');
+const contractFileDropzoneText = document.getElementById('contractFileDropzoneText');
+const contractFileSubmitBtn = document.getElementById('contractFileSubmitBtn');
+
+contractFileDropzone.addEventListener('click', function () {
+  contractFileInput.click();
+});
+contractFileInput.addEventListener('change', function () {
+  if (contractFileInput.files.length > 0) {
+    contractFileDropzoneText.textContent = contractFileInput.files[0].name;
+    contractFileDropzone.classList.add('has-file');
+    contractFileSubmitBtn.disabled = false;
+  }
+});
+
 document.querySelectorAll('.view-contract-btn').forEach(function (btn) {
   btn.addEventListener('click', function () {
     const data = JSON.parse(this.dataset.contract);
@@ -888,6 +1070,25 @@ document.querySelectorAll('.view-contract-btn').forEach(function (btn) {
 
     document.getElementById('status_contract_id').value = data.contract_id;
     document.getElementById('revision_contract_id').value = data.contract_id;
+    document.getElementById('upload_contract_file_id').value = data.contract_id;
+    document.getElementById('delete_contract_file_id').value = data.contract_id;
+
+    const filePresent = document.getElementById('view_contract_file_present');
+    const uploadForm = document.getElementById('uploadContractFileForm');
+    if (data.file_path) {
+      filePresent.classList.remove('d-none');
+      uploadForm.classList.add('d-none');
+      document.getElementById('view_contract_file_name').textContent = data.file_name;
+      document.getElementById('view_contract_file_size').textContent = data.file_size ? ' (' + data.file_size + ')' : '';
+      document.getElementById('view_contract_file_download').href = data.file_path;
+    } else {
+      filePresent.classList.add('d-none');
+      uploadForm.classList.remove('d-none');
+      contractFileDropzoneText.textContent = 'Click to upload the signed contract (PDF, DOC, DOCX)';
+      contractFileDropzone.classList.remove('has-file');
+      contractFileInput.value = '';
+      contractFileSubmitBtn.disabled = true;
+    }
 
     const statusForm = document.getElementById('contractStatusForm');
     statusForm.style.display = (data.status === 'Draft') ? '' : 'none';

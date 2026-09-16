@@ -21,13 +21,17 @@ function redirectForRole(string $role): string
         case 'staff':
             return 'staff/dashboard.php';
         default:
-            return '../login.php';
+            return 'login.php';
     }
 }
 
-// Kung may naka-login na role sa kasalukuyang browser, diretso sa dashboard nito
 foreach ($roleSessions as $role => $sessionName) {
     session_name($sessionName);
+
+    if (isset($_COOKIE[$sessionName])) {
+        session_id($_COOKIE[$sessionName]);
+    }
+
     session_start();
     $loggedIn = isset($_SESSION['user_id']) && ($_SESSION['role'] ?? '') === $role;
     session_write_close();
@@ -38,7 +42,6 @@ foreach ($roleSessions as $role => $sessionName) {
     }
 }
 
-// Pansamantalang session, para lang sa error message bago malaman ang role
 session_name('KMP_LOGIN_MSG');
 session_start();
 
@@ -57,7 +60,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $account = null;
     $role    = null;
 
-    // 1. Tignan muna sa administrator table
     $stmt = $pdo->prepare('SELECT admin_id AS user_id, fullname, email, password FROM administrator WHERE email = ?');
     $stmt->execute([$email]);
     $admin = $stmt->fetch();
@@ -66,7 +68,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $account = $admin;
         $role    = 'admin';
     } else {
-        // 2. Tignan sa users table (Staff, Manager, Supervisor)
         $stmt = $pdo->prepare(
             "SELECT user_id, firstname, lastname, email, password, role, status
              FROM users
@@ -94,7 +95,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // May tamang role na, kaya i-close muna ang temporary session bago lumipat
     session_write_close();
 
     session_name($roleSessions[$role]);
@@ -124,13 +124,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   :root{
     --kmp-navy:#0d2444;
     --kmp-navy-deep:#081930;
-    --kmp-gold:#c9a24b;
   }
   body{
     background:#f4f6f9;
   }
 
-  /* ===== Top info bar ===== */
   .kmp-topbar{
     background:var(--kmp-navy-deep);
     color:#cfd8e3;
@@ -140,41 +138,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     color:#cfd8e3;
     text-decoration:none;
   }
-  .kmp-topbar a:hover{ color:var(--kmp-gold); }
+  .kmp-topbar a:hover{ color:#ffffff; }
   .kmp-topbar .divider{
     width:1px; height:14px; background:rgba(255,255,255,.25);
   }
 
-  /* ===== Main navbar ===== */
   .kmp-navbar{
     background:var(--kmp-navy);
+    box-shadow:0 2px 10px rgba(0,0,0,.15);
   }
   .kmp-navbar .navbar-brand{
     color:#fff;
     font-weight:700;
     letter-spacing:.3px;
+    display:flex;
+    align-items:center;
+    gap:.6rem;
   }
   .kmp-navbar .navbar-brand img{
-    height:40px;
+    height:64px;
     width:auto;
-  }
-  .kmp-navbar .navbar-brand small{
     display:block;
-    font-size:.7rem;
-    font-weight:400;
-    color:#a9b6ca;
-    letter-spacing:.5px;
+    object-fit:contain;
   }
-  .kmp-navbar .nav-link{
-    color:#dfe6f0 !important;
-    font-weight:500;
-    font-size:.92rem;
+  @media (max-width:767.98px){
+    .kmp-navbar .navbar-brand img{
+      height:48px;
+    }
   }
-  .kmp-navbar .nav-link:hover{
-    color:var(--kmp-gold) !important;
+  @media (min-width:1200px){
+    .kmp-navbar .navbar-brand img{
+      height:72px;
+    }
   }
 
-  /* ===== Login section ===== */
   .kmp-login-section{
     min-height:calc(100vh - 118px);
   }
@@ -211,7 +208,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     box-shadow:0 0 0 .2rem rgba(13,36,68,.15);
   }
 
-  /* ===== Footer ===== */
   .kmp-footer{
     background:var(--kmp-navy-deep);
     color:#a9b6ca;
@@ -221,53 +217,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body class="d-flex flex-column min-vh-100">
 
-<!-- ============ Info Topbar ============ -->
 <div class="kmp-topbar py-1">
-  <div class="container d-flex flex-wrap justify-content-between align-items-center">
-    <div class="d-flex align-items-center gap-3">
-      <span><i class="fa-regular fa-envelope me-1"></i>info@kmpconsulthub.com</span>
-      <span class="divider d-none d-sm-block"></span>
-      <span><i class="fa-solid fa-phone me-1"></i>(02) 8123-4567</span>
+  <div class="container d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <div class="d-flex flex-wrap align-items-center gap-3">
+      <span><i class="fa-solid fa-location-dot me-1"></i>Zone III, City of Koronadal, South Cotabato, Philippines</span>
+      <span class="divider d-none d-md-block"></span>
+      <a href="tel:+639641351969"><i class="fa-solid fa-phone me-1"></i>+63-964-135-1969 (Smart)</a>
+      <span class="divider d-none d-md-block"></span>
+      <a href="tel:+639929908757"><i class="fa-solid fa-phone me-1"></i>+63-992-990-8757 (DITO)</a>
+      <span class="divider d-none d-md-block"></span>
+      <a href="mailto:info@kmp-consultancy.com"><i class="fa-regular fa-envelope me-1"></i>info@kmp-consultancy.com</a>
+      <span class="divider d-none d-md-block"></span>
+      <span><i class="fa-regular fa-clock me-1"></i>8:00 AM - 5:00 PM</span>
     </div>
     <div class="d-none d-md-flex align-items-center gap-3">
-      <a href="#"><i class="fa-brands fa-facebook-f"></i></a>
-      <a href="#"><i class="fa-brands fa-linkedin-in"></i></a>
+      <a href="https://www.facebook.com/profile.php?id=61571971492964"><i class="fa-brands fa-facebook-f"></i></a>
     </div>
   </div>
 </div>
 
-<!-- ============ Main Navbar ============ -->
 <nav class="kmp-navbar navbar navbar-expand-md py-2">
   <div class="container">
-    <a class="navbar-brand d-flex align-items-center gap-2" href="index.php">
-      <img src="assets/img/logo.png" alt="KMP ConsultHub Logo">
-      <span>
-        KMP ConsultHub
-        <small>Business &amp; Enterprise Consulting</small>
-      </span>
-    </a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#kmpNav">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse justify-content-end" id="kmpNav">
-      <ul class="navbar-nav align-items-md-center gap-md-3">
-        <li class="nav-item"><a class="nav-link" href="index.php">Home</a></li>
-        <li class="nav-item"><a class="nav-link" href="about.php">About</a></li>
-        <li class="nav-item"><a class="nav-link" href="services.php">Services</a></li>
-        <li class="nav-item"><a class="nav-link" href="contact.php">Contact</a></li>
-      </ul>
-    </div>
+    <span class="navbar-brand mb-0">
+      <img src="assets/img/system_img/logo.png" alt="KMP ConsultHub">
+      <span>KMP ConsultHub</span>
+    </span>
   </div>
 </nav>
 
-<!-- ============ Login Section ============ -->
 <main class="kmp-login-section d-flex align-items-center justify-content-center py-5 px-3">
 
   <section class="login-card card shadow-sm border-0 rounded-4">
     <div class="card-body">
 
       <div class="text-center mb-4">
-        <img src="assets/img/logo.png" alt="KMP ConsultHub" class="login-logo">
+        <img src="assets/img/system_img/logo.png" alt="KMP ConsultHub" class="login-logo">
         <h1 class="login-title h4 fw-bold mb-1">KMP ConsultHub</h1>
         <p class="text-secondary small mb-0">Sign in to your account</p>
       </div>
@@ -310,7 +294,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 </main>
 
-<!-- ============ Footer ============ -->
 <footer class="kmp-footer py-3 text-center">
   <div class="container">
     &copy; <?= date('Y') ?> KMP ConsultHub. All rights reserved.

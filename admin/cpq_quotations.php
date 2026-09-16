@@ -187,7 +187,7 @@ $countStmt->execute($queryParams);
 $filteredQuotationCount = (int) $countStmt->fetchColumn();
 $totalPages = max(1, (int) ceil($filteredQuotationCount / $perPage));
 
-$listQuery = "SELECT q.quotation_id, q.quotation_number, q.status, q.total_amount, q.valid_until, q.created_at,
+$listQuery = "SELECT q.quotation_id, q.quotation_number, q.status, q.total_amount, q.valid_until, q.created_at, q.notes,
             c.company_name, sr.request_title,
             u.firstname AS prepared_by_firstname, u.lastname AS prepared_by_lastname
      $baseQuery
@@ -467,6 +467,26 @@ body {
 .pagination .page-link { color: var(--indigo-text); border-color: var(--line); }
 .pagination .page-item.active .page-link { background-color: var(--indigo); border-color: var(--indigo); color: #fff; }
 .pagination .page-item.disabled .page-link { color: #adb5bd; }
+
+.view-section-label {
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: .3rem;
+}
+
+.view-notes-box {
+  background-color: var(--navy-soft);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: .75rem .9rem;
+  white-space: pre-line;
+  word-break: break-word;
+  min-height: 2.5rem;
+  color: var(--ink);
+}
 </style>
 </head>
 <body>
@@ -615,6 +635,9 @@ body {
                             "request" => $q["request_title"],
                             "total" => number_format((float) $q["total_amount"], 2),
                             "valid_until" => $q["valid_until"] ? date('M d, Y', strtotime($q["valid_until"])) : null,
+                            "notes" => $q["notes"] ?? '',
+                            "prepared_by" => trim(($q["prepared_by_firstname"] ?? '') . ' ' . ($q["prepared_by_lastname"] ?? '')),
+                            "created_at" => $q["created_at"] ? date('M d, Y g:i A', strtotime($q["created_at"])) : null,
                             "items" => array_map(function ($it) {
                                 return [
                                     "description" => $it["description"],
@@ -753,10 +776,35 @@ body {
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <div class="mb-3">
-          <div class="fw-semibold small" id="view_client_name"></div>
-          <div class="small" id="view_request_title" style="color:var(--ink-soft);"></div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6">
+            <div class="view-section-label">Client</div>
+            <div class="fw-semibold small" id="view_client_name"></div>
+            <div class="small" id="view_request_title" style="color:var(--ink-soft);"></div>
+          </div>
+          <div class="col-6 col-sm-3">
+            <div class="view-section-label">Status</div>
+            <span class="status-pill" id="view_status_badge"></span>
+          </div>
+          <div class="col-6 col-sm-3">
+            <div class="view-section-label">Valid Until</div>
+            <div class="small" id="view_valid_until"></div>
+          </div>
         </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6">
+            <div class="view-section-label">Prepared By</div>
+            <div class="small" id="view_prepared_by"></div>
+          </div>
+          <div class="col-sm-6">
+            <div class="view-section-label">Created</div>
+            <div class="small" id="view_created_at"></div>
+          </div>
+        </div>
+
+        <div class="view-section-label">Scope Items</div>
         <div class="table-responsive mb-3">
           <table class="table table-sm mb-0">
             <thead>
@@ -770,12 +818,19 @@ body {
             <tbody id="view_items_body"></tbody>
           </table>
         </div>
-        <div class="d-flex justify-content-end">
+
+        <div class="d-flex justify-content-end mb-3">
           <div class="text-end small">
             <div style="color:var(--ink-soft);">Grand Total</div>
             <div class="fw-bold" style="font-size:1.1rem; color:var(--indigo-text);" id="view_total"></div>
           </div>
         </div>
+
+        <div class="mb-1">
+          <div class="view-section-label">Notes</div>
+          <div class="view-notes-box small" id="view_notes"></div>
+        </div>
+
       </div>
       <div class="modal-footer flex-wrap gap-2" id="view_status_actions">
         <form method="POST" id="statusForm" class="d-flex gap-2 flex-wrap">
@@ -864,6 +919,12 @@ document.getElementById('newQuotationModal').addEventListener('show.bs.modal', f
   addItemRow();
 });
 
+const statusPillClassMap = {
+  Draft: 'status-draft',
+  Approved: 'status-approved',
+  Rejected: 'status-rejected',
+};
+
 document.querySelectorAll('.view-quotation-btn').forEach(function (btn) {
   btn.addEventListener('click', function () {
     const data = JSON.parse(this.dataset.quotation);
@@ -872,7 +933,16 @@ document.querySelectorAll('.view-quotation-btn').forEach(function (btn) {
     document.getElementById('view_client_name').textContent = data.company;
     document.getElementById('view_request_title').textContent = data.request;
     document.getElementById('view_total').textContent = '\u20B1' + data.total;
+    document.getElementById('view_valid_until').textContent = data.valid_until || '\u2014';
+    document.getElementById('view_prepared_by').textContent = (data.prepared_by && data.prepared_by.trim() !== '') ? data.prepared_by : '\u2014';
+    document.getElementById('view_created_at').textContent = data.created_at || '\u2014';
     document.getElementById('status_quotation_id').value = data.quotation_id;
+
+    const statusBadge = document.getElementById('view_status_badge');
+    statusBadge.textContent = data.status;
+    statusBadge.className = 'status-pill ' + (statusPillClassMap[data.status] || 'status-draft');
+
+    document.getElementById('view_notes').textContent = (data.notes && data.notes.trim() !== '') ? data.notes : '\u2014';
 
     const statusActions = document.getElementById('view_status_actions');
     statusActions.style.display = (data.status === 'Draft') ? '' : 'none';

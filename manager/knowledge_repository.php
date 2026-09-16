@@ -94,13 +94,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $category    = $_POST['category'] ?? 'Other';
         $description = trim($_POST['description'] ?? '');
 
-        $ownerStmt = $pdo->prepare('SELECT uploaded_by, uploaded_by_role FROM knowledge_documents WHERE document_id = ?');
+        $ownerStmt = $pdo->prepare('SELECT document_id FROM knowledge_documents WHERE document_id = ?');
         $ownerStmt->execute([$documentId]);
         $doc = $ownerStmt->fetch();
 
-        if (!$doc || $doc['uploaded_by_role'] !== 'manager' || (int) $doc['uploaded_by'] !== (int) $currentUserId) {
+        if (!$doc) {
             $_SESSION['alert_type'] = 'error';
-            $_SESSION['alert_message'] = 'You can only edit documents you uploaded yourself.';
+            $_SESSION['alert_message'] = 'Document not found.';
             header('Location: knowledge_repository.php');
             exit;
         }
@@ -130,13 +130,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $documentId = $_POST['document_id'] ?? null;
 
-        $stmt = $pdo->prepare('SELECT file_path, uploaded_by, uploaded_by_role FROM knowledge_documents WHERE document_id = ?');
+        $stmt = $pdo->prepare('SELECT file_path FROM knowledge_documents WHERE document_id = ?');
         $stmt->execute([$documentId]);
         $doc = $stmt->fetch();
 
-        if (!$doc || $doc['uploaded_by_role'] !== 'manager' || (int) $doc['uploaded_by'] !== (int) $currentUserId) {
+        if (!$doc) {
             $_SESSION['alert_type'] = 'error';
-            $_SESSION['alert_message'] = 'You can only delete documents you uploaded yourself.';
+            $_SESSION['alert_message'] = 'Document not found.';
             header('Location: knowledge_repository.php');
             exit;
         }
@@ -542,7 +542,6 @@ body {
                     : trim(($doc['uploader_firstname'] ?? '') . ' ' . ($doc['uploader_lastname'] ?? ''));
                 $thumbColors = fileTypePalette($doc['file_type']);
                 $catColors = categoryPalette($doc['category']);
-                $isOwner = $doc['uploaded_by_role'] === 'manager' && (int) $doc['uploaded_by'] === (int) $currentUserId;
               ?>
               <li class="document-row" data-title="<?= htmlspecialchars(mb_strtolower($doc['title'])) ?>" data-description="<?= htmlspecialchars(mb_strtolower($doc['description'] ?? '')) ?>">
                 <span class="document-thumb" style="background-color:<?= $thumbColors['bg'] ?>; color:<?= $thumbColors['fg'] ?>;" aria-hidden="true">
@@ -553,7 +552,7 @@ body {
                   <ul class="document-meta">
                     <li><span class="category-pill" style="background-color:<?= $catColors['bg'] ?>; color:<?= $catColors['fg'] ?>;"><?= htmlspecialchars($doc['category']) ?></span></li>
                     <li><?= strtoupper($doc['file_type']) ?> &middot; <?= formatFileSize($doc['file_size']) ?></li>
-                    <li>Uploaded by <?= htmlspecialchars($uploaderName ?: 'Unknown') ?></li>
+                    <li>Uploaded by <?= htmlspecialchars($uploaderName ?: 'Unknown') ?><?= $doc['uploaded_by_role'] === 'manager' ? ' (Manager)' : ($doc['uploaded_by_role'] === 'staff' ? ' (Staff)' : '') ?></li>
                     <li><time datetime="<?= date('Y-m-d', strtotime($doc['created_at'])) ?>"><?= date('M d, Y', strtotime($doc['created_at'])) ?></time></li>
                   </ul>
                   <?php if (!empty($doc['description'])): ?>
@@ -564,22 +563,20 @@ body {
                   <a href="../<?= htmlspecialchars($doc['file_path']) ?>" download="<?= htmlspecialchars($doc['file_name']) ?>" class="btn btn-repo btn-repo-success" title="Download">
                     <i class="fa-solid fa-download"></i>
                   </a>
-                  <?php if ($isOwner): ?>
-                    <button type="button" class="btn btn-repo btn-repo-primary" title="Edit"
-                      data-bs-toggle="modal" data-bs-target="#editDocumentModal"
-                      data-id="<?= $doc['document_id'] ?>"
-                      data-title="<?= htmlspecialchars($doc['title']) ?>"
-                      data-category="<?= htmlspecialchars($doc['category']) ?>"
-                      data-description="<?= htmlspecialchars($doc['description'] ?? '') ?>">
-                      <i class="fa-regular fa-pen-to-square"></i>
-                    </button>
-                    <button type="button" class="btn btn-repo btn-repo-danger" title="Delete"
-                      data-bs-toggle="modal" data-bs-target="#deleteDocumentModal"
-                      data-id="<?= $doc['document_id'] ?>"
-                      data-title="<?= htmlspecialchars($doc['title']) ?>">
-                      <i class="fa-regular fa-trash-can"></i>
-                    </button>
-                  <?php endif; ?>
+                  <button type="button" class="btn btn-repo btn-repo-primary" title="Edit"
+                    data-bs-toggle="modal" data-bs-target="#editDocumentModal"
+                    data-id="<?= $doc['document_id'] ?>"
+                    data-title="<?= htmlspecialchars($doc['title']) ?>"
+                    data-category="<?= htmlspecialchars($doc['category']) ?>"
+                    data-description="<?= htmlspecialchars($doc['description'] ?? '') ?>">
+                    <i class="fa-regular fa-pen-to-square"></i>
+                  </button>
+                  <button type="button" class="btn btn-repo btn-repo-danger" title="Delete"
+                    data-bs-toggle="modal" data-bs-target="#deleteDocumentModal"
+                    data-id="<?= $doc['document_id'] ?>"
+                    data-title="<?= htmlspecialchars($doc['title']) ?>">
+                    <i class="fa-regular fa-trash-can"></i>
+                  </button>
                 </div>
               </li>
             <?php endforeach; ?>
