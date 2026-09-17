@@ -139,10 +139,8 @@ $alertMessage = $_SESSION['alert_message'] ?? null;
 unset($_SESSION['alert_type'], $_SESSION['alert_message']);
 
 $availableQuotationsStmt = $pdo->query(
-    "SELECT q.quotation_id, q.quotation_number, q.total_amount, q.subtotal, q.tax_rate, q.tax_amount,
-            q.project_scope, q.valid_until, q.notes,
-            c.client_id, c.company_name, c.contact_person, c.email, c.contact_number, c.address, c.industry,
-            sr.request_title, sr.request_details, sr.required_skill
+    "SELECT q.quotation_id, q.quotation_number, q.total_amount, q.project_scope,
+            c.company_name, sr.request_title
      FROM quotations q
      INNER JOIN clients c ON q.client_id = c.client_id
      INNER JOIN service_requests sr ON q.request_id = sr.request_id
@@ -151,12 +149,6 @@ $availableQuotationsStmt = $pdo->query(
      ORDER BY q.created_at DESC"
 );
 $availableQuotations = $availableQuotationsStmt->fetchAll();
-
-$availableQuotationItemsStmt = $pdo->query('SELECT * FROM quotation_items ORDER BY quotation_id ASC, sort_order ASC');
-$itemsByAvailableQuotation = [];
-foreach ($availableQuotationItemsStmt->fetchAll() as $row) {
-    $itemsByAvailableQuotation[$row['quotation_id']][] = $row;
-}
 
 $searchTerm = trim($_GET['search'] ?? '');
 $dateFilter = trim($_GET['date'] ?? '');
@@ -454,28 +446,6 @@ body {
 .quotation-pick-card:hover { border-color: var(--indigo); }
 .quotation-pick-card.active { border-color: var(--indigo); background-color: var(--indigo-soft); }
 
-.quotation-preview-panel {
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background-color: var(--navy-soft);
-  padding: 1rem 1.1rem;
-  height: 100%;
-}
-.quotation-preview-empty {
-  color: var(--ink-soft);
-  font-size: .85rem;
-  text-align: center;
-  padding: 2rem 1rem;
-}
-.quotation-preview-content { display: none; }
-.quotation-preview-content.is-visible { display: block; }
-.quotation-preview-content .view-section-label { margin-top: .75rem; }
-.quotation-preview-content .view-section-label:first-child { margin-top: 0; }
-.quotation-preview-items-table th, .quotation-preview-items-table td {
-  font-size: .78rem;
-  padding: .35rem .4rem;
-}
-
 .modal-content { border-radius: 14px; border: none; }
 .modal-header { border-bottom: 1px solid var(--line); }
 .modal-footer { border-top: 1px solid var(--line); }
@@ -512,25 +482,6 @@ body {
 .pagination .page-link { color: var(--indigo-text); border-color: var(--line); }
 .pagination .page-item.active .page-link { background-color: var(--indigo); border-color: var(--indigo); color: #fff; }
 .pagination .page-item.disabled .page-link { color: #adb5bd; }
-
-.view-section-label {
-  font-size: .7rem;
-  font-weight: 700;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-  margin-bottom: .3rem;
-}
-
-.view-text-box {
-  background-color: var(--navy-soft);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: .75rem .9rem;
-  white-space: pre-line;
-  word-break: break-word;
-  color: var(--ink);
-}
 </style>
 </head>
 <body>
@@ -749,7 +700,7 @@ body {
 </div>
 
 <div class="modal fade" id="generateContractModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-xl">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content">
       <form method="POST" id="generateContractForm">
         <input type="hidden" name="action" value="generate_contract">
@@ -760,104 +711,20 @@ body {
         </div>
         <div class="modal-body">
 
-          <div class="row g-3 mb-3">
-            <div class="col-lg-5">
-              <label class="form-label">Approved Quotation</label>
-              <div class="d-flex flex-column gap-2" id="quotationPickList">
-                <?php foreach ($availableQuotations as $q): ?>
-                  <?php
-                    $quotationItems = array_map(function ($it) {
-                        return [
-                            'description' => $it['description'],
-                            'quantity' => rtrim(rtrim(number_format((float) $it['quantity'], 2), '0'), '.'),
-                            'unit_price' => number_format((float) $it['unit_price'], 2),
-                            'line_total' => number_format((float) $it['line_total'], 2),
-                        ];
-                    }, $itemsByAvailableQuotation[$q['quotation_id']] ?? []);
-                  ?>
-                  <div class="quotation-pick-card p-3" data-quotation-id="<?= $q['quotation_id'] ?>"
-                    data-preview='<?= htmlspecialchars(json_encode([
-                      'quotation_number' => $q['quotation_number'],
-                      'company' => $q['company_name'],
-                      'contact_person' => $q['contact_person'],
-                      'email' => $q['email'],
-                      'contact_number' => $q['contact_number'],
-                      'address' => $q['address'],
-                      'industry' => $q['industry'],
-                      'request_title' => $q['request_title'],
-                      'request_details' => $q['request_details'],
-                      'required_skill' => $q['required_skill'],
-                      'project_scope' => $q['project_scope'],
-                      'subtotal' => number_format((float) $q['subtotal'], 2),
-                      'tax_rate' => $q['tax_rate'],
-                      'tax_amount' => number_format((float) $q['tax_amount'], 2),
-                      'total' => number_format((float) $q['total_amount'], 2),
-                      'valid_until' => $q['valid_until'] ? date('M d, Y', strtotime($q['valid_until'])) : null,
-                      'notes' => $q['notes'],
-                      'items' => $quotationItems,
-                    ]), ENT_QUOTES) ?>'>
-                    <div class="d-flex justify-content-between align-items-start">
-                      <div>
-                        <div class="fw-semibold small"><?= htmlspecialchars($q['quotation_number']) ?></div>
-                        <div class="small" style="color:var(--ink-soft);"><?= htmlspecialchars($q['company_name']) ?> &mdash; <?= htmlspecialchars($q['request_title']) ?></div>
-                      </div>
-                      <div class="fw-semibold small" style="color:var(--indigo-text);">&#8369;<?= number_format((float) $q['total_amount'], 2) ?></div>
+          <div class="mb-3">
+            <label class="form-label">Approved Quotation</label>
+            <div class="d-flex flex-column gap-2" id="quotationPickList">
+              <?php foreach ($availableQuotations as $q): ?>
+                <div class="quotation-pick-card p-3" data-quotation-id="<?= $q['quotation_id'] ?>">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                      <div class="fw-semibold small"><?= htmlspecialchars($q['quotation_number']) ?></div>
+                      <div class="small" style="color:var(--ink-soft);"><?= htmlspecialchars($q['company_name']) ?> &mdash; <?= htmlspecialchars($q['request_title']) ?></div>
                     </div>
+                    <div class="fw-semibold small" style="color:var(--indigo-text);">&#8369;<?= number_format((float) $q['total_amount'], 2) ?></div>
                   </div>
-                <?php endforeach; ?>
-              </div>
-            </div>
-
-            <div class="col-lg-7">
-              <label class="form-label">Full Details</label>
-              <div class="quotation-preview-panel">
-                <div class="quotation-preview-empty" id="quotationPreviewEmpty">
-                  Select a quotation on the left to review the full client, request, and quotation details before generating the contract.
                 </div>
-                <div class="quotation-preview-content" id="quotationPreviewContent">
-
-                  <div class="view-section-label">Client</div>
-                  <div class="fw-semibold small" id="preview_company"></div>
-                  <div class="small" id="preview_contact_person"></div>
-                  <div class="small" id="preview_email"></div>
-                  <div class="small" id="preview_contact_number"></div>
-                  <div class="small" id="preview_address"></div>
-                  <div class="small" id="preview_industry"></div>
-
-                  <div class="view-section-label">Service Request</div>
-                  <div class="fw-semibold small" id="preview_request_title"></div>
-                  <div class="small mb-1" id="preview_required_skill"></div>
-                  <div class="small" id="preview_request_details" style="white-space:pre-line;"></div>
-
-                  <div class="view-section-label">Project Scope</div>
-                  <div class="small" id="preview_project_scope" style="white-space:pre-line;"></div>
-
-                  <div class="view-section-label">Quotation Items</div>
-                  <div class="table-responsive">
-                    <table class="table table-sm quotation-preview-items-table mb-1">
-                      <thead>
-                        <tr>
-                          <th>Description</th>
-                          <th class="text-end">Qty</th>
-                          <th class="text-end">Unit Price</th>
-                          <th class="text-end">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody id="preview_items_body"></tbody>
-                    </table>
-                  </div>
-                  <div class="small text-end" id="preview_subtotal"></div>
-                  <div class="small text-end" id="preview_tax"></div>
-                  <div class="fw-bold small text-end" id="preview_total" style="color:var(--indigo-text);"></div>
-
-                  <div class="view-section-label">Valid Until</div>
-                  <div class="small" id="preview_valid_until"></div>
-
-                  <div class="view-section-label">Quotation Notes</div>
-                  <div class="small" id="preview_notes" style="white-space:pre-line;"></div>
-
-                </div>
-              </div>
+              <?php endforeach; ?>
             </div>
           </div>
 
@@ -897,49 +764,42 @@ body {
       <div class="modal-body">
 
         <div class="mb-3">
-          <div class="view-section-label">Client</div>
           <div class="fw-semibold small" id="view_contract_company"></div>
           <div class="small" id="view_contract_request" style="color:var(--ink-soft);"></div>
         </div>
 
         <div class="row g-3 mb-3">
           <div class="col-sm-4">
-            <div class="view-section-label">Quotation</div>
+            <div class="small" style="color:var(--ink-soft);">Quotation</div>
             <div class="fw-semibold small" id="view_contract_quotation"></div>
           </div>
           <div class="col-sm-4">
-            <div class="view-section-label">Total</div>
+            <div class="small" style="color:var(--ink-soft);">Total</div>
             <div class="fw-semibold small" id="view_contract_total"></div>
           </div>
           <div class="col-sm-4">
-            <div class="view-section-label">Duration</div>
+            <div class="small" style="color:var(--ink-soft);">Duration</div>
             <div class="fw-semibold small" id="view_contract_duration"></div>
           </div>
         </div>
 
         <div class="mb-3">
-          <div class="view-section-label">Project Scope</div>
-          <div class="view-text-box small" id="view_contract_scope"></div>
+          <div class="small fw-semibold mb-1">Project Scope</div>
+          <p class="small mb-0" id="view_contract_scope" style="color:var(--ink-soft);"></p>
         </div>
 
         <div class="mb-3">
-          <div class="view-section-label">Terms and Conditions</div>
-          <div class="view-text-box small" id="view_contract_terms"></div>
+          <div class="small fw-semibold mb-1">Terms and Conditions</div>
+          <p class="small mb-0" id="view_contract_terms" style="color:var(--ink-soft);"></p>
         </div>
 
-        <div class="row g-3 mb-3">
-          <div class="col-sm-6">
-            <div class="view-section-label">Prepared By</div>
-            <div class="small" id="view_contract_prepared"></div>
-          </div>
-          <div class="col-sm-6" id="view_contract_approved_wrap">
-            <div class="view-section-label">Approved By</div>
-            <div class="small" id="view_contract_approved"></div>
-          </div>
+        <div class="mb-3">
+          <div class="small" style="color:var(--ink-soft);">Prepared by <span id="view_contract_prepared" class="fw-semibold" style="color:var(--ink);"></span></div>
+          <div class="small" id="view_contract_approved_wrap" style="color:var(--ink-soft);">Approved by <span id="view_contract_approved" class="fw-semibold" style="color:var(--ink);"></span></div>
         </div>
 
         <div id="view_revisions_wrap" class="mb-1">
-          <div class="view-section-label">Revision History</div>
+          <div class="small fw-semibold mb-2">Revision History</div>
           <div id="view_revisions_list" class="d-flex flex-column gap-2" style="max-height:150px; overflow-y:auto;"></div>
         </div>
 
@@ -988,52 +848,12 @@ body {
 
 <script src="../assets/vendor/bootstrap-5.3.8/js/bootstrap.bundle.min.js"></script>
 <script>
-const quotationPreviewEmpty = document.getElementById('quotationPreviewEmpty');
-const quotationPreviewContent = document.getElementById('quotationPreviewContent');
-
 document.querySelectorAll('.quotation-pick-card').forEach(function (cardEl) {
   cardEl.addEventListener('click', function () {
     document.querySelectorAll('.quotation-pick-card').forEach(function (c) { c.classList.remove('active'); });
     cardEl.classList.add('active');
     document.getElementById('generate_quotation_id').value = cardEl.dataset.quotationId;
     document.getElementById('generateContractSubmitBtn').disabled = false;
-
-    const data = JSON.parse(cardEl.dataset.preview);
-
-    document.getElementById('preview_company').textContent = data.company;
-    document.getElementById('preview_contact_person').textContent = data.contact_person;
-    document.getElementById('preview_email').textContent = data.email;
-    document.getElementById('preview_contact_number').textContent = data.contact_number;
-    document.getElementById('preview_address').textContent = data.address;
-    document.getElementById('preview_industry').textContent = data.industry || 'Industry not specified';
-
-    document.getElementById('preview_request_title').textContent = data.request_title;
-    document.getElementById('preview_required_skill').textContent = data.required_skill ? ('Required skill: ' + data.required_skill) : 'Required skill: not specified';
-    document.getElementById('preview_request_details').textContent = data.request_details || 'No additional details were provided for this request.';
-
-    document.getElementById('preview_project_scope').textContent = data.project_scope || 'No project scope provided.';
-
-    const itemsBody = document.getElementById('preview_items_body');
-    itemsBody.innerHTML = '';
-    data.items.forEach(function (item) {
-      const tr = document.createElement('tr');
-      tr.innerHTML =
-        '<td>' + escapeHtml(item.description) + '</td>' +
-        '<td class="text-end">' + escapeHtml(item.quantity) + '</td>' +
-        '<td class="text-end">\u20B1' + escapeHtml(item.unit_price) + '</td>' +
-        '<td class="text-end">\u20B1' + escapeHtml(item.line_total) + '</td>';
-      itemsBody.appendChild(tr);
-    });
-
-    document.getElementById('preview_subtotal').textContent = 'Subtotal: \u20B1' + data.subtotal;
-    document.getElementById('preview_tax').textContent = 'Tax (' + data.tax_rate + '%): \u20B1' + data.tax_amount;
-    document.getElementById('preview_total').textContent = 'Total: \u20B1' + data.total;
-
-    document.getElementById('preview_valid_until').textContent = data.valid_until || 'No expiry set';
-    document.getElementById('preview_notes').textContent = (data.notes && data.notes.trim() !== '') ? data.notes : 'No notes provided.';
-
-    quotationPreviewEmpty.style.display = 'none';
-    quotationPreviewContent.classList.add('is-visible');
   });
 });
 
@@ -1041,8 +861,6 @@ document.getElementById('generateContractModal').addEventListener('hidden.bs.mod
   document.querySelectorAll('.quotation-pick-card').forEach(function (c) { c.classList.remove('active'); });
   document.getElementById('generate_quotation_id').value = '';
   document.getElementById('generateContractSubmitBtn').disabled = true;
-  quotationPreviewEmpty.style.display = '';
-  quotationPreviewContent.classList.remove('is-visible');
 });
 
 document.querySelectorAll('.view-contract-btn').forEach(function (btn) {
@@ -1056,8 +874,8 @@ document.querySelectorAll('.view-contract-btn').forEach(function (btn) {
     document.getElementById('view_contract_total').textContent = '\u20B1' + data.total;
     document.getElementById('view_contract_duration').textContent =
       (data.start_date || '\u2014') + ' \u2013 ' + (data.end_date || '\u2014');
-    document.getElementById('view_contract_scope').textContent = (data.scope_summary && data.scope_summary.trim() !== '') ? data.scope_summary : 'No scope summary provided.';
-    document.getElementById('view_contract_terms').textContent = (data.terms_conditions && data.terms_conditions.trim() !== '') ? data.terms_conditions : 'No terms and conditions provided.';
+    document.getElementById('view_contract_scope').textContent = data.scope_summary || 'No scope summary provided.';
+    document.getElementById('view_contract_terms').textContent = data.terms_conditions || 'No terms and conditions provided.';
     document.getElementById('view_contract_prepared').textContent = data.prepared_by || '\u2014';
 
     const approvedWrap = document.getElementById('view_contract_approved_wrap');
@@ -1083,7 +901,7 @@ document.querySelectorAll('.view-contract-btn').forEach(function (btn) {
         const div = document.createElement('div');
         div.className = 'revision-item';
         div.innerHTML =
-          '<div class="small" style="white-space:pre-line;">' + escapeHtml(rev.note) + '</div>' +
+          '<div class="small">' + escapeHtml(rev.note) + '</div>' +
           '<div class="small" style="color:var(--ink-soft); font-size:.7rem;">' + escapeHtml(rev.by || 'Unknown') + ' &middot; ' + escapeHtml(rev.date) + '</div>';
         revisionsList.appendChild(div);
       });

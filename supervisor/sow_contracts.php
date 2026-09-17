@@ -482,6 +482,25 @@ body {
 .pagination .page-link { color: var(--indigo-text); border-color: var(--line); }
 .pagination .page-item.active .page-link { background-color: var(--indigo); border-color: var(--indigo); color: #fff; }
 .pagination .page-item.disabled .page-link { color: #adb5bd; }
+
+.view-section-label {
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: .3rem;
+}
+
+.view-text-box {
+  background-color: var(--navy-soft);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: .75rem .9rem;
+  white-space: pre-line;
+  word-break: break-word;
+  color: var(--ink);
+}
 </style>
 </head>
 <body>
@@ -764,42 +783,49 @@ body {
       <div class="modal-body">
 
         <div class="mb-3">
+          <div class="view-section-label">Client</div>
           <div class="fw-semibold small" id="view_contract_company"></div>
           <div class="small" id="view_contract_request" style="color:var(--ink-soft);"></div>
         </div>
 
         <div class="row g-3 mb-3">
           <div class="col-sm-4">
-            <div class="small" style="color:var(--ink-soft);">Quotation</div>
+            <div class="view-section-label">Quotation</div>
             <div class="fw-semibold small" id="view_contract_quotation"></div>
           </div>
           <div class="col-sm-4">
-            <div class="small" style="color:var(--ink-soft);">Total</div>
+            <div class="view-section-label">Total</div>
             <div class="fw-semibold small" id="view_contract_total"></div>
           </div>
           <div class="col-sm-4">
-            <div class="small" style="color:var(--ink-soft);">Duration</div>
+            <div class="view-section-label">Duration</div>
             <div class="fw-semibold small" id="view_contract_duration"></div>
           </div>
         </div>
 
         <div class="mb-3">
-          <div class="small fw-semibold mb-1">Project Scope</div>
-          <p class="small mb-0" id="view_contract_scope" style="color:var(--ink-soft);"></p>
+          <div class="view-section-label">Project Scope</div>
+          <div class="view-text-box small" id="view_contract_scope"></div>
         </div>
 
         <div class="mb-3">
-          <div class="small fw-semibold mb-1">Terms and Conditions</div>
-          <p class="small mb-0" id="view_contract_terms" style="color:var(--ink-soft);"></p>
+          <div class="view-section-label">Terms and Conditions</div>
+          <div class="view-text-box small" id="view_contract_terms"></div>
         </div>
 
-        <div class="mb-3">
-          <div class="small" style="color:var(--ink-soft);">Prepared by <span id="view_contract_prepared" class="fw-semibold" style="color:var(--ink);"></span></div>
-          <div class="small" id="view_contract_approved_wrap" style="color:var(--ink-soft);">Approved by <span id="view_contract_approved" class="fw-semibold" style="color:var(--ink);"></span></div>
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6">
+            <div class="view-section-label">Prepared By</div>
+            <div class="small" id="view_contract_prepared"></div>
+          </div>
+          <div class="col-sm-6" id="view_contract_approved_wrap">
+            <div class="view-section-label">Approved By</div>
+            <div class="small" id="view_contract_approved"></div>
+          </div>
         </div>
 
         <div id="view_revisions_wrap" class="mb-1">
-          <div class="small fw-semibold mb-2">Revision History</div>
+          <div class="view-section-label">Revision History</div>
           <div id="view_revisions_list" class="d-flex flex-column gap-2" style="max-height:150px; overflow-y:auto;"></div>
         </div>
 
@@ -874,8 +900,8 @@ document.querySelectorAll('.view-contract-btn').forEach(function (btn) {
     document.getElementById('view_contract_total').textContent = '\u20B1' + data.total;
     document.getElementById('view_contract_duration').textContent =
       (data.start_date || '\u2014') + ' \u2013 ' + (data.end_date || '\u2014');
-    document.getElementById('view_contract_scope').textContent = data.scope_summary || 'No scope summary provided.';
-    document.getElementById('view_contract_terms').textContent = data.terms_conditions || 'No terms and conditions provided.';
+    document.getElementById('view_contract_scope').textContent = (data.scope_summary && data.scope_summary.trim() !== '') ? data.scope_summary : 'No scope summary provided.';
+    document.getElementById('view_contract_terms').textContent = (data.terms_conditions && data.terms_conditions.trim() !== '') ? data.terms_conditions : 'No terms and conditions provided.';
     document.getElementById('view_contract_prepared').textContent = data.prepared_by || '\u2014';
 
     const approvedWrap = document.getElementById('view_contract_approved_wrap');
@@ -901,7 +927,7 @@ document.querySelectorAll('.view-contract-btn').forEach(function (btn) {
         const div = document.createElement('div');
         div.className = 'revision-item';
         div.innerHTML =
-          '<div class="small">' + escapeHtml(rev.note) + '</div>' +
+          '<div class="small" style="white-space:pre-line;">' + escapeHtml(rev.note) + '</div>' +
           '<div class="small" style="color:var(--ink-soft); font-size:.7rem;">' + escapeHtml(rev.by || 'Unknown') + ' &middot; ' + escapeHtml(rev.date) + '</div>';
         revisionsList.appendChild(div);
       });

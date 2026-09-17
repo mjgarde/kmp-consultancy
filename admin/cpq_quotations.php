@@ -487,6 +487,25 @@ body {
   min-height: 2.5rem;
   color: var(--ink);
 }
+
+.request-preview-box {
+  background-color: var(--navy-soft);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: .85rem 1rem;
+  display: none;
+}
+.request-preview-box.is-visible { display: block; }
+.request-preview-box .view-section-label { margin-bottom: .15rem; }
+.request-preview-box .request-preview-details {
+  white-space: pre-line;
+  word-break: break-word;
+  color: var(--ink);
+  font-size: .85rem;
+}
+.request-preview-box .request-preview-skill {
+  margin-top: .5rem;
+}
 </style>
 </head>
 <body>
@@ -715,14 +734,35 @@ body {
 
           <div class="mb-3">
             <label class="form-label">Service Request</label>
-            <select class="form-select" name="request_id" required>
+            <select class="form-select" name="request_id" id="requestSelect" required>
               <option value="" selected disabled>Select a service request</option>
               <?php foreach ($serviceRequests as $req): ?>
-                <option value="<?= $req['request_id'] ?>">
+                <option value="<?= $req['request_id'] ?>"
+                  data-company="<?= htmlspecialchars($req['company_name']) ?>"
+                  data-title="<?= htmlspecialchars($req['request_title']) ?>"
+                  data-details="<?= htmlspecialchars($req['request_details'] ?? '') ?>"
+                  data-skill="<?= htmlspecialchars($req['required_skill'] ?? '') ?>">
                   <?= htmlspecialchars($req['company_name']) ?> &mdash; <?= htmlspecialchars($req['request_title']) ?> (<?= htmlspecialchars($req['status']) ?>)
                 </option>
               <?php endforeach; ?>
             </select>
+          </div>
+
+          <div class="request-preview-box mb-3" id="requestPreviewBox">
+            <div class="row g-2 mb-2">
+              <div class="col-sm-6">
+                <div class="view-section-label">Client</div>
+                <div class="small fw-semibold" id="requestPreviewCompany"></div>
+              </div>
+              <div class="col-sm-6">
+                <div class="view-section-label">Request Title</div>
+                <div class="small fw-semibold" id="requestPreviewTitle"></div>
+              </div>
+            </div>
+            <div class="view-section-label">Required Skill</div>
+            <div class="small mb-2" id="requestPreviewSkill"></div>
+            <div class="view-section-label">Details</div>
+            <div class="request-preview-details" id="requestPreviewDetails"></div>
           </div>
 
           <div class="mb-3">
@@ -850,6 +890,33 @@ let itemIndex = 0;
 const itemsContainer = document.getElementById('itemsContainer');
 const addItemBtn = document.getElementById('addItemBtn');
 const taxRateInput = document.getElementById('taxRateInput');
+const requestSelect = document.getElementById('requestSelect');
+const requestPreviewBox = document.getElementById('requestPreviewBox');
+const requestPreviewCompany = document.getElementById('requestPreviewCompany');
+const requestPreviewTitle = document.getElementById('requestPreviewTitle');
+const requestPreviewDetails = document.getElementById('requestPreviewDetails');
+const requestPreviewSkill = document.getElementById('requestPreviewSkill');
+
+function updateRequestPreview() {
+  const option = requestSelect.options[requestSelect.selectedIndex];
+  if (!option || !option.value) {
+    requestPreviewBox.classList.remove('is-visible');
+    return;
+  }
+
+  const company = option.dataset.company || '';
+  const title = option.dataset.title || '';
+  const details = option.dataset.details || '';
+  const skill = option.dataset.skill || '';
+
+  requestPreviewCompany.textContent = company;
+  requestPreviewTitle.textContent = title;
+  requestPreviewDetails.textContent = details !== '' ? details : 'No additional details were provided for this request.';
+  requestPreviewSkill.textContent = skill !== '' ? skill : 'Not specified / any skill';
+  requestPreviewBox.classList.add('is-visible');
+}
+
+requestSelect.addEventListener('change', updateRequestPreview);
 
 function addItemRow() {
   const row = document.createElement('div');
@@ -917,6 +984,8 @@ document.getElementById('newQuotationModal').addEventListener('show.bs.modal', f
   itemsContainer.innerHTML = '';
   itemIndex = 0;
   addItemRow();
+  requestSelect.selectedIndex = 0;
+  requestPreviewBox.classList.remove('is-visible');
 });
 
 const statusPillClassMap = {

@@ -70,11 +70,6 @@ function navActive(string $page, string $currentPage): string
         </a>
       </li>
       <li class="nav-item mb-1">
-        <a href="knowledge_repository.php" class="nav-link <?= navActive('knowledge_repository.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
-          <i class="fa-solid fa-book" style="width:18px;"></i> Repository
-        </a>
-      </li>
-      <li class="nav-item mb-1">
         <a href="cpq_quotations.php" class="nav-link <?= navActive('cpq_quotations.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
           <i class="fa-solid fa-file-invoice-dollar" style="width:18px;"></i> CPQ &amp; Quotations
         </a>
@@ -82,6 +77,17 @@ function navActive(string $page, string $currentPage): string
       <li class="nav-item mb-1">
         <a href="calendar_deadlines.php" class="nav-link <?= navActive('calendar_deadlines.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
           <i class="fa-solid fa-calendar-days" style="width:18px;"></i> Calendar Deadlines
+        </a>
+      </li>
+    </ul>
+
+    <div class="dashboard-nav-label text-uppercase text-secondary small fw-semibold px-3 mb-2" style="letter-spacing:.06em; font-size:.72rem;">
+      Documents
+    </div>
+    <ul class="dashboard-sidebar-menu nav flex-column mb-4">
+      <li class="nav-item mb-1">
+        <a href="knowledge_repository.php" class="nav-link <?= navActive('knowledge_repository.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
+          <i class="fa-solid fa-book" style="width:18px;"></i> Repository
         </a>
       </li>
     </ul>
