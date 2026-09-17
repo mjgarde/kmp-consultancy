@@ -47,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['alert_message'] = 'Client profile added successfully.';
             } else {
                 $stmt = $pdo->prepare(
-                    'UPDATE clients SET company_name = ?, contact_person = ?, email = ?, contact_number = ?, address = ?, industry = ? WHERE client_id = ?'
+                    'UPDATE clients SET company_name = ?, contact_person = ?, email = ?, contact_number = ?, address = ?, industry = ?, updated_at = NOW() WHERE client_id = ?'
                 );
                 $stmt->execute([$companyName, $contactPerson, $email, $contactNumber, $address, $industry, $clientId]);
                 $_SESSION['alert_type'] = 'success';
@@ -257,6 +257,17 @@ function buildPageUrl(int $targetPage, string $activeTab, string $searchTerm, st
         $params['status'] = $statusFilter;
     }
     return '?' . http_build_query($params);
+}
+
+function clientActivityLabel(array $client): string
+{
+    $createdAt = $client['created_at'] ?? null;
+    $updatedAt = $client['updated_at'] ?? null;
+
+    if (!empty($updatedAt) && $updatedAt !== $createdAt) {
+        return 'Updated ' . date('M d, Y', strtotime($updatedAt));
+    }
+    return 'Added ' . date('M d, Y', strtotime($createdAt));
 }
 ?>
 <!DOCTYPE html>
@@ -598,12 +609,13 @@ body {
                   <th scope="col" class="d-none d-md-table-cell">Contact Person</th>
                   <th scope="col" class="d-none d-lg-table-cell">Email</th>
                   <th scope="col" class="d-none d-lg-table-cell">Contact Number</th>
+                  <th scope="col" class="d-none d-md-table-cell">Date</th>
                 </tr>
               </thead>
               <tbody>
                 <?php if (empty($clients)): ?>
                   <tr>
-                    <td colspan="4" class="text-center py-5" style="color:var(--ink-soft);">
+                    <td colspan="5" class="text-center py-5" style="color:var(--ink-soft);">
                       <i class="fa-regular fa-folder-open fs-3 d-block mb-2"></i>
                       No clients found.
                     </td>
@@ -626,6 +638,7 @@ body {
                       <td class="small d-none d-md-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars($client['contact_person']) ?></td>
                       <td class="small d-none d-lg-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars($client['email']) ?></td>
                       <td class="small d-none d-lg-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars($client['contact_number']) ?></td>
+                      <td class="small d-none d-md-table-cell" style="color:var(--ink-soft);"><?= clientActivityLabel($client) ?></td>
                     </tr>
                   <?php endforeach; ?>
                 <?php endif; ?>
@@ -859,7 +872,7 @@ body {
             </div>
             <div class="col-md-6">
               <label class="form-label">Industry</label>
-              <input type="text" name="industry" class="form-control" placeholder="Optional">
+              <input type="text" name="industry" class="form-control">
             </div>
             <div class="col-md-6">
               <label class="form-label">Address</label>
