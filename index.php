@@ -137,8 +137,10 @@ foreach ($roleSessions as $role => $sessionName) {
 
       <ul id="navMenu" class="hidden lg:flex items-center gap-1 absolute lg:static top-full left-0 w-full lg:w-auto bg-ink lg:bg-transparent overflow-hidden lg:overflow-visible">
         <li><a href="#home" data-page="home" class="nav-link block px-4 py-3 lg:py-2 text-white text-[15px] font-semibold hover:bg-white/10 lg:rounded transition-colors border-b border-white/5 lg:border-0">Home</a></li>
+        <li><a href="#clients" data-page="clients" class="nav-link block px-4 py-3 lg:py-2 text-white text-[15px] font-medium hover:bg-white/10 lg:rounded transition-colors border-b border-white/5 lg:border-0">Our Clients</a></li>
         <li><a href="#contact" data-page="contact" class="nav-link block px-4 py-3 lg:py-2 text-white text-[15px] font-medium hover:bg-white/10 lg:rounded transition-colors border-b border-white/5 lg:border-0">Contact</a></li>
-        <li><a href="#about" data-page="about" class="nav-link block px-4 py-3 lg:py-2 text-white text-[15px] font-medium hover:bg-white/10 lg:rounded transition-colors">About Us</a></li>
+        <li><a href="#about" data-page="about" class="nav-link block px-4 py-3 lg:py-2 text-white text-[15px] font-medium hover:bg-white/10 lg:rounded transition-colors border-b border-white/5 lg:border-0">About Us</a></li>
+        <li class="lg:ml-2"><a href="login.php" class="block text-center px-5 py-2.5 lg:py-2 bg-gold text-ink text-[15px] font-semibold rounded hover:bg-goldlight transition-colors">Login</a></li>
       </ul>
     </div>
   </nav>
@@ -433,6 +435,33 @@ foreach ($roleSessions as $role => $sessionName) {
 
   </div>
 
+  <div id="page-clients" class="page hidden" data-page="clients">
+
+  <section id="clients" class="bg-white py-20 sm:py-28 px-5 sm:px-8 border-t border-gray-200">
+    <div class="max-w-6xl mx-auto">
+
+      <div class="text-center mb-16 fade-up">
+        <h2 class="font-serif font-bold text-3xl sm:text-4xl text-ink">Our Clients</h2>
+        <div class="flex justify-center gap-2 mt-4">
+          <span class="w-2 h-2 rounded-full bg-ink"></span>
+          <span class="w-2 h-2 rounded-full bg-ink/50"></span>
+          <span class="w-2 h-2 rounded-full bg-ink/20"></span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-8 stagger">
+        <?php for ($i = 1; $i <= 20; $i++): ?>
+        <div class="flex items-center justify-center">
+          <img src="assets/img/clients/<?= $i ?>.png" alt="Client <?= $i ?>" class="max-w-full h-auto" onerror="this.onerror=null;this.style.display='none';this.parentElement.innerHTML='&lt;i class=\'fa-solid fa-building text-3xl text-gray-300\'&gt;&lt;/i&gt;'">
+        </div>
+        <?php endfor; ?>
+      </div>
+
+    </div>
+  </section>
+
+  </div>
+
   <div id="page-contact" class="page hidden" data-page="contact">
 
   <section id="contact" class="bg-paper py-20 sm:py-28 px-5 sm:px-8">
@@ -620,7 +649,7 @@ foreach ($roleSessions as $role => $sessionName) {
       });
     });
 
-    const validPages = ['home', 'about', 'contact'];
+    const validPages = ['home', 'about', 'clients', 'contact'];
     const startHash = window.location.hash.replace('#', '');
     showPage(validPages.includes(startHash) ? startHash : 'home');
 
