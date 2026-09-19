@@ -531,7 +531,7 @@ body {
 
 <div class="dashboard-layout d-flex">
 
-<?php require __DIR__ . '/../includes/admin/sidebar.php'; ?>
+<?php require __DIR__ . '/../includes/manager/sidebar.php'; ?>
 
   <div class="dashboard-main flex-grow-1" style="min-width:0;">
 

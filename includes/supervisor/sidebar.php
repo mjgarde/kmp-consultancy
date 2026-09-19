@@ -1,7 +1,7 @@
 <?php
 $supervisorFullname = $_SESSION['fullname'] ?? 'Supervisor';
 $supervisorEmail    = $_SESSION['email'] ?? '';
-$currentPage         = basename($_SERVER['PHP_SELF']);
+$currentPage     = basename($_SERVER['PHP_SELF']);
 
 function maskEmail(string $email): string
 {
@@ -222,13 +222,29 @@ function navActive(string $page, string $currentPage): string
         </a>
       </li>
       <li class="nav-item mb-1">
-        <a href="knowledge_repository.php" title="Repository" class="nav-link <?= navActive('knowledge_repository.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
-          <i class="fa-solid fa-book" style="width:18px;"></i> <span class="sidebar-text">Repository</span>
+        <a href="cpq_quotations.php" title="CPQ &amp; Quotations" class="nav-link <?= navActive('cpq_quotations.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
+          <i class="fa-solid fa-file-invoice-dollar" style="width:18px;"></i> <span class="sidebar-text">CPQ &amp; Quotations</span>
         </a>
       </li>
       <li class="nav-item mb-1">
-        <a href="cpq_quotations.php" title="CPQ &amp; Quotations" class="nav-link <?= navActive('cpq_quotations.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
-          <i class="fa-solid fa-file-invoice-dollar" style="width:18px;"></i> <span class="sidebar-text">CPQ &amp; Quotations</span>
+        <a href="calendar_deadlines.php" title="Calendar Deadlines" class="nav-link <?= navActive('calendar_deadlines.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
+          <i class="fa-solid fa-calendar-days" style="width:18px;"></i> <span class="sidebar-text">Calendar Deadlines</span>
+        </a>
+      </li>
+      <li class="nav-item mb-1">
+        <a href="schedule.php" title="Schedule" class="nav-link <?= navActive('schedule.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
+          <i class="fa-solid fa-calendar-check" style="width:18px;"></i> <span class="sidebar-text">Schedule</span>
+        </a>
+      </li>
+    </ul>
+
+    <div class="dashboard-nav-label text-uppercase text-secondary small fw-semibold px-3 mb-2" style="letter-spacing:.06em; font-size:.72rem;">
+      Documents
+    </div>
+    <ul class="dashboard-sidebar-menu nav flex-column mb-4">
+      <li class="nav-item mb-1">
+        <a href="knowledge_repository.php" title="Repository" class="nav-link <?= navActive('knowledge_repository.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
+          <i class="fa-solid fa-book" style="width:18px;"></i> <span class="sidebar-text">Repository</span>
         </a>
       </li>
     </ul>
