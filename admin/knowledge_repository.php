@@ -18,7 +18,6 @@ if (!is_dir($uploadDir)) {
     mkdir($uploadDir, 0755, true);
 }
 
-// Cache folder para sa mga na-convert na PDF (galing sa docx/xlsx/pptx)
 $pdfCacheDir = __DIR__ . '/../uploads/pdf_cache/';
 if (!is_dir($pdfCacheDir)) {
     mkdir($pdfCacheDir, 0755, true);
@@ -59,12 +58,6 @@ function fileIcon(string $fileName): string
     };
 }
 
-/**
- * Decide how a file type should be previewed in-browser.
- * 'office'  -> docx/xlsx/pptx/doc/xls/ppt: server converts to PDF first, then shown natively
- * 'native'  -> browser can render it directly (pdf, images)
- * 'none'    -> no inline preview, download only
- */
 function previewMode(string $ext): string
 {
     $ext = strtolower($ext);
@@ -77,13 +70,6 @@ function previewMode(string $ext): string
     return 'none';
 }
 
-/**
- * Converts an office document (docx/xlsx/pptx/doc/xls/ppt) into a PDF using
- * LibreOffice headless mode, caching the result so repeat views are instant.
- * Returns the absolute path to the resulting PDF, or null on failure.
- *
- * Requires: LibreOffice installed on the server, and exec() not disabled in php.ini.
- */
 function convertToPdf(string $sourcePath, string $cacheDir, string $documentId): ?string
 {
     if (!is_file($sourcePath)) {
@@ -101,10 +87,6 @@ function convertToPdf(string $sourcePath, string $cacheDir, string $documentId):
         return null;
     }
 
-    // LibreOffice needs a writable HOME/profile dir to run headless.
-    // The web server user (e.g. www-data) usually has none, which makes
-    // the conversion fail silently. Give it a dedicated one, unique per
-    // call so concurrent conversions don't fight over a profile lock.
     $loProfileDir = sys_get_temp_dir() . '/lo_profile_' . uniqid();
     if (!is_dir($loProfileDir)) {
         mkdir($loProfileDir, 0700, true);
@@ -119,7 +101,6 @@ function convertToPdf(string $sourcePath, string $cacheDir, string $documentId):
     );
     exec($cmd, $output, $returnCode);
 
-    // Log always (not just on failure) so we can see what happened.
     error_log('convertToPdf cmd: ' . $cmd);
     error_log('convertToPdf return code: ' . $returnCode . ' output: ' . implode(' | ', $output));
 
@@ -290,66 +271,58 @@ if (isset($_GET['download'])) {
     }
 }
 
-/**
- * ?view=<id>  — opens inline in a new tab.
- * - pdf / images: served as-is, browser renders natively.
- * - docx / xlsx / pptx / doc / xls / ppt: converted to PDF on the server
- *   (cached after first conversion), then served as a PDF so the browser's
- *   own built-in PDF viewer displays it — no external viewer needed.
- */
 if (isset($_GET['view'])) {
     $fileId = (int) $_GET['view'];
     $stmt = $pdo->prepare("SELECT title, file_path, file_type FROM knowledge_documents WHERE document_id = ? AND item_type = 'file'");
     $stmt->execute([$fileId]);
     $file = $stmt->fetch();
 
-    // TEMP DEBUG — remove after
     error_log('VIEW debug: fileId=' . $fileId
         . ' row=' . json_encode($file)
         . ' expected_path=' . ($file ? $uploadDir . basename($file['file_path']) : 'n/a')
         . ' exists=' . ($file ? var_export(is_file($uploadDir . basename($file['file_path'])), true) : 'n/a'));
 
-if ($file && is_file($uploadDir . basename($file['file_path']))) {
+    if ($file && is_file($uploadDir . basename($file['file_path']))) {
         $sourcePath = $uploadDir . basename($file['file_path']);
         $ext = strtolower($file['file_type'] ?? '');
         $baseTitle = pathinfo($file['title'], PATHINFO_FILENAME);
 
         $officeExts = ['docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt'];
 
-if (in_array($ext, $officeExts, true)) {
+        if (in_array($ext, $officeExts, true)) {
             $pdfPath = convertToPdf($sourcePath, $pdfCacheDir, (string) $fileId);
 
-if ($pdfPath === null || !is_file($pdfPath)) {
-http_response_code(500);
-header('Content-Type: text/plain');
-echo "Could not generate a preview for this file. You can still download it.";
-exit;
+            if ($pdfPath === null || !is_file($pdfPath)) {
+                http_response_code(500);
+                header('Content-Type: text/plain');
+                echo "Could not generate a preview for this file. You can still download it.";
+                exit;
             }
 
-header('Content-Type: application/pdf');
-header('Content-Disposition: inline; filename="' . $baseTitle . '.pdf"');
-header('Content-Length: ' . filesize($pdfPath));
-readfile($pdfPath);
-exit;
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: inline; filename="' . $baseTitle . '.pdf"');
+            header('Content-Length: ' . filesize($pdfPath));
+            readfile($pdfPath);
+            exit;
         }
 
         $mimeTypes = [
-'pdf'  => 'application/pdf',
-'jpg'  => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png',
-'gif'  => 'image/gif', 'webp' => 'image/webp',
+            'pdf'  => 'application/pdf',
+            'jpg'  => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png',
+            'gif'  => 'image/gif', 'webp' => 'image/webp',
         ];
         $mime = $mimeTypes[$ext] ?? 'application/octet-stream';
-header('Content-Type: ' . $mime);
-header('Content-Disposition: inline; filename="' . $file['title'] . '"');
-header('Content-Length: ' . filesize($sourcePath));
-readfile($sourcePath);
-exit;
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: inline; filename="' . $file['title'] . '"');
+        header('Content-Length: ' . filesize($sourcePath));
+        readfile($sourcePath);
+        exit;
     }
 
-http_response_code(404);
-header('Content-Type: text/plain');
-echo 'File not found.';
-exit;
+    http_response_code(404);
+    header('Content-Type: text/plain');
+    echo 'File not found.';
+    exit;
 }
 
 $alertType    = $_SESSION['alert_type'] ?? null;
@@ -396,8 +369,13 @@ if ($currentFolderId === null) {
 
 $allFolders = $pdo->query("SELECT document_id, title, parent_id FROM knowledge_documents WHERE item_type = 'folder' ORDER BY title ASC")->fetchAll();
 
-$totalFolders = (int) $pdo->query("SELECT COUNT(*) FROM knowledge_documents WHERE item_type = 'folder'")->fetchColumn();
-$totalFiles   = (int) $pdo->query("SELECT COUNT(*) FROM knowledge_documents WHERE item_type = 'file'")->fetchColumn();
+$stmt = $pdo->prepare("SELECT COUNT(*) FROM knowledge_documents WHERE item_type = 'folder'$dateCondition");
+$stmt->execute($dateParams);
+$totalFolders = (int) $stmt->fetchColumn();
+
+$stmt = $pdo->prepare("SELECT COUNT(*) FROM knowledge_documents WHERE item_type = 'file'$dateCondition");
+$stmt->execute($dateParams);
+$totalFiles = (int) $stmt->fetchColumn();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -606,11 +584,8 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
                     $downloadUrl = 'knowledge_repository.php?download=' . $file['document_id'];
 
                     if ($mode === 'office') {
-                        // Convert-then-open: JS shows a brief loading state, opens the
-                        // view URL (server converts to PDF) in a new tab.
                         $clickAction = "previewFile(this, " . $file['document_id'] . ");";
                     } elseif ($mode === 'native') {
-                        // Browser renders pdf/images directly — open the view URL in a new tab.
                         $clickAction = "window.open('" . $viewUrl . "', '_blank', 'noopener,noreferrer');";
                     } else {
                         $clickAction = "window.location='" . $downloadUrl . "';";
@@ -891,17 +866,6 @@ if (repoSearchInput) {
   });
 }
 
-/**
- * docx / xlsx / pptx (and legacy doc/xls/ppt) don't render natively in the browser.
- * The server (?view=<id>) converts them to PDF on the fly using LibreOffice and
- * caches the result, so we just open that same URL in a new tab — the browser's
- * own built-in PDF viewer takes it from there. No external service needed, and
- * it works on localhost too.
- *
- * Since the actual conversion happens server-side and can take a second or two
- * on first view (cached afterward), we show a brief loading state on the clicked
- * card while the new tab opens and starts fetching.
- */
 function previewFile(cardEl, id) {
   const viewUrl = 'knowledge_repository.php?view=' + id;
 

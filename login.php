@@ -238,10 +238,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <nav class="kmp-navbar navbar navbar-expand-md py-2">
   <div class="container">
-    <span class="navbar-brand mb-0">
+    <a href="index.php" class="navbar-brand mb-0 text-decoration-none">
       <img src="assets/img/system_img/logo.png" alt="KMP ConsultHub">
       <span>KMP ConsultHub</span>
-    </span>
+    </a>
   </div>
 </nav>
 
