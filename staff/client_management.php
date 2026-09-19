@@ -88,7 +88,7 @@ $sortOrder    = $_GET['sort'] ?? 'newest';
 $sortSql      = $sortOrder === 'oldest' ? 'ASC' : 'DESC';
 $searchTerm   = trim($_GET['search'] ?? '');
 $statusFilter = $_GET['status'] ?? '';
-$perPage      = 20;
+$perPage      = 25;
 $page         = max(1, (int)($_GET['page'] ?? 1));
 $offset       = ($page - 1) * $perPage;
 
@@ -174,16 +174,11 @@ $newRequests        = (int) $pdo->query("SELECT COUNT(*) FROM service_requests W
 $inProgressRequests = (int) $pdo->query("SELECT COUNT(*) FROM service_requests WHERE status = 'In Progress'")->fetchColumn();
 $completedRequests  = (int) $pdo->query("SELECT COUNT(*) FROM service_requests WHERE status = 'Completed'")->fetchColumn();
 
-if ($activeTab === 'reports') {
-    $totalReportClients = (int) $pdo->query('SELECT COUNT(*) FROM clients')->fetchColumn();
-    $reportClientsStmt = $pdo->prepare("SELECT * FROM clients ORDER BY company_name ASC LIMIT $perPage OFFSET $offset");
-    $reportClientsStmt->execute();
-    $reportClients = $reportClientsStmt->fetchAll();
-    $totalPages = max(1, ceil($totalReportClients / $perPage));
-} else {
-    $reportClients = $pdo->query('SELECT * FROM clients ORDER BY company_name ASC')->fetchAll();
-}
-$reportRequests = $pdo->query('SELECT client_id, status FROM service_requests')->fetchAll();
+$reportTotalPages = max(1, (int) ceil($totalClientsAll / $perPage));
+$reportPage       = min($page, $reportTotalPages);
+$reportOffset     = ($reportPage - 1) * $perPage;
+$reportClients    = $pdo->query("SELECT * FROM clients ORDER BY company_name ASC LIMIT $perPage OFFSET $reportOffset")->fetchAll();
+$reportRequests   = $pdo->query('SELECT client_id, status FROM service_requests')->fetchAll();
 
 function statusBadgeClass(string $status): string
 {
@@ -292,7 +287,7 @@ body {
 }
 .form-control:hover, .form-select:hover { border-color: #C6CCD8; }
 
-.form-label { font-size: .8rem; font-weight: 700; color: var(--slate); text-transform: uppercase; letter-spacing: .02em; }
+.form-label { font-size: .85rem; font-weight: 600; color: var(--slate); }
 
 .btn-primary-solid {
   background-color: var(--navy-deep);
@@ -404,7 +399,7 @@ body {
   font-size: .7rem;
   letter-spacing: .05em;
   text-transform: uppercase;
-  background-color: var(--navy-soft) !important;
+  background-color: #fff !important;
 }
 .table td { border-bottom: 1px solid var(--line); color: var(--ink); vertical-align: middle; }
 .table-hover tbody tr:hover { background-color: var(--navy-soft); }
@@ -441,6 +436,38 @@ body {
 .modal-content { border-radius: 14px; border: none; }
 .modal-header { border-bottom: 1px solid var(--line); }
 .modal-footer { border-top: 1px solid var(--line); }
+
+@media (max-width: 767.98px) {
+  .stat-card { padding: .6rem .7rem; gap: .5rem; }
+  .stat-icon { width: 30px; height: 30px; font-size: .78rem; border-radius: 7px; }
+  .stat-label { font-size: .6rem; }
+  .stat-value { font-size: 1rem; }
+
+  .client-management-tabs { gap: .9rem; }
+  .client-management-tabs a { font-size: .78rem; padding: .6rem .2rem; }
+
+  .btn { font-size: .82rem; padding: .4rem .7rem; }
+  .btn-icon-neutral,
+  .btn-icon-danger { width: 28px; height: 28px; font-size: .75rem; }
+
+  .form-control, .form-select { font-size: .85rem; padding: .4rem .65rem; }
+  .form-label { font-size: .78rem; }
+
+  .table td, .table th { padding: .55rem .6rem; }
+  .table thead th { font-size: .62rem; }
+  .status-pill { font-size: .62rem; padding: .25rem .55rem; }
+
+  .pagination .page-link { padding: .25rem .5rem; font-size: .75rem; }
+
+  .modal-title { font-size: 1rem; }
+  .modal-body { padding: .9rem; }
+  .modal-header, .modal-footer { padding: .7rem .9rem; }
+}
+
+@media (max-width: 575.98px) {
+  .stat-value { font-size: .95rem; }
+  .dashboard-title { font-size: 1rem; }
+}
 </style>
 </head>
 <body>
@@ -737,35 +764,44 @@ body {
                 </tr>
               </thead>
               <tbody>
-                <?php foreach ($reportClients as $client): ?>
-                  <?php
-                    $clientRequests = array_filter($reportRequests, fn($r) => $r['client_id'] == $client['client_id']);
-                    $clientCompleted = count(array_filter($clientRequests, fn($r) => $r['status'] === 'Completed'));
-                  ?>
+                <?php if (empty($reportClients)): ?>
                   <tr>
-                    <td class="fw-semibold small"><?= htmlspecialchars($client['company_name']) ?></td>
-                    <td class="small" style="color:var(--ink-soft);"><?= count($clientRequests) ?></td>
-                    <td class="small" style="color:var(--ink-soft);"><?= $clientCompleted ?></td>
+                    <td colspan="3" class="text-center py-5" style="color:var(--ink-soft);">
+                      <i class="fa-regular fa-folder-open fs-3 d-block mb-2"></i>
+                      No report data available.
+                    </td>
                   </tr>
-                <?php endforeach; ?>
+                <?php else: ?>
+                  <?php foreach ($reportClients as $client): ?>
+                    <?php
+                      $clientRequests = array_filter($reportRequests, fn($r) => $r['client_id'] == $client['client_id']);
+                      $clientCompleted = count(array_filter($clientRequests, fn($r) => $r['status'] === 'Completed'));
+                    ?>
+                    <tr>
+                      <td class="fw-semibold small"><?= htmlspecialchars($client['company_name']) ?></td>
+                      <td class="small" style="color:var(--ink-soft);"><?= count($clientRequests) ?></td>
+                      <td class="small" style="color:var(--ink-soft);"><?= $clientCompleted ?></td>
+                    </tr>
+                  <?php endforeach; ?>
+                <?php endif; ?>
               </tbody>
             </table>
           </div>
-          <?php if ($totalPages > 1): ?>
+          <?php if ($reportTotalPages > 1): ?>
           <div class="card-footer bg-white d-flex justify-content-between align-items-center flex-wrap gap-2 py-3" style="border-top:1px solid var(--line);">
-            <span class="small" style="color:var(--ink-soft);">Page <?= $page ?> of <?= $totalPages ?> &middot; <?= $totalReportClients ?> total</span>
+            <span class="small" style="color:var(--ink-soft);">Page <?= $reportPage ?> of <?= $reportTotalPages ?> &middot; <?= $totalClientsAll ?> total</span>
             <nav aria-label="Reports pagination">
               <ul class="pagination pagination-sm mb-0">
-                <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
-                  <a class="page-link" href="<?= buildPageUrl($page - 1, 'reports', $searchTerm, $sortOrder, '') ?>">Previous</a>
+                <li class="page-item <?= $reportPage <= 1 ? 'disabled' : '' ?>">
+                  <a class="page-link" href="<?= buildPageUrl($reportPage - 1, 'reports', '', 'newest', '') ?>">Previous</a>
                 </li>
-                <?php for ($i = 1; $i <= $totalPages; $i++): ?>
-                  <li class="page-item <?= $i === $page ? 'active' : '' ?>">
-                    <a class="page-link" href="<?= buildPageUrl($i, 'reports', $searchTerm, $sortOrder, '') ?>"><?= $i ?></a>
+                <?php for ($i = 1; $i <= $reportTotalPages; $i++): ?>
+                  <li class="page-item <?= $i === $reportPage ? 'active' : '' ?>">
+                    <a class="page-link" href="<?= buildPageUrl($i, 'reports', '', 'newest', '') ?>"><?= $i ?></a>
                   </li>
                 <?php endfor; ?>
-                <li class="page-item <?= $page >= $totalPages ? 'disabled' : '' ?>">
-                  <a class="page-link" href="<?= buildPageUrl($page + 1, 'reports', $searchTerm, $sortOrder, '') ?>">Next</a>
+                <li class="page-item <?= $reportPage >= $reportTotalPages ? 'disabled' : '' ?>">
+                  <a class="page-link" href="<?= buildPageUrl($reportPage + 1, 'reports', '', 'newest', '') ?>">Next</a>
                 </li>
               </ul>
             </nav>
@@ -782,7 +818,7 @@ body {
 </div>
 
 <div class="modal fade" id="addClientModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-fullscreen-sm-down">
     <div class="modal-content">
       <form method="POST" novalidate>
         <input type="hidden" name="action" value="add_client">
@@ -827,7 +863,7 @@ body {
 </div>
 
 <div class="modal fade" id="viewClientModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-fullscreen-sm-down">
     <div class="modal-content">
       <div class="modal-header">
         <h2 class="modal-title h5 fw-bold">Client Details</h2>
@@ -866,7 +902,7 @@ body {
 </div>
 
 <div class="modal fade" id="addRequestModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-fullscreen-sm-down">
     <div class="modal-content">
       <form method="POST" novalidate>
         <input type="hidden" name="action" value="add_request">
@@ -914,7 +950,7 @@ body {
 </div>
 
 <div class="modal fade" id="viewRequestModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-fullscreen-sm-down">
     <div class="modal-content">
       <div class="modal-header">
         <h2 class="modal-title h5 fw-bold">Service Request Details</h2>
