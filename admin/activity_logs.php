@@ -168,8 +168,12 @@ $roleCountsStmt = $pdo->prepare(
 $roleCountsStmt->execute($roleCountParams);
 $roleCounts = ['Manager' => 0, 'Supervisor' => 0, 'Staff' => 0, 'Admin' => 0];
 foreach ($roleCountsStmt->fetchAll() as $row) {
-    if (isset($roleCounts[$row['role']])) {
-        $roleCounts[$row['role']] = (int) $row['cnt'];
+    $normalizedRole = strtolower(trim($row['role'] ?? ''));
+    foreach (array_keys($roleCounts) as $knownRole) {
+        if (strtolower($knownRole) === $normalizedRole) {
+            $roleCounts[$knownRole] += (int) $row['cnt'];
+            break;
+        }
     }
 }
 
@@ -183,6 +187,19 @@ function actionTypeClass(string $type): string
         'Revision' => 'chip-warn',
         'Repository' => 'chip-slate',
         default => 'chip-slate',
+    };
+}
+
+function actionTypeIcon(string $type): string
+{
+    return match ($type) {
+        'Assignment' => 'fa-user-plus',
+        'Progress Update' => 'fa-chart-line',
+        'Quotation' => 'fa-file-invoice',
+        'Contract' => 'fa-file-signature',
+        'Revision' => 'fa-clock-rotate-left',
+        'Repository' => 'fa-folder-open',
+        default => 'fa-circle-dot',
     };
 }
 
@@ -206,7 +223,7 @@ $hasActiveFilters = $searchTerm !== '' || $roleFilter !== '' || $actionFilter !=
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Activity Logs</title>
 <link rel="stylesheet" href="../assets/vendor/bootstrap-5.3.8/css/bootstrap.min.css">
 <link rel="stylesheet" href="../assets/vendor/fontawesome-free-7.3.1/css/all.min.css">
@@ -243,19 +260,22 @@ $hasActiveFilters = $searchTerm !== '' || $roleFilter !== '' || $actionFilter !=
   --ink: #1A2233;
   --ink-soft: #667085;
   --line: #E2E5EB;
-  --canvas: #FFFFFF;
+  --canvas: #F7F8FA;
   --card: #FFFFFF;
 }
+
+* { -webkit-tap-highlight-color: transparent; }
 
 body {
   background-color: var(--canvas);
   color: var(--ink);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  overflow-x: hidden;
 }
 
-.dashboard-layout, .dashboard-main, .dashboard-content {
-  background-color: var(--canvas) !important;
-}
+.dashboard-layout, .dashboard-content { background-color: var(--canvas) !important; }
+.dashboard-main { min-width: 0; max-width: 100%; }
+.dashboard-topbar { background-color: #fff !important; }
 
 .dashboard-title, h1, h2, h3 {
   font-family: 'Lexend', 'Inter', sans-serif;
@@ -263,46 +283,43 @@ body {
 
 .dashboard-title { color: var(--navy-deep); letter-spacing: -0.01em; }
 .dashboard-subtitle { color: var(--ink-soft) !important; }
-.dashboard-topbar { border-bottom: 1px solid var(--line) !important; background-color: #fff; }
+.dashboard-topbar { border-bottom: 1px solid var(--line) !important; }
 
-/* --- Stat strip --- */
 .stat-strip {
-  display: flex;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  overflow: hidden;
-  background-color: #fff;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, .03);
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: .75rem;
 }
 .stat-strip-item {
-  flex: 1;
-  padding: 1.1rem 1.2rem;
-  border-right: 1px solid var(--line);
+  background-color: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1.1rem 1rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
   text-align: center;
 }
-.stat-strip-item:last-child { border-right: none; }
-.stat-strip-label { font-size: .68rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-soft); }
-.stat-strip-value { font-size: 1.6rem; font-weight: 700; font-family: 'Lexend', sans-serif; color: var(--navy-deep); margin-top: .3rem; line-height: 1; }
+.stat-strip-label { font-size: .66rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-soft); }
+.stat-strip-value { font-size: 1.55rem; font-weight: 700; font-family: 'Lexend', sans-serif; color: var(--navy-deep); margin-top: .4rem; line-height: 1; }
 
-/* --- Filter toolbar --- */
 .filter-toolbar {
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background-color: #FAFBFC;
-  padding: .9rem 1rem;
+  border-radius: 12px;
+  background-color: var(--card);
+  padding: 1rem 1.1rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .03);
 }
 .filter-toolbar .form-label {
-  font-size: .68rem;
+  font-size: .66rem;
   font-weight: 700;
-  letter-spacing: .04em;
+  letter-spacing: .05em;
   text-transform: uppercase;
   color: var(--ink-soft);
-  margin-bottom: .3rem;
+  margin-bottom: .35rem;
 }
 .filter-toolbar .form-control,
 .filter-toolbar .form-select {
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 7px;
   font-size: .82rem;
   color: var(--ink);
 }
@@ -316,48 +333,54 @@ body {
   border: 1px solid var(--line);
   border-right: none;
   color: var(--ink-soft);
+  border-radius: 7px 0 0 7px;
 }
 
 .btn-filter-clear {
   background-color: #fff;
-  color: var(--ink-soft);
-  border: 1px solid var(--line);
-  border-radius: 6px;
+  color: var(--danger-text);
+  border: 1px solid var(--danger-border);
+  border-radius: 7px;
   font-weight: 600;
-  font-size: .82rem;
+  font-size: .8rem;
 }
-.btn-filter-clear:hover { background-color: var(--navy-soft); color: var(--ink); }
+.btn-filter-clear:hover { background-color: var(--danger-soft); color: var(--danger); }
 
-/* --- Table --- */
-.log-table-wrap { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background-color: #fff; }
+.log-table-wrap {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  background-color: var(--card);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .03);
+}
 .table thead th {
   border-bottom: 1px solid var(--line) !important;
   color: var(--ink-soft);
   font-weight: 700;
-  font-size: .68rem;
-  letter-spacing: .05em;
+  font-size: .66rem;
+  letter-spacing: .06em;
   text-transform: uppercase;
   background-color: #FAFBFC !important;
-  padding: .7rem 1rem;
+  padding: .8rem 1.1rem;
+  white-space: nowrap;
 }
-.table td { border-bottom: 1px solid var(--line); vertical-align: middle; font-size: .82rem; color: var(--ink); padding: .65rem 1rem; }
+.table td { border-bottom: 1px solid var(--line); vertical-align: middle; font-size: .83rem; color: var(--ink); padding: .75rem 1.1rem; }
 .table tbody tr:last-child td { border-bottom: none; }
-.table-hover tbody tr:hover { background-color: #F8F9FB; }
+.table-hover tbody tr:hover { background-color: #F8F9FC; }
 .log-row { cursor: pointer; }
 
-/* --- Avatar --- */
 .actor-avatar {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: .68rem;
+  font-size: .7rem;
   font-weight: 700;
   flex-shrink: 0;
-  background-color: var(--navy-soft);
-  color: var(--slate);
+  background-color: var(--indigo-soft);
+  color: var(--indigo-text);
 }
 
 .role-label {
@@ -366,29 +389,23 @@ body {
   color: var(--ink);
 }
 
-/* --- Action chip: text color only, no background --- */
 .chip {
   display: inline-flex;
   align-items: center;
   gap: .35rem;
-  font-size: .72rem;
+  font-size: .7rem;
   font-weight: 700;
   white-space: nowrap;
+  padding: .28rem .6rem;
+  border-radius: 999px;
 }
-.chip::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: currentColor;
-  flex-shrink: 0;
-}
-.chip-indigo  { color: #3B4E8A; }
-.chip-navy    { color: #33495C; }
-.chip-warn    { color: #B7791F; }
-.chip-success { color: #157A5F; }
-.chip-danger  { color: #B4432F; }
-.chip-slate   { color: #64748B; }
+.chip i { font-size: .68rem; }
+.chip-indigo  { color: var(--indigo-text); background-color: var(--indigo-soft); }
+.chip-navy    { color: #33495C; background-color: #E7ECEF; }
+.chip-warn    { color: var(--warn-text); background-color: var(--warn-soft); }
+.chip-success { color: var(--success-text); background-color: var(--success-soft); }
+.chip-danger  { color: var(--danger-text); background-color: var(--danger-soft); }
+.chip-slate   { color: var(--slate); background-color: var(--navy-soft); }
 
 .log-pagination .page-link { color: var(--indigo-text); border-color: var(--line); font-size: .8rem; border-radius: 6px; }
 .log-pagination .page-item { margin-right: 2px; }
@@ -398,13 +415,95 @@ body {
 .empty-state { color: var(--ink-soft); }
 .empty-state i { color: #C7D0D6; }
 
-.modal-content { border-radius: 10px; border: none; }
+.modal-content { border-radius: 14px; border: none; }
 .modal-header { border-bottom: 1px solid var(--line); }
 .modal-footer { border-top: 1px solid var(--line); }
 .detail-row { padding: .6rem 0; border-bottom: 1px solid var(--line); }
 .detail-row:last-child { border-bottom: none; }
-.detail-label { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-soft); }
-.detail-value { font-size: .88rem; font-weight: 600; color: var(--ink); margin-top: .15rem; }
+.detail-label { font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-soft); }
+.detail-value { font-size: .88rem; font-weight: 600; color: var(--ink); margin-top: .15rem; word-break: break-word; }
+
+.mobile-row-label { display: none; }
+
+@media (max-width: 1199.98px) {
+  .stat-strip-item { padding: .9rem .85rem; }
+  .stat-strip-value { font-size: 1.35rem; }
+}
+
+@media (max-width: 991.98px) {
+  .dashboard-title { font-size: 1rem !important; }
+  .dashboard-subtitle { font-size: .78rem !important; }
+  .stat-strip { grid-template-columns: repeat(3, 1fr); }
+  .stat-strip-value { font-size: 1.2rem; }
+  .stat-strip-label { font-size: .6rem; }
+  .table td, .table th { font-size: .8rem; }
+}
+
+@media (max-width: 767.98px) {
+  .dashboard-content { padding: .65rem !important; }
+  .dashboard-topbar { padding: .5rem .65rem !important; }
+  .dashboard-title { font-size: .92rem !important; }
+
+  .stat-strip { grid-template-columns: repeat(2, 1fr); gap: .5rem; }
+  .stat-strip-item { padding: .7rem .65rem; border-radius: 10px; }
+  .stat-strip-label { font-size: .58rem; letter-spacing: .03em; }
+  .stat-strip-value { font-size: 1.05rem; margin-top: .3rem; }
+
+  .filter-toolbar { padding: .8rem .85rem; border-radius: 10px; }
+  .filter-toolbar .form-control,
+  .filter-toolbar .form-select { font-size: .78rem; }
+  .filter-toolbar .form-label { font-size: .62rem; }
+
+  .log-table-wrap { border-radius: 10px; }
+  .table-responsive { overflow: visible; }
+  #logsTable thead { display: none; }
+  #logsTable, #logsTable tbody, #logsTable tr, #logsTable td { display: block; width: 100%; }
+  #logsTable tbody tr.log-row {
+    border-bottom: 1px solid var(--line);
+    padding: .7rem .85rem;
+  }
+  #logsTable.table-hover tbody tr:hover { background-color: #fff; }
+  #logsTable tbody tr.log-row td {
+    display: flex !important;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: .6rem;
+    border: none !important;
+    padding: .22rem 0;
+    font-size: .78rem;
+    text-align: right;
+  }
+  #logsTable tbody tr.log-row td .mobile-row-label {
+    display: block;
+    font-size: .6rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    text-align: left;
+    flex: 0 0 auto;
+    padding-top: .15rem;
+  }
+  #logsTable tbody tr.log-row td .cell-body { flex: 1 1 auto; min-width: 0; word-break: break-word; text-align: right; }
+
+  .chip { font-size: .64rem; padding: .22rem .5rem; }
+  .actor-avatar { width: 26px; height: 26px; font-size: .62rem; }
+
+  .modal-header { padding: .7rem .8rem !important; }
+  .modal-title { font-size: .95rem !important; }
+  .modal-body { padding: .9rem !important; }
+  .detail-label { font-size: .6rem; }
+  .detail-value { font-size: .8rem; }
+
+  .log-pagination .page-link { font-size: .72rem; padding: .25rem .5rem; }
+}
+
+@media (max-width: 575.98px) {
+  .dashboard-content { padding: .5rem !important; }
+  .stat-strip { grid-template-columns: repeat(2, 1fr); }
+  .stat-strip-value { font-size: .95rem; }
+  .modal-title { font-size: .88rem !important; }
+}
 </style>
 </head>
 
@@ -494,7 +593,7 @@ body {
 
       <section class="log-table-wrap">
         <div class="table-responsive">
-          <table class="table table-hover align-middle mb-0">
+          <table class="table table-hover align-middle mb-0" id="logsTable">
             <thead>
               <tr>
                 <th scope="col">User</th>
@@ -526,23 +625,34 @@ body {
                     data-related="<?= htmlspecialchars($log['related_staff'] ?? '') ?>"
                     data-occurred="<?= htmlspecialchars(date('F d, Y g:i A', strtotime($log['occurred_at']))) ?>">
                     <td>
-                      <div class="d-flex align-items-center gap-2">
+                      <span class="mobile-row-label">User</span>
+                      <span class="cell-body d-flex align-items-center gap-2 text-start">
                         <span class="actor-avatar"><?= htmlspecialchars($initials) ?></span>
-                        <div>
-                          <div class="fw-semibold small"><?= htmlspecialchars(trim($log['firstname'] . ' ' . $log['lastname'])) ?></div>
-                          <div class="d-md-none role-label"><?= htmlspecialchars($log['role']) ?></div>
-                        </div>
-                      </div>
+                        <span>
+                          <span class="fw-semibold small d-block"><?= htmlspecialchars(trim($log['firstname'] . ' ' . $log['lastname'])) ?></span>
+                          <span class="d-md-none role-label d-block"><?= htmlspecialchars($log['role']) ?></span>
+                        </span>
+                      </span>
                     </td>
                     <td class="d-none d-md-table-cell">
-                      <span class="role-label"><?= htmlspecialchars($log['role']) ?></span>
+                      <span class="mobile-row-label">Role</span>
+                      <span class="cell-body role-label"><?= htmlspecialchars($log['role']) ?></span>
                     </td>
                     <td>
-                      <span class="chip <?= actionTypeClass($log['action_type']) ?>"><?= htmlspecialchars($log['action_type']) ?></span>
-                      <div class="small mt-1" style="color:var(--ink-soft);"><?= htmlspecialchars($log['action_label']) ?></div>
+                      <span class="mobile-row-label">Action</span>
+                      <span class="cell-body">
+                        <span class="chip <?= actionTypeClass($log['action_type']) ?>"><i class="fa-solid <?= actionTypeIcon($log['action_type']) ?>"></i><?= htmlspecialchars($log['action_type']) ?></span>
+                        <span class="small d-block mt-1" style="color:var(--ink-soft);"><?= htmlspecialchars($log['action_label']) ?></span>
+                      </span>
                     </td>
-                    <td class="small d-none d-lg-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars($log['target_label'] ?? '—') ?></td>
-                    <td class="small" style="color:var(--ink-soft); white-space:nowrap;"><?= htmlspecialchars(date('M d, Y g:i A', strtotime($log['occurred_at']))) ?></td>
+                    <td class="small d-none d-lg-table-cell" style="color:var(--ink-soft);">
+                      <span class="mobile-row-label">Record</span>
+                      <span class="cell-body"><?= htmlspecialchars($log['target_label'] ?? '—') ?></span>
+                    </td>
+                    <td class="small" style="color:var(--ink-soft); white-space:nowrap;">
+                      <span class="mobile-row-label">When</span>
+                      <span class="cell-body"><?= htmlspecialchars(date('M d, Y g:i A', strtotime($log['occurred_at']))) ?></span>
+                    </td>
                   </tr>
                 <?php endforeach; ?>
               <?php endif; ?>
@@ -553,9 +663,9 @@ body {
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 py-3 px-3" style="border-top:1px solid var(--line);">
           <span class="small" style="color:var(--ink-soft);">Page <?= $page ?> of <?= $totalPages ?> &middot; <?= $totalLogs ?> total</span>
           <nav aria-label="Activity log pagination">
-            <ul class="pagination pagination-sm mb-0 log-pagination">
+            <ul class="pagination pagination-sm mb-0 log-pagination flex-wrap">
               <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
-                <a class="page-link" href="<?= buildLogPageUrl($page - 1, $roleFilter, $actionFilter, $searchTerm, $dateFilter) ?>">Previous</a>
+                <a class="page-link" href="<?= buildLogPageUrl($page - 1, $roleFilter, $actionFilter, $searchTerm, $dateFilter) ?>">Prev</a>
               </li>
               <?php for ($i = 1; $i <= $totalPages; $i++): ?>
                 <li class="page-item <?= $i === $page ? 'active' : '' ?>">

@@ -189,8 +189,12 @@ $existingSkills = $existingSkillsStmt->fetchAll(PDO::FETCH_COLUMN);
 $roleCountsStmt = $pdo->query("SELECT role, COUNT(*) AS cnt FROM users GROUP BY role");
 $roleCounts = ['Manager' => 0, 'Supervisor' => 0, 'Staff' => 0];
 foreach ($roleCountsStmt->fetchAll() as $row) {
-    if (isset($roleCounts[$row['role']])) {
-        $roleCounts[$row['role']] = (int) $row['cnt'];
+    $normalizedRole = strtolower(trim($row['role'] ?? ''));
+    foreach (array_keys($roleCounts) as $knownRole) {
+        if (strtolower($knownRole) === $normalizedRole) {
+            $roleCounts[$knownRole] += (int) $row['cnt'];
+            break;
+        }
     }
 }
 $totalUsers = array_sum($roleCounts);
@@ -200,7 +204,7 @@ $totalUsers = array_sum($roleCounts);
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>KMP ConsultHub - User Management</title>
 <link rel="stylesheet" href="../assets/vendor/bootstrap-5.3.8/css/bootstrap.min.css">
 <link rel="stylesheet" href="../assets/vendor/fontawesome-free-7.3.1/css/all.min.css">
@@ -217,15 +221,21 @@ $totalUsers = array_sum($roleCounts);
   --um-danger-dark: #A6432F;
 }
 
+* { -webkit-tap-highlight-color: transparent; }
+
 body {
   background-color: var(--canvas);
   color: var(--ink);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  overflow-x: hidden;
 }
+
+.dashboard-main { min-width: 0; max-width: 100%; }
 
 .dashboard-title, h1, h2, h3 {
   font-family: 'Lexend', 'Inter', sans-serif;
 }
+.form-control, .form-select { font-size: .875rem; }
 .form-control:focus, .form-select:focus, .form-control:hover, .form-select:hover {
   border-color: var(--um-primary);
   box-shadow: 0 0 0 .2rem rgba(47,93,138,.15);
@@ -264,11 +274,13 @@ body {
 
 .um-stat-strip {
   display: flex;
+  flex-wrap: wrap;
   border-radius: 10px;
   overflow: hidden;
 }
 .um-stat-item {
-  flex: 1;
+  flex: 1 1 25%;
+  min-width: 110px;
   padding: 1.1rem 1.2rem;
   border-right: 1px solid rgba(0,0,0,.06);
   text-align: center;
@@ -276,6 +288,97 @@ body {
 .um-stat-item:last-child { border-right: none; }
 .um-stat-label { font-size: .68rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #8a94a3; }
 .um-stat-value { font-size: 1.6rem; font-weight: 700; font-family: 'Lexend', sans-serif; color: #1A2233; margin-top: .3rem; line-height: 1; }
+
+.mobile-row-label { display: none; }
+
+@media (max-width: 1199.98px) {
+  .um-stat-item { padding: .95rem 1rem; }
+  .um-stat-value { font-size: 1.4rem; }
+}
+
+@media (max-width: 991.98px) {
+  .dashboard-title { font-size: 1rem !important; }
+  .dashboard-subtitle { font-size: .78rem !important; }
+  .um-stat-item { flex: 1 1 50%; border-bottom: 1px solid rgba(0,0,0,.06); }
+  .um-stat-item:nth-child(2) { border-right: none; }
+  .um-stat-item:nth-last-child(-n+2) { border-bottom: none; }
+  .um-stat-label { font-size: .64rem; }
+  .um-stat-value { font-size: 1.25rem; }
+  .table td, .table th { font-size: .8rem; }
+}
+
+@media (max-width: 767.98px) {
+  .dashboard-content { padding: .65rem !important; }
+  .dashboard-topbar { padding-left: .65rem !important; padding-right: .65rem !important; }
+  .dashboard-title { font-size: .92rem !important; }
+
+  .card { border-radius: 10px; }
+
+  .form-control, .form-select, .input-group-text { font-size: .8rem; padding-top: .4rem; padding-bottom: .4rem; }
+  .input-group-text i { font-size: .78rem; }
+  .btn { font-size: .8rem; }
+
+  .um-stat-item { padding: .75rem .6rem; min-width: 0; }
+  .um-stat-label { font-size: .58rem; letter-spacing: .03em; }
+  .um-stat-value { font-size: 1.05rem; }
+
+  .table-responsive { overflow: visible; }
+  #usersTable thead { display: none; }
+  #usersTable, #usersTable tbody, #usersTable tr, #usersTable td { display: block; width: 100%; }
+  #usersTable tbody tr.user-management-row {
+    border: 1px solid var(--line, #E2E5EB);
+    border-radius: 10px;
+    margin: .6rem .65rem;
+    padding: .55rem .2rem .45rem;
+    background-color: #fff;
+  }
+  #usersTable.table-hover tbody tr:hover { background-color: #fff; }
+  #usersTable tbody tr.user-management-row td {
+    display: flex !important;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: .75rem;
+    border: none !important;
+    padding: .28rem .7rem;
+    font-size: .78rem;
+    text-align: right;
+  }
+  #usersTable tbody tr.user-management-row td .mobile-row-label {
+    display: block;
+    font-size: .62rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: #8a94a3;
+    text-align: left;
+    flex: 0 0 auto;
+    padding-top: .1rem;
+  }
+  #usersTable tbody tr.user-management-row td .cell-body { flex: 1 1 auto; min-width: 0; word-break: break-word; text-align: right; }
+  #usersTable tbody tr.user-management-row td.cell-actions {
+    justify-content: flex-end;
+    border-top: 1px solid var(--line, #E2E5EB) !important;
+    margin-top: .35rem;
+    padding-top: .5rem;
+  }
+  #usersTable tbody tr.user-management-row td.cell-actions .mobile-row-label { display: none; }
+  #usersTable tbody tr.user-management-row td.cell-actions .cell-body { display: flex; justify-content: flex-end; gap: .35rem; }
+
+  .modal-header { padding: .7rem .8rem !important; }
+  .modal-title { font-size: .95rem !important; }
+  .modal-body { padding: .9rem !important; }
+  .modal-footer { padding: .6rem .8rem !important; }
+  .form-label { font-size: .78rem; }
+  .skill-tag { font-size: .74rem; padding: .25rem .5rem; }
+  .skill-badge { font-size: .66rem; }
+}
+
+@media (max-width: 575.98px) {
+  .dashboard-content { padding: .5rem !important; }
+  .um-stat-value { font-size: .95rem; }
+  .modal-title { font-size: .88rem !important; }
+  #usersTable tbody tr.user-management-row td { font-size: .74rem; }
+}
 </style>
 </head>
 <body class="bg-light">
@@ -349,7 +452,7 @@ body {
 
       <section class="user-management-table card border-0 shadow-sm">
         <div class="table-responsive">
-          <table class="table table-hover align-middle mb-0">
+          <table class="table table-hover align-middle mb-0" id="usersTable">
             <thead class="table-light">
               <tr>
                 <th scope="col" class="small text-uppercase text-secondary">Name</th>
@@ -382,39 +485,57 @@ body {
                     data-status="<?= htmlspecialchars($user['status']) ?>"
                     data-skills="<?= htmlspecialchars(json_encode($userSkills)) ?>">
                     <td>
-                      <div class="fw-semibold small"><?= htmlspecialchars($user['firstname'] . ' ' . $user['lastname']) ?></div>
-                      <div class="text-secondary d-md-none" style="font-size:.72rem;"><?= htmlspecialchars($user['email']) ?></div>
-                    </td>
-                    <td class="text-secondary small d-none d-md-table-cell"><?= htmlspecialchars($user['email']) ?></td>
-                    <td class="text-secondary small d-none d-lg-table-cell"><?= htmlspecialchars($user['contact_number']) ?></td>
-                    <td class="small text-dark"><?= htmlspecialchars($user['role']) ?></td>
-                    <td class="d-none d-sm-table-cell">
-                      <span class="badge rounded-pill" style="background: transparent; color: gray;">
-                      <?= htmlspecialchars($user['status']) ?>
+                      <span class="mobile-row-label">Name</span>
+                      <span class="cell-body">
+                        <span class="fw-semibold small d-block"><?= htmlspecialchars($user['firstname'] . ' ' . $user['lastname']) ?></span>
+                        <span class="text-secondary d-md-none d-block" style="font-size:.72rem;"><?= htmlspecialchars($user['email']) ?></span>
                       </span>
                     </td>
-                    <td class="text-end" onclick="event.stopPropagation();">
-                      <button type="button" class="btn btn-sm" style="background-color:var(--um-primary); color:#fff;" title="Edit"
-                        data-bs-toggle="modal" data-bs-target="#editUserModal"
-                        data-id="<?= $user['user_id'] ?>"
-                        data-firstname="<?= htmlspecialchars($user['firstname']) ?>"
-                        data-middlename="<?= htmlspecialchars($user['middlename'] ?? '') ?>"
-                        data-lastname="<?= htmlspecialchars($user['lastname']) ?>"
-                        data-birthday="<?= htmlspecialchars($user['birthday']) ?>"
-                        data-gender="<?= htmlspecialchars($user['gender']) ?>"
-                        data-address="<?= htmlspecialchars($user['address']) ?>"
-                        data-contact="<?= htmlspecialchars($user['contact_number']) ?>"
-                        data-email="<?= htmlspecialchars($user['email']) ?>"
-                        data-role="<?= htmlspecialchars($user['role']) ?>"
-                        data-skills="<?= htmlspecialchars(json_encode($userSkills)) ?>">
-                        <i class="fa-regular fa-pen-to-square"></i>
-                      </button>
-                      <button type="button" class="btn btn-sm" style="background-color:var(--um-danger); color:#fff;" title="Delete"
-                        data-bs-toggle="modal" data-bs-target="#deleteUserModal"
-                        data-id="<?= $user['user_id'] ?>"
-                        data-name="<?= htmlspecialchars($user['firstname'] . ' ' . $user['lastname']) ?>">
-                        <i class="fa-regular fa-trash-can"></i>
-                      </button>
+                    <td class="text-secondary small d-none d-md-table-cell">
+                      <span class="mobile-row-label">Email</span>
+                      <span class="cell-body"><?= htmlspecialchars($user['email']) ?></span>
+                    </td>
+                    <td class="text-secondary small d-none d-lg-table-cell">
+                      <span class="mobile-row-label">Contact</span>
+                      <span class="cell-body"><?= htmlspecialchars($user['contact_number']) ?></span>
+                    </td>
+                    <td class="small text-dark">
+                      <span class="mobile-row-label">Role</span>
+                      <span class="cell-body"><?= htmlspecialchars($user['role']) ?></span>
+                    </td>
+                    <td class="d-none d-sm-table-cell">
+                      <span class="mobile-row-label">Status</span>
+                      <span class="cell-body">
+                        <span class="badge rounded-pill" style="background: transparent; color: gray;">
+                        <?= htmlspecialchars($user['status']) ?>
+                        </span>
+                      </span>
+                    </td>
+                    <td class="text-end cell-actions" onclick="event.stopPropagation();">
+                      <span class="mobile-row-label">Actions</span>
+                      <span class="cell-body">
+                        <button type="button" class="btn btn-sm" style="background-color:var(--um-primary); color:#fff;" title="Edit"
+                          data-bs-toggle="modal" data-bs-target="#editUserModal"
+                          data-id="<?= $user['user_id'] ?>"
+                          data-firstname="<?= htmlspecialchars($user['firstname']) ?>"
+                          data-middlename="<?= htmlspecialchars($user['middlename'] ?? '') ?>"
+                          data-lastname="<?= htmlspecialchars($user['lastname']) ?>"
+                          data-birthday="<?= htmlspecialchars($user['birthday']) ?>"
+                          data-gender="<?= htmlspecialchars($user['gender']) ?>"
+                          data-address="<?= htmlspecialchars($user['address']) ?>"
+                          data-contact="<?= htmlspecialchars($user['contact_number']) ?>"
+                          data-email="<?= htmlspecialchars($user['email']) ?>"
+                          data-role="<?= htmlspecialchars($user['role']) ?>"
+                          data-skills="<?= htmlspecialchars(json_encode($userSkills)) ?>">
+                          <i class="fa-regular fa-pen-to-square"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm" style="background-color:var(--um-danger); color:#fff;" title="Delete"
+                          data-bs-toggle="modal" data-bs-target="#deleteUserModal"
+                          data-id="<?= $user['user_id'] ?>"
+                          data-name="<?= htmlspecialchars($user['firstname'] . ' ' . $user['lastname']) ?>">
+                          <i class="fa-regular fa-trash-can"></i>
+                        </button>
+                      </span>
                     </td>
                   </tr>
                 <?php endforeach; ?>
@@ -431,7 +552,7 @@ body {
 </div>
 
 <div class="modal fade" id="addUserModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
     <div class="modal-content">
       <form method="POST" id="addUserForm" novalidate>
         <input type="hidden" name="action" value="add">
@@ -442,23 +563,23 @@ body {
         </div>
         <div class="modal-body">
           <div class="row g-3">
-            <div class="col-md-4">
+            <div class="col-12 col-md-4">
               <label class="form-label fw-semibold">First Name</label>
               <input type="text" name="firstname" class="form-control" required>
             </div>
-            <div class="col-md-4">
+            <div class="col-12 col-md-4">
               <label class="form-label fw-semibold">Middle Name</label>
               <input type="text" name="middlename" class="form-control">
             </div>
-            <div class="col-md-4">
+            <div class="col-12 col-md-4">
               <label class="form-label fw-semibold">Last Name</label>
               <input type="text" name="lastname" class="form-control" required>
             </div>
-            <div class="col-md-6">
+            <div class="col-12 col-md-6">
               <label class="form-label fw-semibold">Birthday</label>
               <input type="date" name="birthday" class="form-control" required>
             </div>
-            <div class="col-md-6">
+            <div class="col-12 col-md-6">
               <label class="form-label fw-semibold">Gender</label>
               <select name="gender" class="form-select" required>
                 <option value="" selected disabled>Select gender</option>
@@ -470,11 +591,11 @@ body {
               <label class="form-label fw-semibold">Address</label>
               <input type="text" name="address" class="form-control" required>
             </div>
-            <div class="col-md-6">
+            <div class="col-12 col-md-6">
               <label class="form-label fw-semibold">Contact Number</label>
               <input type="tel" name="contact_number" class="form-control" placeholder="e.g. +639171234567 or 09171234567" required>
             </div>
-            <div class="col-md-6">
+            <div class="col-12 col-md-6">
               <label class="form-label fw-semibold">Role</label>
               <select name="role" class="form-select" id="add_role" required>
                 <option value="" selected disabled>Select role</option>
@@ -483,18 +604,18 @@ body {
                 <option value="Staff">Staff</option>
               </select>
             </div>
-            <div class="col-md-6">
+            <div class="col-12 col-md-6">
               <label class="form-label fw-semibold">Email Address</label>
               <input type="email" name="email" class="form-control" required>
             </div>
-            <div class="col-md-6">
+            <div class="col-12 col-md-6">
               <label class="form-label fw-semibold">Password</label>
               <input type="password" name="password" class="form-control" placeholder="At least 8 characters" required>
             </div>
             <div class="col-12 d-none" id="add_skills_wrapper">
               <label class="form-label fw-semibold">Skills</label>
               <div class="row g-2 mb-2">
-                <div class="col-md-6">
+                <div class="col-12 col-md-6">
                   <div class="input-group">
                     <select class="form-select" id="add_skill_select">
                       <option value="" selected disabled>Select existing skill</option>
@@ -505,7 +626,7 @@ body {
                     <button type="button" class="btn btn-outline-secondary" id="add_skill_select_btn">Add</button>
                   </div>
                 </div>
-                <div class="col-md-6">
+                <div class="col-12 col-md-6">
                   <div class="input-group">
                     <input type="text" class="form-control" id="add_skill_input" placeholder="Add new skill">
                     <button type="button" class="btn btn-outline-secondary" id="add_skill_btn">Add</button>
@@ -517,7 +638,7 @@ body {
           </div>
         </div>
         <div class="modal-footer">
-          <button type="submit" class="btn" style="background-color:var(--um-primary); color:#fff;">Save User</button>
+          <button type="submit" class="btn w-100 w-sm-auto" style="background-color:var(--um-primary); color:#fff;">Save User</button>
         </div>
       </form>
     </div>
@@ -525,7 +646,7 @@ body {
 </div>
 
 <div class="modal fade" id="editUserModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
     <div class="modal-content">
       <form method="POST" id="editUserForm" novalidate>
         <input type="hidden" name="action" value="edit">
@@ -537,23 +658,23 @@ body {
         </div>
         <div class="modal-body">
           <div class="row g-3">
-            <div class="col-md-4">
+            <div class="col-12 col-md-4">
               <label class="form-label fw-semibold">First Name</label>
               <input type="text" name="firstname" id="edit_firstname" class="form-control" required>
             </div>
-            <div class="col-md-4">
+            <div class="col-12 col-md-4">
               <label class="form-label fw-semibold">Middle Name</label>
               <input type="text" name="middlename" id="edit_middlename" class="form-control">
             </div>
-            <div class="col-md-4">
+            <div class="col-12 col-md-4">
               <label class="form-label fw-semibold">Last Name</label>
               <input type="text" name="lastname" id="edit_lastname" class="form-control" required>
             </div>
-            <div class="col-md-6">
+            <div class="col-12 col-md-6">
               <label class="form-label fw-semibold">Birthday</label>
               <input type="date" name="birthday" id="edit_birthday" class="form-control" required>
             </div>
-            <div class="col-md-6">
+            <div class="col-12 col-md-6">
               <label class="form-label fw-semibold">Gender</label>
               <select name="gender" id="edit_gender" class="form-select" required>
                 <option value="Male">Male</option>
@@ -564,11 +685,11 @@ body {
               <label class="form-label fw-semibold">Address</label>
               <input type="text" name="address" id="edit_address" class="form-control" required>
             </div>
-            <div class="col-md-6">
+            <div class="col-12 col-md-6">
               <label class="form-label fw-semibold">Contact Number</label>
               <input type="tel" name="contact_number" id="edit_contact_number" class="form-control" placeholder="e.g. +639171234567 or 09171234567" required>
             </div>
-            <div class="col-md-6">
+            <div class="col-12 col-md-6">
               <label class="form-label fw-semibold">Role</label>
               <select name="role" id="edit_role" class="form-select" required>
                 <option value="Manager">Manager</option>
@@ -576,18 +697,18 @@ body {
                 <option value="Staff">Staff</option>
               </select>
             </div>
-            <div class="col-md-6">
+            <div class="col-12 col-md-6">
               <label class="form-label fw-semibold">Email Address</label>
               <input type="email" name="email" id="edit_email" class="form-control" required>
             </div>
-            <div class="col-md-6">
+            <div class="col-12 col-md-6">
               <label class="form-label fw-semibold">New Password</label>
               <input type="password" name="password" class="form-control" placeholder="Leave blank to keep current password">
             </div>
             <div class="col-12 d-none" id="edit_skills_wrapper">
               <label class="form-label fw-semibold">Skills</label>
               <div class="row g-2 mb-2">
-                <div class="col-md-6">
+                <div class="col-12 col-md-6">
                   <div class="input-group">
                     <select class="form-select" id="edit_skill_select">
                       <option value="" selected disabled>Select existing skill</option>
@@ -598,7 +719,7 @@ body {
                     <button type="button" class="btn btn-outline-secondary" id="edit_skill_select_btn">Add</button>
                   </div>
                 </div>
-                <div class="col-md-6">
+                <div class="col-12 col-md-6">
                   <div class="input-group">
                     <input type="text" class="form-control" id="edit_skill_input" placeholder="Add new skill">
                     <button type="button" class="btn btn-outline-secondary" id="edit_skill_btn">Add</button>
@@ -610,7 +731,7 @@ body {
           </div>
         </div>
         <div class="modal-footer">
-          <button type="submit" class="btn" style="background-color:var(--um-primary); color:#fff;">Update User</button>
+          <button type="submit" class="btn w-100 w-sm-auto" style="background-color:var(--um-primary); color:#fff;">Update User</button>
         </div>
       </form>
     </div>
@@ -618,7 +739,7 @@ body {
 </div>
 
 <div class="modal fade" id="viewUserModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
         <h2 class="modal-title h5 fw-bold">User Details</h2>
@@ -626,23 +747,23 @@ body {
       </div>
       <div class="modal-body">
         <div class="row g-3">
-          <div class="col-md-4">
+          <div class="col-12 col-md-4">
             <div class="text-secondary small">First Name</div>
             <div class="fw-semibold" id="view_firstname"></div>
           </div>
-          <div class="col-md-4">
+          <div class="col-12 col-md-4">
             <div class="text-secondary small">Middle Name</div>
             <div class="fw-semibold" id="view_middlename"></div>
           </div>
-          <div class="col-md-4">
+          <div class="col-12 col-md-4">
             <div class="text-secondary small">Last Name</div>
             <div class="fw-semibold" id="view_lastname"></div>
           </div>
-          <div class="col-md-6">
+          <div class="col-6 col-md-6">
             <div class="text-secondary small">Birthday</div>
             <div class="fw-semibold" id="view_birthday"></div>
           </div>
-          <div class="col-md-6">
+          <div class="col-6 col-md-6">
             <div class="text-secondary small">Gender</div>
             <div class="fw-semibold" id="view_gender"></div>
           </div>
@@ -650,19 +771,19 @@ body {
             <div class="text-secondary small">Address</div>
             <div class="fw-semibold" id="view_address"></div>
           </div>
-          <div class="col-md-6">
+          <div class="col-12 col-md-6">
             <div class="text-secondary small">Contact Number</div>
             <div class="fw-semibold" id="view_contact"></div>
           </div>
-          <div class="col-md-6">
+          <div class="col-6 col-md-6">
             <div class="text-secondary small">Role</div>
             <div class="fw-semibold" id="view_role"></div>
           </div>
-          <div class="col-md-6">
+          <div class="col-12 col-md-6">
             <div class="text-secondary small">Email Address</div>
-            <div class="fw-semibold" id="view_email"></div>
+            <div class="fw-semibold" id="view_email" style="word-break:break-word;"></div>
           </div>
-          <div class="col-md-6">
+          <div class="col-6 col-md-6">
             <div class="text-secondary small">Status</div>
             <div class="fw-semibold" id="view_status"></div>
           </div>
@@ -692,8 +813,8 @@ body {
           <p class="mb-0">Are you sure you want to delete <strong id="delete_user_name"></strong>? This action cannot be undone.</p>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn" style="background-color:var(--um-danger); color:#fff;">Delete User</button>
+          <button type="button" class="btn btn-outline-secondary w-100 w-sm-auto" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn w-100 w-sm-auto" style="background-color:var(--um-danger); color:#fff;">Delete User</button>
         </div>
       </form>
     </div>

@@ -14,8 +14,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $action = $_POST['action'] ?? '';
 
-    if ($action === 'add_client') {
+    if ($action === 'add_client' || $action === 'edit_client') {
 
+        $clientId      = $_POST['client_id'] ?? null;
         $companyName   = trim($_POST['company_name'] ?? '');
         $contactPerson = trim($_POST['contact_person'] ?? '');
         $email         = trim($_POST['email'] ?? '');
@@ -35,6 +36,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if ($address === '') $errors[] = 'Address is required.';
 
+        if ($action === 'edit_client') {
+            $_SESSION['alert_type'] = 'error';
+            $_SESSION['alert_message'] = 'Editing clients is not permitted.';
+            header('Location: client_management.php?tab=clients');
+            exit;
+        }
+
         if (empty($errors)) {
             $stmt = $pdo->prepare(
                 'INSERT INTO clients (company_name, contact_person, email, contact_number, address, industry)
@@ -48,6 +56,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['alert_message'] = implode(' ', $errors);
         }
 
+        header('Location: client_management.php?tab=clients');
+        exit;
+
+    } elseif ($action === 'delete_client') {
+
+        $_SESSION['alert_type'] = 'error';
+        $_SESSION['alert_message'] = 'Deleting clients is not permitted.';
         header('Location: client_management.php?tab=clients');
         exit;
 
@@ -74,6 +89,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['alert_message'] = implode(' ', $errors);
         }
 
+        header('Location: client_management.php?tab=requests');
+        exit;
+
+    } elseif ($action === 'edit_request') {
+
+        $_SESSION['alert_type'] = 'error';
+        $_SESSION['alert_message'] = 'Editing service requests is not permitted.';
+        header('Location: client_management.php?tab=requests');
+        exit;
+
+    } elseif ($action === 'delete_request') {
+
+        $_SESSION['alert_type'] = 'error';
+        $_SESSION['alert_message'] = 'Deleting service requests is not permitted.';
         header('Location: client_management.php?tab=requests');
         exit;
     }
@@ -703,15 +732,13 @@ body {
                 <?php else: ?>
                   <?php foreach ($requests as $request): ?>
                     <tr class="client-management-row"
-                      data-bs-toggle="modal" data-bs-target="#viewRequestModal"
+                      data-bs-toggle="modal" data-bs-target="#manageRequestModal"
                       data-id="<?= $request['request_id'] ?>"
                       data-client-id="<?= $request['client_id'] ?>"
-                      data-client-name="<?= htmlspecialchars($request['company_name']) ?>"
                       data-title="<?= htmlspecialchars($request['request_title']) ?>"
                       data-details="<?= htmlspecialchars($request['request_details'] ?? '') ?>"
                       data-skill="<?= htmlspecialchars($request['required_skill'] ?? '') ?>"
-                      data-status="<?= htmlspecialchars($request['status']) ?>"
-                      data-assigned="<?= $request['firstname'] ? htmlspecialchars($request['firstname'] . ' ' . $request['lastname']) : '' ?>">
+                      data-status="<?= htmlspecialchars($request['status']) ?>">
                       <td>
                         <div class="fw-semibold small"><?= htmlspecialchars($request['request_title']) ?></div>
                         <div class="d-md-none" style="font-size:.72rem; color:var(--ink-soft);"><?= htmlspecialchars($request['company_name']) ?></div>
@@ -949,7 +976,7 @@ body {
   </div>
 </div>
 
-<div class="modal fade" id="viewRequestModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="manageRequestModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-lg modal-fullscreen-sm-down">
     <div class="modal-content">
       <div class="modal-header">
@@ -958,31 +985,31 @@ body {
       </div>
       <div class="modal-body">
         <div class="row g-3">
-          <div class="col-md-6">
-            <div class="small" style="color:var(--ink-soft);">Client</div>
-            <div class="fw-semibold" id="view_req_client"></div>
-          </div>
-          <div class="col-md-6">
-            <div class="small" style="color:var(--ink-soft);">Assigned To</div>
-            <div class="fw-semibold" id="view_req_assigned"></div>
+          <div class="col-12">
+            <label class="form-label">Client</label>
+            <input type="text" id="manage_client_name" class="form-control" readonly>
           </div>
           <div class="col-12">
-            <div class="small" style="color:var(--ink-soft);">Request Title</div>
-            <div class="fw-semibold" id="view_req_title"></div>
+            <label class="form-label">Request Title</label>
+            <input type="text" id="manage_request_title" class="form-control" readonly>
           </div>
-          <div class="col-md-6">
-            <div class="small" style="color:var(--ink-soft);">Required Skill</div>
-            <div class="fw-semibold" id="view_req_skill"></div>
+          <div class="col-12">
+            <label class="form-label">Required Skill</label>
+            <input type="text" id="manage_required_skill" class="form-control" readonly>
           </div>
-          <div class="col-md-6">
+          <div class="col-12">
+            <label class="form-label">Details</label>
+            <textarea id="manage_request_details" class="form-control" rows="4" readonly></textarea>
+          </div>
+          <div class="col-12">
             <div class="small" style="color:var(--ink-soft);">Status</div>
-            <span class="status-pill" id="view_req_status"></span>
-          </div>
-          <div class="col-12">
-            <div class="small" style="color:var(--ink-soft);">Details</div>
-            <div id="view_req_details" style="white-space:pre-wrap;"></div>
+            <span class="status-pill" id="manage_status_pill"></span>
+            <div class="form-text mt-2">Status is updated once the request has an approved contract, in Resource Matching.</div>
           </div>
         </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-teal-solid" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>
@@ -991,24 +1018,29 @@ body {
 <script src="../assets/vendor/bootstrap-5.3.8/js/bootstrap.bundle.min.js"></script>
 <script>
 document.getElementById('viewClientModal').addEventListener('show.bs.modal', function (event) {
-  const data = event.relatedTarget.dataset;
-  document.getElementById('view_company').textContent  = data.company;
-  document.getElementById('view_contact').textContent  = data.contact;
-  document.getElementById('view_email').textContent    = data.email;
-  document.getElementById('view_number').textContent   = data.number;
+  const btn = event.relatedTarget;
+  const data = btn.dataset;
+  document.getElementById('view_company').textContent = data.company;
+  document.getElementById('view_contact').textContent = data.contact;
+  document.getElementById('view_email').textContent = data.email;
+  document.getElementById('view_number').textContent = data.number;
   document.getElementById('view_industry').textContent = data.industry || '-';
-  document.getElementById('view_address').textContent  = data.address;
+  document.getElementById('view_address').textContent = data.address;
 });
 
-document.getElementById('viewRequestModal').addEventListener('show.bs.modal', function (event) {
-  const data = event.relatedTarget.dataset;
-  document.getElementById('view_req_client').textContent   = data.clientName;
-  document.getElementById('view_req_assigned').textContent = data.assigned || '—';
-  document.getElementById('view_req_title').textContent    = data.title;
-  document.getElementById('view_req_skill').textContent    = data.skill || '—';
-  document.getElementById('view_req_details').textContent  = data.details || '—';
+document.getElementById('manageRequestModal').addEventListener('show.bs.modal', function (event) {
+  const btn = event.relatedTarget;
+  const data = btn.dataset;
 
-  const statusPill = document.getElementById('view_req_status');
+  const clientSelect = btn.closest('tr').querySelector('.d-none.d-md-table-cell');
+  const clientName = clientSelect ? clientSelect.textContent.trim() : '';
+
+  document.getElementById('manage_client_name').value = clientName;
+  document.getElementById('manage_request_title').value = data.title;
+  document.getElementById('manage_required_skill').value = data.skill || 'Not specified / any skill';
+  document.getElementById('manage_request_details').value = data.details;
+
+  const statusPill = document.getElementById('manage_status_pill');
   statusPill.textContent = data.status;
   statusPill.className = 'status-pill ' + ({
     'New': 'status-draft',

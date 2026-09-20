@@ -231,11 +231,6 @@ function navActive(string $page, string $currentPage): string
           <i class="fa-solid fa-calendar-days" style="width:18px;"></i> <span class="sidebar-text">Calendar Deadlines</span>
         </a>
       </li>
-      <li class="nav-item mb-1">
-        <a href="schedule.php" title="Schedule" class="nav-link <?= navActive('schedule.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
-          <i class="fa-solid fa-calendar-check" style="width:18px;"></i> <span class="sidebar-text">Schedule</span>
-        </a>
-      </li>
     </ul>
 
     <div class="dashboard-nav-label text-uppercase text-secondary small fw-semibold px-3 mb-2" style="letter-spacing:.06em; font-size:.72rem;">

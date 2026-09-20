@@ -349,8 +349,16 @@ if ($dateFilter !== '') {
     $dateParams[] = $dateFilter;
 }
 
+$folderPerPage = 150;
+$folderPage = max(1, (int) ($_GET['folder_page'] ?? 1));
+$folderOffset = ($folderPage - 1) * $folderPerPage;
+
 if ($currentFolderId === null) {
-    $stmt = $pdo->prepare("SELECT * FROM knowledge_documents WHERE item_type = 'folder' AND parent_id IS NULL$dateCondition ORDER BY $orderBy");
+    $countStmt = $pdo->prepare("SELECT COUNT(*) FROM knowledge_documents WHERE item_type = 'folder' AND parent_id IS NULL$dateCondition");
+    $countStmt->execute($dateParams);
+    $folderCountInScope = (int) $countStmt->fetchColumn();
+
+    $stmt = $pdo->prepare("SELECT * FROM knowledge_documents WHERE item_type = 'folder' AND parent_id IS NULL$dateCondition ORDER BY $orderBy LIMIT $folderPerPage OFFSET $folderOffset");
     $stmt->execute($dateParams);
     $subfolders = $stmt->fetchAll();
 
@@ -358,13 +366,29 @@ if ($currentFolderId === null) {
     $stmt->execute($dateParams);
     $files = $stmt->fetchAll();
 } else {
-    $stmt = $pdo->prepare("SELECT * FROM knowledge_documents WHERE item_type = 'folder' AND parent_id = ?$dateCondition ORDER BY $orderBy");
+    $countStmt = $pdo->prepare("SELECT COUNT(*) FROM knowledge_documents WHERE item_type = 'folder' AND parent_id = ?$dateCondition");
+    $countStmt->execute(array_merge([$currentFolderId], $dateParams));
+    $folderCountInScope = (int) $countStmt->fetchColumn();
+
+    $stmt = $pdo->prepare("SELECT * FROM knowledge_documents WHERE item_type = 'folder' AND parent_id = ?$dateCondition ORDER BY $orderBy LIMIT $folderPerPage OFFSET $folderOffset");
     $stmt->execute(array_merge([$currentFolderId], $dateParams));
     $subfolders = $stmt->fetchAll();
 
     $stmt = $pdo->prepare("SELECT * FROM knowledge_documents WHERE item_type = 'file' AND parent_id = ?$dateCondition ORDER BY $orderBy");
     $stmt->execute(array_merge([$currentFolderId], $dateParams));
     $files = $stmt->fetchAll();
+}
+
+$folderTotalPages = max(1, (int) ceil($folderCountInScope / $folderPerPage));
+
+function buildRepoUrl(?int $folderId, string $sort, string $date, int $folderPage): string
+{
+    $params = [];
+    if ($folderId !== null) $params['folder'] = $folderId;
+    if ($sort !== 'name_asc') $params['sort'] = $sort;
+    if ($date !== '') $params['date'] = $date;
+    if ($folderPage > 1) $params['folder_page'] = $folderPage;
+    return 'knowledge_repository.php' . (!empty($params) ? '?' . http_build_query($params) : '');
 }
 
 $allFolders = $pdo->query("SELECT document_id, title, parent_id FROM knowledge_documents WHERE item_type = 'folder' ORDER BY title ASC")->fetchAll();
@@ -381,7 +405,7 @@ $totalFiles = (int) $stmt->fetchColumn();
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Repository</title>
 <link rel="stylesheet" href="../assets/vendor/bootstrap-5.3.8/css/bootstrap.min.css">
 <link rel="stylesheet" href="../assets/vendor/fontawesome-free-7.3.1/css/all.min.css">
@@ -400,13 +424,16 @@ $totalFiles = (int) $stmt->fetchColumn();
   --line: #E2E5EB;
   --canvas: #FFFFFF;
 }
-body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+* { -webkit-tap-highlight-color: transparent; }
+body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; overflow-x: hidden; }
 .dashboard-layout, .dashboard-main, .dashboard-content { background-color: var(--canvas) !important; }
+.dashboard-main { min-width: 0; max-width: 100%; }
 .dashboard-title, h1, h2, h3 { font-family: 'Lexend', 'Inter', sans-serif; }
 .dashboard-title { color: var(--navy-deep); letter-spacing: -0.01em; }
 .dashboard-subtitle { color: var(--ink-soft) !important; }
 .dashboard-topbar { border-bottom: 1px solid var(--line) !important; background-color: #fff; }
 .card { border-radius: 12px; border: 1px solid var(--line) !important; box-shadow: none !important; }
+.form-control, .form-select { font-size: .8rem; }
 .form-control:focus, .form-select:focus { border-color: var(--indigo); box-shadow: 0 0 0 .2rem rgba(59,78,138,.13); outline: none; }
 .form-label { font-size: .8rem; font-weight: 700; color: var(--slate); text-transform: uppercase; letter-spacing: .02em; }
 .btn-teal-solid { background-color: var(--indigo); color: #fff; border: none; border-radius: 8px; font-weight: 600; }
@@ -418,6 +445,36 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
 .stat-icon { width: 38px; height: 38px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: .95rem; }
 .stat-label { font-size: .68rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-soft); }
 .stat-value { font-family: 'Lexend', sans-serif; font-size: 1.25rem; font-weight: 700; margin-top: .1rem; }
+
+.repo-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .6rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.repo-toolbar-filters {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex-wrap: wrap;
+  flex: 1 1 auto;
+}
+.repo-toolbar-filters .input-group,
+.repo-toolbar-filters select,
+.repo-toolbar-filters input[type="date"] { width: auto; }
+.repo-search-wrap { flex: 1 1 200px; min-width: 160px; max-width: 260px; }
+.repo-sort-wrap { flex: 0 0 auto; min-width: 150px; }
+.repo-date-wrap { flex: 0 0 auto; min-width: 140px; }
+.repo-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+}
+.repo-toolbar-actions .btn { white-space: nowrap; }
 
 .repo-breadcrumb { font-size: .85rem; }
 .repo-breadcrumb a { color: var(--ink-soft); text-decoration: none; }
@@ -450,6 +507,111 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
 .modal-content { border-radius: 14px; border: none; }
 .modal-header { border-bottom: 1px solid var(--line); }
 .modal-footer { border-top: 1px solid var(--line); }
+
+.repo-pagination { display: flex; justify-content: center; align-items: center; gap: .5rem; margin-top: 1.25rem; flex-wrap: wrap; }
+.repo-pagination .page-link { color: var(--indigo-text); border-color: var(--line); font-size: .8rem; }
+.repo-pagination .page-item.active .page-link { background-color: var(--indigo); border-color: var(--indigo); color: #fff; }
+.repo-pagination .page-item.disabled .page-link { color: #adb5bd; }
+
+@media (max-width: 1199.98px) {
+  .stat-card { padding: .75rem .85rem; }
+  .stat-value { font-size: 1.1rem; }
+}
+
+@media (max-width: 991.98px) {
+  .dashboard-title { font-size: 1rem !important; }
+  .dashboard-subtitle { font-size: .78rem !important; }
+  .repo-search-wrap { max-width: none; flex: 1 1 100%; order: 1; }
+  .repo-sort-wrap { flex: 1 1 calc(50% - .25rem); order: 2; min-width: 0; }
+  .repo-date-wrap { flex: 1 1 calc(50% - .25rem); order: 3; min-width: 0; flex-wrap: nowrap; }
+  .repo-date-wrap input[type="date"] { min-width: 0; flex: 1 1 auto; }
+  .repo-toolbar-filters .form-select-sm,
+  .repo-toolbar-filters .form-control-sm,
+  .repo-toolbar-actions .btn-sm {
+    height: 34px;
+    padding-top: .3rem;
+    padding-bottom: .3rem;
+    font-size: .8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .repo-date-wrap .btn-outline-soft { flex: 0 0 32px; width: 32px; padding: 0; }
+  .repo-toolbar-filters { width: 100%; }
+  .repo-toolbar-actions { width: 100%; justify-content: flex-end; }
+  .repo-grid { grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)); gap: .6rem; }
+  .repo-item { padding: .75rem .55rem; }
+  .repo-item i.repo-icon { font-size: 1.6rem; }
+}
+
+@media (max-width: 767.98px) {
+  .dashboard-content { padding: .65rem !important; }
+  .dashboard-topbar { padding: .5rem .65rem !important; }
+  .dashboard-title { font-size: .92rem !important; }
+  .card { border-radius: 10px; }
+
+  .stat-card { padding: .6rem .7rem; gap: .55rem; }
+  .stat-icon { width: 32px; height: 32px; font-size: .82rem; }
+  .stat-label { font-size: .6rem; }
+  .stat-value { font-size: 1rem; }
+
+  .repo-toolbar { gap: .45rem; margin-bottom: .8rem; }
+  .repo-toolbar-filters { gap: .4rem; }
+  .repo-search-wrap { flex: 1 1 100%; }
+  .repo-sort-wrap, .repo-date-wrap {
+    flex: 0 0 calc(50% - .2rem);
+    width: calc(50% - .2rem);
+    max-width: calc(50% - .2rem);
+    min-width: 0;
+    box-sizing: border-box;
+  }
+  .repo-sort-wrap select,
+  .repo-date-wrap { display: flex; }
+  .repo-date-wrap { flex-wrap: nowrap; align-items: center; }
+  .repo-date-wrap input[type="date"] { min-width: 0; width: 100%; flex: 1 1 auto; box-sizing: border-box; }
+  .repo-toolbar-actions { gap: .4rem; }
+  .repo-toolbar-actions .btn {
+    flex: 0 0 calc(50% - .2rem);
+    width: calc(50% - .2rem);
+    max-width: calc(50% - .2rem);
+    box-sizing: border-box;
+    font-size: .76rem;
+    padding: .3rem .5rem;
+  }
+  .repo-toolbar-filters .form-select-sm,
+  .repo-toolbar-filters .form-control-sm,
+  .repo-toolbar-actions .btn-sm {
+    height: 32px;
+    font-size: .76rem;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .repo-date-wrap .btn-outline-soft { flex: 0 0 32px; width: 32px; padding: 0; }
+  .form-control, .form-select { font-size: .76rem; }
+  .repo-breadcrumb { font-size: .74rem; gap: .3rem !important; }
+
+  .repo-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: .5rem; }
+  .repo-item { padding: .6rem .4rem; border-radius: 8px; }
+  .repo-item i.repo-icon { font-size: 1.35rem; }
+  .repo-item .repo-name { font-size: .68rem; margin-top: .35rem; }
+  .repo-item .repo-meta { font-size: .6rem; }
+  .repo-section-label { font-size: .64rem; margin: 1rem 0 .5rem; }
+
+  .modal-header { padding: .7rem .8rem !important; }
+  .modal-title { font-size: .95rem !important; }
+  .modal-body { padding: .9rem !important; }
+  .modal-footer { padding: .6rem .8rem !important; }
+  .form-label { font-size: .68rem; }
+
+  .repo-pagination .page-link { font-size: .72rem; padding: .25rem .5rem; }
+}
+
+@media (max-width: 575.98px) {
+  .dashboard-content { padding: .5rem !important; }
+  .repo-grid { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: .4rem; }
+  .repo-item .repo-name { font-size: .64rem; }
+  .modal-title { font-size: .88rem !important; }
+}
 </style>
 </head>
 <body>
@@ -470,28 +632,6 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
           <p class="dashboard-subtitle small mb-0 d-none d-sm-block">Organize client files and company templates.</p>
         </div>
       </div>
-
-      <form method="GET" class="d-flex align-items-center gap-2 flex-wrap" id="repoFilterForm">
-        <?php if ($currentFolderId !== null): ?>
-          <input type="hidden" name="folder" value="<?= $currentFolderId ?>">
-        <?php endif; ?>
-        <div class="input-group input-group-sm" style="width:180px;">
-          <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass" style="color:var(--ink-soft);"></i></span>
-          <input type="text" id="repoLiveSearch" class="form-control" placeholder="Search">
-        </div>
-        <select name="sort" class="form-select form-select-sm" style="width:150px;" onchange="this.form.submit()">
-          <option value="name_asc" <?= $sortOption === 'name_asc' ? 'selected' : '' ?>>Name A-Z</option>
-          <option value="name_desc" <?= $sortOption === 'name_desc' ? 'selected' : '' ?>>Name Z-A</option>
-          <option value="newest" <?= $sortOption === 'newest' ? 'selected' : '' ?>>Newest to Oldest</option>
-          <option value="oldest" <?= $sortOption === 'oldest' ? 'selected' : '' ?>>Oldest to Newest</option>
-        </select>
-        <input type="date" name="date" class="form-control form-control-sm" style="width:140px;" value="<?= htmlspecialchars($dateFilter) ?>" onchange="this.form.submit()">
-        <?php if ($dateFilter !== ''): ?>
-          <a href="knowledge_repository.php<?= $currentFolderId !== null ? '?folder=' . $currentFolderId : '' ?>" class="btn btn-outline-soft btn-sm" title="Clear date filter">
-            <i class="fa-solid fa-xmark"></i>
-          </a>
-        <?php endif; ?>
-      </form>
     </header>
 
     <main class="dashboard-content p-3 p-md-4">
@@ -536,13 +676,43 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
             <?php endforeach; ?>
           </nav>
 
-          <div class="d-flex justify-content-end gap-2 mb-3">
-            <button type="button" class="btn btn-outline-soft btn-sm" data-bs-toggle="modal" data-bs-target="#newFolderModal">
-              <i class="fa-solid fa-folder-plus"></i> New Folder
-            </button>
-            <button type="button" class="btn btn-teal-solid btn-sm" data-bs-toggle="modal" data-bs-target="#uploadFileModal">
-              <i class="fa-solid fa-upload"></i> Upload
-            </button>
+          <div class="repo-toolbar">
+            <form method="GET" class="repo-toolbar-filters" id="repoFilterForm">
+              <?php if ($currentFolderId !== null): ?>
+                <input type="hidden" name="folder" value="<?= $currentFolderId ?>">
+              <?php endif; ?>
+              <div class="repo-search-wrap">
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass" style="color:var(--ink-soft);"></i></span>
+                  <input type="text" id="repoLiveSearch" class="form-control" placeholder="Search this folder">
+                </div>
+              </div>
+              <div class="repo-sort-wrap">
+                <select name="sort" class="form-select form-select-sm" onchange="this.form.submit()">
+                  <option value="name_asc" <?= $sortOption === 'name_asc' ? 'selected' : '' ?>>Name A-Z</option>
+                  <option value="name_desc" <?= $sortOption === 'name_desc' ? 'selected' : '' ?>>Name Z-A</option>
+                  <option value="newest" <?= $sortOption === 'newest' ? 'selected' : '' ?>>Newest to Oldest</option>
+                  <option value="oldest" <?= $sortOption === 'oldest' ? 'selected' : '' ?>>Oldest to Newest</option>
+                </select>
+              </div>
+              <div class="repo-date-wrap d-flex gap-2">
+                <input type="date" name="date" class="form-control form-control-sm" value="<?= htmlspecialchars($dateFilter) ?>" onchange="this.form.submit()">
+                <?php if ($dateFilter !== ''): ?>
+                  <a href="knowledge_repository.php<?= $currentFolderId !== null ? '?folder=' . $currentFolderId : '' ?>" class="btn btn-outline-soft btn-sm" title="Clear date filter">
+                    <i class="fa-solid fa-xmark"></i>
+                  </a>
+                <?php endif; ?>
+              </div>
+            </form>
+
+            <div class="repo-toolbar-actions">
+              <button type="button" class="btn btn-outline-soft btn-sm" data-bs-toggle="modal" data-bs-target="#newFolderModal">
+                <i class="fa-solid fa-folder-plus"></i> New Folder
+              </button>
+              <button type="button" class="btn btn-teal-solid btn-sm" data-bs-toggle="modal" data-bs-target="#uploadFileModal">
+                <i class="fa-solid fa-upload"></i> Upload
+              </button>
+            </div>
           </div>
 
           <?php if (empty($subfolders) && empty($files)): ?>
@@ -553,7 +723,9 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
           <?php else: ?>
 
             <?php if (!empty($subfolders)): ?>
-              <div class="repo-section-label">Folders</div>
+              <div class="repo-section-label">
+                Folders<?= $folderCountInScope > $folderPerPage ? ' &middot; ' . number_format($folderCountInScope) . ' total' : '' ?>
+              </div>
               <div class="repo-grid mb-3">
                 <?php foreach ($subfolders as $folder): ?>
                   <div class="repo-item" data-name="<?= htmlspecialchars(strtolower($folder['title'])) ?>" onclick="if(!event.target.closest('.repo-menu-btn')) window.location='knowledge_repository.php?folder=<?= $folder['document_id'] ?>'">
@@ -571,6 +743,24 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
                   </div>
                 <?php endforeach; ?>
               </div>
+
+              <?php if ($folderTotalPages > 1): ?>
+                <nav aria-label="Folders pagination">
+                  <ul class="pagination repo-pagination mb-3">
+                    <li class="page-item <?= $folderPage <= 1 ? 'disabled' : '' ?>">
+                      <a class="page-link" href="<?= buildRepoUrl($currentFolderId, $sortOption, $dateFilter, $folderPage - 1) ?>">Prev</a>
+                    </li>
+                    <?php for ($i = 1; $i <= $folderTotalPages; $i++): ?>
+                      <li class="page-item <?= $i === $folderPage ? 'active' : '' ?>">
+                        <a class="page-link" href="<?= buildRepoUrl($currentFolderId, $sortOption, $dateFilter, $i) ?>"><?= $i ?></a>
+                      </li>
+                    <?php endfor; ?>
+                    <li class="page-item <?= $folderPage >= $folderTotalPages ? 'disabled' : '' ?>">
+                      <a class="page-link" href="<?= buildRepoUrl($currentFolderId, $sortOption, $dateFilter, $folderPage + 1) ?>">Next</a>
+                    </li>
+                  </ul>
+                </nav>
+              <?php endif; ?>
             <?php endif; ?>
 
             <?php if (!empty($files)): ?>
@@ -639,7 +829,7 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
           <input type="text" name="folder_name" class="form-control" required autofocus>
         </div>
         <div class="modal-footer">
-          <button type="submit" class="btn btn-teal-solid">Create Folder</button>
+          <button type="submit" class="btn btn-teal-solid w-100 w-sm-auto">Create Folder</button>
         </div>
       </form>
     </div>
@@ -662,7 +852,7 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
           <div class="form-text mt-2">Files will be uploaded to the current folder.</div>
         </div>
         <div class="modal-footer">
-          <button type="submit" class="btn btn-teal-solid">Upload</button>
+          <button type="submit" class="btn btn-teal-solid w-100 w-sm-auto">Upload</button>
         </div>
       </form>
     </div>
@@ -685,7 +875,7 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
           <input type="text" name="folder_name" id="rename_folder_name" class="form-control" required>
         </div>
         <div class="modal-footer">
-          <button type="submit" class="btn btn-teal-solid">Save</button>
+          <button type="submit" class="btn btn-teal-solid w-100 w-sm-auto">Save</button>
         </div>
       </form>
     </div>
@@ -707,7 +897,7 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
           <p class="mb-0">Are you sure you want to delete <strong id="delete_folder_name"></strong>? This will also delete everything inside it.</p>
         </div>
         <div class="modal-footer">
-          <button type="submit" class="btn btn-teal-solid" style="background-color:#B4432F;">Delete Folder</button>
+          <button type="submit" class="btn btn-teal-solid w-100 w-sm-auto" style="background-color:#B4432F;">Delete Folder</button>
         </div>
       </form>
     </div>
@@ -735,7 +925,7 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
           </select>
         </div>
         <div class="modal-footer">
-          <button type="submit" class="btn btn-teal-solid">Move</button>
+          <button type="submit" class="btn btn-teal-solid w-100 w-sm-auto">Move</button>
         </div>
       </form>
     </div>
@@ -758,7 +948,7 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
           <input type="text" name="file_title" id="rename_file_title" class="form-control" required>
         </div>
         <div class="modal-footer">
-          <button type="submit" class="btn btn-teal-solid">Save</button>
+          <button type="submit" class="btn btn-teal-solid w-100 w-sm-auto">Save</button>
         </div>
       </form>
     </div>
@@ -780,7 +970,7 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
           <p class="mb-0">Are you sure you want to delete <strong id="delete_file_name"></strong>?</p>
         </div>
         <div class="modal-footer">
-          <button type="submit" class="btn btn-teal-solid" style="background-color:#B4432F;">Delete File</button>
+          <button type="submit" class="btn btn-teal-solid w-100 w-sm-auto" style="background-color:#B4432F;">Delete File</button>
         </div>
       </form>
     </div>
@@ -808,7 +998,7 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
           </select>
         </div>
         <div class="modal-footer">
-          <button type="submit" class="btn btn-teal-solid">Move</button>
+          <button type="submit" class="btn btn-teal-solid w-100 w-sm-auto">Move</button>
         </div>
       </form>
     </div>
