@@ -61,8 +61,8 @@ function fileIcon(string $fileName): string
 function previewMode(string $ext): string
 {
     $ext = strtolower($ext);
-    if (in_array($ext, ['docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt'], true)) {
-        return 'office';
+    if (in_array($ext, ['docx', 'doc', 'xlsx', 'xls', 'csv', 'pptx', 'ppt'], true)) {
+        return 'office-server';
     }
     if (in_array($ext, ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
         return 'native';
@@ -73,9 +73,11 @@ function previewMode(string $ext): string
 function convertToPdf(string $sourcePath, string $cacheDir, string $documentId): ?string
 {
     if (!is_file($sourcePath)) {
+        error_log("convertToPdf: source not found: $sourcePath");
         return null;
     }
 
+    $cacheDir = rtrim($cacheDir, '/') . '/';
     $cachedPdf = $cacheDir . $documentId . '.pdf';
 
     if (is_file($cachedPdf) && filemtime($cachedPdf) >= filemtime($sourcePath)) {
@@ -83,38 +85,70 @@ function convertToPdf(string $sourcePath, string $cacheDir, string $documentId):
     }
 
     if (!function_exists('exec')) {
-        error_log('convertToPdf: exec() is disabled on this server.');
+        error_log('convertToPdf: exec() disabled.');
         return null;
     }
 
-    $loProfileDir = sys_get_temp_dir() . '/lo_profile_' . uniqid();
-    if (!is_dir($loProfileDir)) {
-        mkdir($loProfileDir, 0700, true);
+    if (!is_dir($cacheDir)) @mkdir($cacheDir, 0755, true);
+    if (!is_writable($cacheDir)) {
+        error_log("convertToPdf: cache dir not writable: $cacheDir");
+        return null;
     }
+
+    $binaries = ['/usr/bin/libreoffice', '/usr/bin/soffice', '/usr/local/bin/libreoffice', '/usr/local/bin/soffice'];
+    $binary = null;
+    foreach ($binaries as $b) {
+        if (@is_executable($b)) { $binary = $b; break; }
+    }
+    if ($binary === null) {
+        error_log('convertToPdf: no libreoffice binary.');
+        return null;
+    }
+
+    $workDir = sys_get_temp_dir() . '/lo_' . uniqid();
+    @mkdir($workDir, 0700, true);
+    $cacheHome = $workDir . '/.cache';
+    $configHome = $workDir . '/.config';
+    @mkdir($cacheHome, 0700, true);
+    @mkdir($configHome, 0700, true);
 
     $cmd = sprintf(
-        'HOME=%s libreoffice --headless --norestore --convert-to pdf --outdir %s -env:UserInstallation=file://%s %s 2>&1',
-        escapeshellarg($loProfileDir),
+        'env -u LD_LIBRARY_PATH -u LD_PRELOAD HOME=%s XDG_CACHE_HOME=%s XDG_CONFIG_HOME=%s timeout 60 %s --headless --norestore --nologo --nofirststartwizard --convert-to pdf --outdir %s -env:UserInstallation=%s %s 2>&1',
+        escapeshellarg($workDir),
+        escapeshellarg($cacheHome),
+        escapeshellarg($configHome),
+        escapeshellarg($binary),
         escapeshellarg($cacheDir),
-        escapeshellarg($loProfileDir . '/lo_config'),
+        escapeshellarg('file://' . $workDir . '/lo_config'),
         escapeshellarg($sourcePath)
     );
-    exec($cmd, $output, $returnCode);
+
+    $output = [];
+    $returnCode = 0;
+    @exec($cmd, $output, $returnCode);
 
     error_log('convertToPdf cmd: ' . $cmd);
-    error_log('convertToPdf return code: ' . $returnCode . ' output: ' . implode(' | ', $output));
+    error_log('convertToPdf rc=' . $returnCode . ' out=' . implode(' | ', $output));
 
-    exec('rm -rf ' . escapeshellarg($loProfileDir));
-
-    $originalPdfName = pathinfo($sourcePath, PATHINFO_FILENAME) . '.pdf';
-    $generatedPath = $cacheDir . $originalPdfName;
-
-    if (is_file($generatedPath)) {
-        rename($generatedPath, $cachedPdf);
-        return $cachedPdf;
+    $expectedName = pathinfo($sourcePath, PATHINFO_FILENAME) . '.pdf';
+    $generated = $cacheDir . $expectedName;
+    if (is_file($generated) && $generated !== $cachedPdf) {
+        @rename($generated, $cachedPdf);
     }
 
-    error_log('convertToPdf failed for ' . $sourcePath . ': ' . implode("\n", $output));
+    if (!is_file($cachedPdf)) {
+        foreach (glob($cacheDir . '*.pdf') as $p) {
+            if (filemtime($p) >= time() - 30) {
+                @rename($p, $cachedPdf);
+                break;
+            }
+        }
+    }
+
+    @exec('rm -rf ' . escapeshellarg($workDir));
+
+    if (is_file($cachedPdf)) return $cachedPdf;
+    error_log('convertToPdf: no PDF produced.');
     return null;
 }
 
@@ -137,6 +171,43 @@ function deleteFolderRecursive(PDO $pdo, int $folderId, string $uploadDir, strin
     }
     $pdo->prepare("DELETE FROM knowledge_documents WHERE document_id = ?")->execute([$folderId]);
 }
+
+function addFolderToZip(PDO $pdo, ZipArchive $zip, int $folderId, string $basePath, string $uploadDir): void
+{
+    $stmt = $pdo->prepare("SELECT document_id, item_type, title, file_path FROM knowledge_documents WHERE parent_id = ?");
+    $stmt->execute([$folderId]);
+    $used = [];
+    foreach ($stmt->fetchAll() as $child) {
+        $safeName = trim(preg_replace('/[\\\\\/:*?"<>|]/', '_', $child['title']));
+        if ($safeName === '') $safeName = 'unnamed';
+        $name = $safeName;
+        $n = 1;
+        while (isset($used[strtolower($name)])) {
+            $info = pathinfo($safeName);
+            $ext = ($child['item_type'] === 'file' && isset($info['extension'])) ? '.' . $info['extension'] : '';
+            $stem = $child['item_type'] === 'file' ? $info['filename'] : $safeName;
+            $name = $stem . ' (' . $n++ . ')' . $ext;
+        }
+        $used[strtolower($name)] = true;
+
+        if ($child['item_type'] === 'folder') {
+            $zip->addEmptyDir($basePath . $name);
+            addFolderToZip($pdo, $zip, (int) $child['document_id'], $basePath . $name . '/', $uploadDir);
+        } else {
+            $realPath = $uploadDir . basename((string) $child['file_path']);
+            if ($child['file_path'] && is_file($realPath)) {
+                $zip->addFile($realPath, $basePath . $name);
+            }
+        }
+    }
+}
+
+$allowedUploadExtensions = [
+    'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'tif', 'tiff', 'ico', 'heic', 'heif', 'avif',
+    'doc', 'docx',
+    'xls', 'xlsx', 'csv',
+    'pdf',
+];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
@@ -224,15 +295,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     } elseif ($action === 'upload_file') {
 
+        $uploaded = 0;
+        $rejected = 0;
+
         if (!empty($_FILES['files']['name'][0])) {
             $count = count($_FILES['files']['name']);
             for ($i = 0; $i < $count; $i++) {
                 if ($_FILES['files']['error'][$i] !== UPLOAD_ERR_OK) continue;
                 $originalName = $_FILES['files']['name'][$i];
+                $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+
+                if (!in_array($ext, $allowedUploadExtensions, true)) {
+                    $rejected++;
+                    continue;
+                }
+
                 $storedName = uniqid('doc_', true) . '_' . preg_replace('/[^A-Za-z0-9._-]/', '_', $originalName);
                 $tmpPath = $_FILES['files']['tmp_name'][$i];
                 $size = $_FILES['files']['size'][$i];
-                $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
 
                 if (move_uploaded_file($tmpPath, $uploadDir . $storedName)) {
                     $stmt = $pdo->prepare(
@@ -241,10 +321,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                          VALUES ('file', ?, ?, ?, ?, ?, ?, ?, ?)"
                     );
                     $stmt->execute([$currentFolderId, $originalName, $originalName, 'repository/' . $storedName, $size, $ext, $userId, $userRole]);
+                    $uploaded++;
                 }
             }
+        }
+
+        if ($uploaded > 0 && $rejected === 0) {
             $_SESSION['alert_type'] = 'success';
             $_SESSION['alert_message'] = 'File(s) uploaded successfully.';
+        } elseif ($uploaded > 0) {
+            $_SESSION['alert_type'] = 'success';
+            $_SESSION['alert_message'] = $uploaded . ' file(s) uploaded. ' . $rejected . ' skipped (only images, Word, Excel, and PDF are allowed).';
+        } else {
+            $_SESSION['alert_type'] = 'error';
+            $_SESSION['alert_message'] = 'Upload failed. Only images, Word, Excel, and PDF files are allowed.';
         }
     }
 
@@ -253,6 +343,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $redirect .= '?folder=' . $currentFolderId;
     }
     header('Location: ' . $redirect);
+    exit;
+}
+
+if (isset($_GET['download_folder'])) {
+    $folderId = (int) $_GET['download_folder'];
+    $stmt = $pdo->prepare("SELECT title FROM knowledge_documents WHERE document_id = ? AND item_type = 'folder'");
+    $stmt->execute([$folderId]);
+    $folderTitle = $stmt->fetchColumn();
+
+    if ($folderTitle === false) {
+        http_response_code(404);
+        header('Content-Type: text/plain');
+        echo 'Folder not found.';
+        exit;
+    }
+
+    if (!class_exists('ZipArchive')) {
+        http_response_code(500);
+        header('Content-Type: text/plain');
+        echo 'ZIP is not supported on this server.';
+        exit;
+    }
+
+    $safeTitle = trim(preg_replace('/[\\\\\/:*?"<>|]/', '_', $folderTitle));
+    if ($safeTitle === '') $safeTitle = 'folder';
+
+    $tmpZip = tempnam(sys_get_temp_dir(), 'zip_');
+    $zip = new ZipArchive();
+    if ($zip->open($tmpZip, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+        @unlink($tmpZip);
+        http_response_code(500);
+        header('Content-Type: text/plain');
+        echo 'Could not create ZIP file.';
+        exit;
+    }
+
+    $zip->addEmptyDir($safeTitle);
+    addFolderToZip($pdo, $zip, $folderId, $safeTitle . '/', $uploadDir);
+    $zip->close();
+
+    header('Content-Description: File Transfer');
+    header('Content-Type: application/zip');
+    header('Content-Disposition: attachment; filename="' . $safeTitle . '.zip"');
+    header('Content-Length: ' . filesize($tmpZip));
+    readfile($tmpZip);
+    @unlink($tmpZip);
     exit;
 }
 
@@ -277,25 +413,26 @@ if (isset($_GET['view'])) {
     $stmt->execute([$fileId]);
     $file = $stmt->fetch();
 
-    error_log('VIEW debug: fileId=' . $fileId
-        . ' row=' . json_encode($file)
-        . ' expected_path=' . ($file ? $uploadDir . basename($file['file_path']) : 'n/a')
-        . ' exists=' . ($file ? var_export(is_file($uploadDir . basename($file['file_path'])), true) : 'n/a'));
-
     if ($file && is_file($uploadDir . basename($file['file_path']))) {
         $sourcePath = $uploadDir . basename($file['file_path']);
         $ext = strtolower($file['file_type'] ?? '');
         $baseTitle = pathinfo($file['title'], PATHINFO_FILENAME);
 
-        $officeExts = ['docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt'];
+        $officeExts = ['doc', 'docx', 'xls', 'xlsx', 'csv', 'ppt', 'pptx'];
 
         if (in_array($ext, $officeExts, true)) {
             $pdfPath = convertToPdf($sourcePath, $pdfCacheDir, (string) $fileId);
 
             if ($pdfPath === null || !is_file($pdfPath)) {
                 http_response_code(500);
-                header('Content-Type: text/plain');
-                echo "Could not generate a preview for this file. You can still download it.";
+                header('Content-Type: text/html; charset=utf-8');
+                echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Preview Error</title>';
+                echo '<style>body{font-family:system-ui,sans-serif;padding:2rem;max-width:640px;margin:auto;color:#1A2233;}h1{color:#B4432F;font-size:1.25rem;}code{background:#F5F6F9;padding:.1rem .35rem;border-radius:4px;}a{color:#2E3E70;}</style>';
+                echo '</head><body>';
+                echo '<h1>Preview not available</h1>';
+                echo '<p>Hindi ma-convert ang file na ito sa PDF.</p>';
+                echo '<p><a href="knowledge_repository.php?download=' . (int) $fileId . '">⬇ Download na lang ang file</a></p>';
+                echo '</body></html>';
                 exit;
             }
 
@@ -733,6 +870,7 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
                       <i class="fa-solid fa-ellipsis-vertical"></i>
                     </button>
                     <ul class="dropdown-menu" onclick="event.stopPropagation()">
+                      <li><a class="dropdown-item" href="knowledge_repository.php?download_folder=<?= $folder['document_id'] ?>"><i class="fa-solid fa-file-zipper me-2"></i>Download as ZIP</a></li>
                       <li><a class="dropdown-item" href="#" onclick="openRenameFolder(<?= $folder['document_id'] ?>, '<?= htmlspecialchars($folder['title'], ENT_QUOTES) ?>'); return false;"><i class="fa-regular fa-pen-to-square me-2"></i>Rename</a></li>
                       <li><a class="dropdown-item" href="#" onclick="openMoveFolder(<?= $folder['document_id'] ?>); return false;"><i class="fa-solid fa-arrows-up-down-left-right me-2"></i>Move</a></li>
                       <li><a class="dropdown-item text-danger" href="#" onclick="openDeleteFolder(<?= $folder['document_id'] ?>, '<?= htmlspecialchars($folder['title'], ENT_QUOTES) ?>'); return false;"><i class="fa-regular fa-trash-can me-2"></i>Delete</a></li>
@@ -773,10 +911,10 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
                     $viewUrl = 'knowledge_repository.php?view=' . $file['document_id'];
                     $downloadUrl = 'knowledge_repository.php?download=' . $file['document_id'];
 
-                    if ($mode === 'office') {
-                        $clickAction = "previewFile(this, " . $file['document_id'] . ");";
+                    if ($mode === 'office-server') {
+                        $clickAction = "viewDoc(this, " . $file['document_id'] . ");";
                     } elseif ($mode === 'native') {
-                        $clickAction = "window.open('" . $viewUrl . "', '_blank', 'noopener,noreferrer');";
+                        $clickAction = "viewPdf(" . $file['document_id'] . ");";
                     } else {
                         $clickAction = "window.location='" . $downloadUrl . "';";
                     }
@@ -787,10 +925,10 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
                       <i class="fa-solid fa-ellipsis-vertical"></i>
                     </button>
                     <ul class="dropdown-menu" onclick="event.stopPropagation()">
-                      <?php if ($mode === 'office'): ?>
-                        <li><a class="dropdown-item" href="#" onclick="previewFile(null, <?= $file['document_id'] ?>); return false;"><i class="fa-regular fa-eye me-2"></i>View</a></li>
+                      <?php if ($mode === 'office-server'): ?>
+                        <li><a class="dropdown-item" href="#" onclick="viewDoc(null, <?= $file['document_id'] ?>); return false;"><i class="fa-regular fa-eye me-2"></i>View</a></li>
                       <?php elseif ($mode === 'native'): ?>
-                        <li><a class="dropdown-item" href="<?= $viewUrl ?>" target="_blank" rel="noopener noreferrer"><i class="fa-regular fa-eye me-2"></i>View</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="viewPdf(<?= $file['document_id'] ?>); return false;"><i class="fa-regular fa-eye me-2"></i>View</a></li>
                       <?php endif; ?>
                       <li><a class="dropdown-item" href="<?= $downloadUrl ?>"><i class="fa-solid fa-download me-2"></i>Download</a></li>
                       <li><a class="dropdown-item" href="#" onclick="openRenameFile(<?= $file['document_id'] ?>, '<?= htmlspecialchars($file['title'], ENT_QUOTES) ?>'); return false;"><i class="fa-regular fa-pen-to-square me-2"></i>Rename</a></li>
@@ -848,8 +986,8 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
         </div>
         <div class="modal-body">
           <label class="form-label">Files</label>
-          <input type="file" name="files[]" class="form-control" multiple required>
-          <div class="form-text mt-2">Files will be uploaded to the current folder.</div>
+          <input type="file" name="files[]" class="form-control" multiple required accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.bmp,.svg,.tif,.tiff,.ico,.heic,.heif,.avif,.doc,.docx,.xls,.xlsx,.csv,.pdf">
+          <div class="form-text mt-2">Allowed: images, Word (.doc, .docx), Excel (.xls, .xlsx, .csv), and PDF.</div>
         </div>
         <div class="modal-footer">
           <button type="submit" class="btn btn-teal-solid w-100 w-sm-auto">Upload</button>
@@ -1036,6 +1174,20 @@ function openMoveFile(id) {
   new bootstrap.Modal(document.getElementById('moveFileModal')).show();
 }
 
+function viewPdf(id) {
+  window.open('knowledge_repository.php?view=' + id + '#toolbar=1&navpanes=0', '_blank', 'noopener,noreferrer');
+}
+
+function viewDoc(cardEl, id) {
+  if (cardEl) {
+    cardEl.classList.add('is-loading');
+    setTimeout(function () {
+      cardEl.classList.remove('is-loading');
+    }, 3000);
+  }
+  window.open('knowledge_repository.php?view=' + id + '#toolbar=1&navpanes=0', '_blank', 'noopener,noreferrer');
+}
+
 const repoSearchInput = document.getElementById('repoLiveSearch');
 if (repoSearchInput) {
   repoSearchInput.addEventListener('input', function () {
@@ -1054,19 +1206,6 @@ if (repoSearchInput) {
       grid.style.display = anyVisible ? '' : 'none';
     });
   });
-}
-
-function previewFile(cardEl, id) {
-  const viewUrl = 'knowledge_repository.php?view=' + id;
-
-  if (cardEl) {
-    cardEl.classList.add('is-loading');
-    setTimeout(function () {
-      cardEl.classList.remove('is-loading');
-    }, 1500);
-  }
-
-  window.open(viewUrl, '_blank', 'noopener,noreferrer');
 }
 
 <?php if ($alertType && $alertMessage): ?>

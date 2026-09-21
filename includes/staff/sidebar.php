@@ -202,7 +202,6 @@ function badgeCount(int $count): string
       font-size: 1.05rem;
     }
 
-    /* Hide badges when collapsed to keep icon centered */
     html.sidebar-collapsed .sidebar-badge-group {
       display: none !important;
     }
@@ -278,8 +277,8 @@ function badgeCount(int $count): string
         </a>
       </li>
       <li class="nav-item mb-1">
-        <a href="calendar_deadlines.php" title="Calendar Deadlines" class="nav-link <?= navActive('calendar_deadlines.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
-          <i class="fa-solid fa-calendar-days" style="width:18px;"></i> <span class="sidebar-text">Calendar Deadlines</span>
+        <a href="services.php" title="Services &amp; Fees" class="nav-link <?= navActive('services.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
+          <i class="fa-solid fa-tags" style="width:18px;"></i> <span class="sidebar-text">Services &amp; Fees</span>
         </a>
       </li>
     </ul>
