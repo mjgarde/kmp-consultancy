@@ -1,0 +1,3 @@
+ALTER TABLE service_requests MODIFY request_details TEXT NULL;
+ALTER TABLE quotations MODIFY notes TEXT NULL;
+ALTER TABLE quotation_items MODIFY description TEXT NULL;  ///Seperate

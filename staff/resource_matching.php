@@ -1,7 +1,9 @@
 <?php
 
-session_name('STAFF_SESSION');
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_name('STAFF_SESSION');
+    session_start();
+}
 require_once __DIR__ . '/../config/database.php';
 
 if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'staff') {
@@ -16,8 +18,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
     if ($action === 'assign') {
-        $_SESSION['alert_type'] = 'error';
-        $_SESSION['alert_message'] = 'Assigning staff is not permitted.';
+        $requestId = $_POST['request_id'] ?? null;
+        $userId    = $_POST['user_id'] ?? null;
+
+        if ($requestId && $userId) {
+            $stmt = $pdo->prepare(
+                "UPDATE service_requests SET assigned_to = ?, assigned_by = ? WHERE request_id = ?"
+            );
+            $stmt->execute([$userId, $_SESSION['user_id'], $requestId]);
+
+            $_SESSION['alert_type'] = 'success';
+            $_SESSION['alert_message'] = 'Staff assigned successfully.';
+        } else {
+            $_SESSION['alert_type'] = 'error';
+            $_SESSION['alert_message'] = 'Unable to assign staff. Please try again.';
+        }
+
         header('Location: resource_matching.php');
         exit;
     }
@@ -481,6 +497,18 @@ body {
 .match-none { background-color: var(--danger-soft); color: var(--danger-text); border-color: var(--danger-border); }
 .match-neutral { background-color: var(--surface); color: var(--slate); border-color: var(--line); }
 
+.btn-assign {
+  background-color: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: .82rem;
+  padding: .45rem 1.1rem;
+}
+.btn-assign:hover:not(:disabled) { background-color: var(--accent-hover); color: #fff; }
+.btn-assign:disabled { background-color: var(--surface); color: var(--ink-soft); }
+
 .table thead th {
   background-color: var(--surface) !important;
   color: var(--ink-soft);
@@ -508,6 +536,27 @@ body {
 .modal-content { background-color: var(--card); border-radius: 14px; border: none; }
 .modal-header { border-bottom: 1px solid var(--line); }
 .modal-footer { border-top: 1px solid var(--line); }
+.confirm-summary { background-color: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: .85rem 1rem; }
+.confirm-summary .row-line { display: flex; justify-content: space-between; gap: 1rem; font-size: .85rem; padding: .2rem 0; }
+.confirm-summary .row-line span:first-child { color: var(--ink-soft); }
+.confirm-summary .row-line span:last-child { font-weight: 600; text-align: right; }
+
+.btn-confirm {
+  background-color: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+}
+.btn-confirm:hover { background-color: var(--accent-hover); color: #fff; }
+.btn-cancel {
+  background-color: var(--surface);
+  color: var(--charcoal);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-weight: 600;
+}
+.btn-cancel:hover { background-color: #EAE7E0; color: var(--charcoal); }
 
 #requestDetailsModal .modal-content { border-radius: 0; }
 #requestDetailsModal .modal-header {
@@ -589,6 +638,7 @@ body {
   .staff-name { font-size: .82rem; }
   .staff-meta { font-size: .68rem; }
   .match-pill { font-size: .6rem; padding: .2rem .5rem; }
+  .btn-assign { font-size: .74rem; padding: .38rem .85rem; width: 100%; margin-top: .4rem; }
   .staff-match-row { flex-direction: column; }
   .staff-match-row > .flex-grow-1 { width: 100%; }
 
@@ -647,7 +697,7 @@ body {
         </button>
         <div>
           <h1 class="dashboard-title h6 h5-md fw-bold mb-0">Resource Matching</h1>
-          <p class="dashboard-subtitle small mb-0 d-none d-sm-block">Review approved service engagements and assigned staff.</p>
+          <p class="dashboard-subtitle small mb-0 d-none d-sm-block">Assign the most suitable staff to approved service engagements.</p>
         </div>
       </div>
     </header>
@@ -699,7 +749,7 @@ body {
           <section class="card h-100">
             <div class="card-header">
               <h2 class="h6 fw-bold mb-0">Pending Service Requests</h2>
-              <p class="small mb-0">Select a request to review its details and recommended staff.</p>
+              <p class="small mb-0">Select a request to review its details and find suitable staff.</p>
             </div>
             <div class="card-body p-3">
               <?php if (!empty($pendingRequests)): ?>
@@ -755,7 +805,7 @@ body {
         <div class="col-lg-7">
           <section class="card h-100">
             <div class="card-header">
-              <h2 class="h6 fw-bold mb-0">Request Review and Recommended Staff</h2>
+              <h2 class="h6 fw-bold mb-0">Request Review and Staff Recommendation</h2>
               <p class="small mb-0" id="matching_subtitle">Select a service request first.</p>
             </div>
             <div class="card-body p-3">
@@ -766,6 +816,12 @@ body {
               </div>
 
               <div id="matching_content" class="d-none">
+
+                <form method="POST" id="assignForm">
+                  <input type="hidden" name="action" value="assign">
+                  <input type="hidden" name="request_id" id="assign_request_id">
+                  <input type="hidden" name="user_id" id="assign_user_id">
+                </form>
 
                 <div class="request-summary">
                   <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
@@ -866,6 +922,30 @@ body {
 
   </div>
 
+</div>
+
+<div class="modal fade" id="confirmAssignModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title h5 fw-bold">Confirm Assignment</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small mb-3" style="color:var(--ink-soft);">Please review the assignment below before confirming.</p>
+        <div class="confirm-summary">
+          <div class="row-line"><span>Request</span><span id="confirm_request_title"></span></div>
+          <div class="row-line"><span>Client</span><span id="confirm_client_name"></span></div>
+          <div class="row-line"><span>Assigned Staff</span><span id="confirm_staff_name"></span></div>
+          <div class="row-line"><span>Skill Match</span><span id="confirm_skill_match"></span></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-cancel" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-confirm px-4" id="confirm_assign_btn">Confirm Assignment</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="modal fade" id="requestDetailsModal" tabindex="-1" aria-hidden="true">
@@ -1229,7 +1309,12 @@ function renderStaffMatches(requiredSkill) {
         '</div>' +
         '<div class="mb-1">' + buildSkillBadges(staff, requiredSkill) + '</div>' +
         '<div class="staff-meta">' + (staff.workload === 0 ? 'Available &middot; no active tasks' : staff.workload + ' active task(s)') + ' &middot; ' + escapeHtml(staff.status) + '</div>' +
-      '</div>';
+      '</div>' +
+      '<button type="button" class="btn btn-assign flex-shrink-0"' + (staff.status !== 'Active' ? ' disabled' : '') + '>Assign</button>';
+
+    row.querySelector('button').addEventListener('click', function () {
+      openConfirmModal(staff, requiredSkill);
+    });
 
     staffMatchList.appendChild(row);
   });
@@ -1244,7 +1329,7 @@ function selectRequest(card) {
   renderSelectedRequest(selectedRequest);
   renderStaffMatches(selectedRequest.required_skill || '');
 
-  matchingSubtitle.textContent = 'Review the request and the recommended staff.';
+  matchingSubtitle.textContent = 'Review the request, then assign a suitable staff member.';
   matchingEmptyState.classList.add('d-none');
   matchingContent.classList.remove('d-none');
 }
@@ -1267,6 +1352,27 @@ if (requestSearchInput) {
 
     document.getElementById('requestSearchEmpty').classList.toggle('d-none', visibleCount > 0);
   });
+}
+
+function openConfirmModal(staff, requiredSkill) {
+  let skillMatchLabel = 'No skill required';
+  if (hasText(requiredSkill)) {
+    skillMatchLabel = staff.hasSkill ? 'Matches ' + requiredSkill : 'Does not match ' + requiredSkill;
+  }
+
+  document.getElementById('confirm_request_title').textContent = selectedRequest.request_title;
+  document.getElementById('confirm_client_name').textContent = selectedRequest.company;
+  document.getElementById('confirm_staff_name').textContent = staff.name;
+  document.getElementById('confirm_skill_match').textContent = skillMatchLabel;
+
+  const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmAssignModal'));
+  modal.show();
+
+  document.getElementById('confirm_assign_btn').onclick = function () {
+    document.getElementById('assign_request_id').value = selectedRequest.request_id;
+    document.getElementById('assign_user_id').value = staff.user_id;
+    document.getElementById('assignForm').submit();
+  };
 }
 
 <?php if ($alertType && $alertMessage): ?>

@@ -1,5 +1,7 @@
 <?php
-
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 session_name('STAFF_SESSION');
 session_start();
 require_once __DIR__ . '/../config/database.php';
@@ -25,29 +27,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
     if ($action === 'create_quotation') {
-        $requestId   = $_POST['request_id'] ?? null;
+        $requestId    = $_POST['request_id'] ?? null;
         $projectScope = trim($_POST['project_scope'] ?? '');
-        $taxRate     = (float) ($_POST['tax_rate'] ?? 0);
-        $validUntil  = $_POST['valid_until'] ?: null;
-        $notes       = trim($_POST['notes'] ?? '');
+        $taxRate      = (float) ($_POST['tax_rate'] ?? 0);
+        $validUntil   = $_POST['valid_until'] ?: null;
         $descriptions = $_POST['item_description'] ?? [];
         $quantities   = $_POST['item_quantity'] ?? [];
         $unitPrices   = $_POST['item_unit_price'] ?? [];
 
         if (!$requestId || empty($descriptions)) {
             $_SESSION['alert_type'] = 'error';
-            $_SESSION['alert_message'] = 'Please select a service request and add at least one scope item.';
+            $_SESSION['alert_message'] = 'Please select a service transaction and add at least one scope item.';
             header('Location: cpq_quotations.php');
             exit;
         }
 
-        $reqStmt = $pdo->prepare("SELECT client_id FROM service_requests WHERE request_id = ?");
+        $reqStmt = $pdo->prepare(
+            "SELECT sr.client_id
+             FROM service_requests sr
+             LEFT JOIN quotations q ON q.request_id = sr.request_id AND q.status = 'Approved'
+             WHERE sr.request_id = ? AND q.quotation_id IS NULL"
+        );
         $reqStmt->execute([$requestId]);
         $req = $reqStmt->fetch();
 
         if (!$req) {
             $_SESSION['alert_type'] = 'error';
-            $_SESSION['alert_message'] = 'Selected service request was not found.';
+            $_SESSION['alert_message'] = 'This service transaction already has an approved quotation or was not found.';
             header('Location: cpq_quotations.php');
             exit;
         }
@@ -81,12 +87,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $insertQuotation = $pdo->prepare(
             "INSERT INTO quotations
-                (quotation_number, request_id, client_id, project_scope, status, subtotal, tax_rate, tax_amount, total_amount, valid_until, notes, prepared_by)
-             VALUES (?, ?, ?, ?, 'Draft', ?, ?, ?, ?, ?, ?, ?)"
+                (quotation_number, request_id, client_id, project_scope, status, subtotal, tax_rate, tax_amount, total_amount, valid_until, prepared_by)
+             VALUES (?, ?, ?, ?, 'Approved', ?, ?, ?, ?, ?, ?)"
         );
         $insertQuotation->execute([
             $quotationNumber, $requestId, $req['client_id'], $projectScope,
-            $subtotal, $taxRate, $taxAmount, $totalAmount, $validUntil, $notes, $_SESSION['user_id'],
+            $subtotal, $taxRate, $taxAmount, $totalAmount, $validUntil, $_SESSION['user_id'],
         ]);
         $quotationId = (int) $pdo->lastInsertId();
 
@@ -101,27 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->commit();
 
         $_SESSION['alert_type'] = 'success';
-        $_SESSION['alert_message'] = "Quotation {$quotationNumber} created successfully.";
-        header('Location: cpq_quotations.php');
-        exit;
-    }
-
-    if ($action === 'update_status') {
-        $quotationId = $_POST['quotation_id'] ?? null;
-        $newStatus   = $_POST['new_status'] ?? '';
-        $validStatuses = ['Draft', 'Approved', 'Rejected'];
-
-        if ($quotationId && in_array($newStatus, $validStatuses, true)) {
-            $stmt = $pdo->prepare("UPDATE quotations SET status = ? WHERE quotation_id = ?");
-            $stmt->execute([$newStatus, $quotationId]);
-
-            $_SESSION['alert_type'] = 'success';
-            $_SESSION['alert_message'] = "Quotation marked as {$newStatus}.";
-        } else {
-            $_SESSION['alert_type'] = 'error';
-            $_SESSION['alert_message'] = 'Unable to update quotation status.';
-        }
-
+        $_SESSION['alert_message'] = "Quotation {$quotationNumber} created and approved successfully.";
         header('Location: cpq_quotations.php');
         exit;
     }
@@ -136,7 +122,8 @@ $requestsStmt = $pdo->query(
             c.client_id, c.company_name
      FROM service_requests sr
      INNER JOIN clients c ON sr.client_id = c.client_id
-     WHERE sr.status = 'New'
+     LEFT JOIN quotations q ON q.request_id = sr.request_id AND q.status = 'Approved'
+     WHERE sr.status = 'New' AND q.quotation_id IS NULL
      ORDER BY sr.created_at DESC"
 );
 $serviceRequests = $requestsStmt->fetchAll();
@@ -147,18 +134,12 @@ $perPage     = 8;
 $page        = max(1, (int) ($_GET['page'] ?? 1));
 $offset      = ($page - 1) * $perPage;
 
-$statsStmt = $pdo->query("SELECT status, total_amount FROM quotations");
+$statsStmt = $pdo->query("SELECT total_amount FROM quotations WHERE status = 'Approved'");
 $statsRows = $statsStmt->fetchAll();
 
-$statusCounts = ['Draft' => 0, 'Approved' => 0, 'Rejected' => 0];
 $totalApprovedValue = 0.0;
 foreach ($statsRows as $row) {
-    if (isset($statusCounts[$row['status']])) {
-        $statusCounts[$row['status']]++;
-    }
-    if ($row['status'] === 'Approved') {
-        $totalApprovedValue += (float) $row['total_amount'];
-    }
+    $totalApprovedValue += (float) $row['total_amount'];
 }
 $totalQuotations = count($statsRows);
 
@@ -187,7 +168,7 @@ $countStmt->execute($queryParams);
 $filteredQuotationCount = (int) $countStmt->fetchColumn();
 $totalPages = max(1, (int) ceil($filteredQuotationCount / $perPage));
 
-$listQuery = "SELECT q.quotation_id, q.quotation_number, q.status, q.subtotal, q.tax_rate, q.tax_amount, q.total_amount, q.project_scope, q.valid_until, q.created_at, q.notes,
+$listQuery = "SELECT q.quotation_id, q.quotation_number, q.status, q.subtotal, q.tax_rate, q.tax_amount, q.total_amount, q.project_scope, q.valid_until, q.created_at,
             c.company_name, sr.request_title,
             u.firstname AS prepared_by_firstname, u.lastname AS prepared_by_lastname
      $baseQuery
@@ -353,26 +334,6 @@ body {
   box-shadow: 0 0 0 .2rem rgba(180, 67, 47, .25);
 }
 
-.btn-approve {
-  background-color: var(--success);
-  color: #fff;
-  border: 1px solid var(--success);
-  border-radius: 7px;
-  font-weight: 600;
-  font-size: .78rem;
-}
-.btn-approve:hover { background-color: #0F5F49; border-color: #0F5F49; color: #fff; }
-
-.btn-reject {
-  background-color: var(--danger);
-  color: #fff;
-  border: 1px solid var(--danger);
-  border-radius: 7px;
-  font-weight: 600;
-  font-size: .78rem;
-}
-.btn-reject:hover { background-color: #93382A; border-color: #93382A; color: #fff; }
-
 .table thead th {
   border-bottom: 1px solid var(--line) !important;
   color: var(--ink-soft);
@@ -386,65 +347,6 @@ body {
 
 .table td { border-bottom: 1px solid var(--line); color: var(--ink); vertical-align: middle; }
 .table-hover tbody tr:hover { background-color: var(--navy-soft); }
-
-.status-pill {
-  font-size: .7rem;
-  font-weight: 700;
-  padding: .32rem .7rem;
-  border-radius: 999px;
-  white-space: nowrap;
-  letter-spacing: .01em;
-  border: 1px solid transparent;
-  display: inline-block;
-}
-
-.status-draft { background-color: var(--navy-soft); color: var(--slate); border-color: var(--line); }
-.status-approved { background-color: var(--success-soft); color: var(--success-text); border-color: var(--success-border); }
-.status-rejected { background-color: var(--danger-soft); color: var(--danger-text); border-color: var(--danger-border); }
-
-.status-tabs {
-  display: flex;
-  gap: .4rem;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  border-bottom: 1px solid var(--line);
-  padding: 0 1.15rem;
-  background-color: var(--card);
-  border-radius: 12px 12px 0 0;
-}
-.status-tabs::-webkit-scrollbar { display: none; }
-
-.status-tab {
-  border: none;
-  background: none;
-  padding: .8rem .3rem;
-  font-size: .82rem;
-  font-weight: 600;
-  color: var(--ink-soft);
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  display: flex;
-  align-items: center;
-  gap: .4rem;
-  white-space: nowrap;
-  flex: 0 0 auto;
-}
-
-.status-tab:hover { color: var(--navy-deep); }
-.status-tab.active { color: var(--indigo-text); border-bottom-color: var(--indigo); }
-
-.status-tab .count-badge {
-  background-color: var(--navy-soft);
-  color: var(--slate);
-  font-size: .68rem;
-  font-weight: 700;
-  padding: .1rem .45rem;
-  border-radius: 999px;
-}
-
-.status-tab.active .count-badge { background-color: var(--indigo-soft); color: var(--indigo-text); }
 
 .search-spinner {
   display: none;
@@ -492,15 +394,21 @@ body {
 }
 
 .btn-close-remove {
-  color: var(--danger-text);
-  background-color: var(--danger-soft);
-  border: 1px solid var(--danger-border);
+  background-color: #9B2C2C;
+  color: #F5E1E1;
+  border: 1px solid #7F1D1D;
   border-radius: 7px;
   font-size: .85rem;
   line-height: 1;
-  padding: .3rem .5rem;
+  padding: .35rem .55rem;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease;
 }
-.btn-close-remove:hover { background-color: #F5DED7; color: var(--danger); }
+.btn-close-remove:hover { background-color: #7F1D1D; border-color: #631717; color: #fff; }
+.btn-close-remove:active { background-color: #6B1717; border-color: #501111; color: #fff; }
+.btn-close-remove:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 .2rem rgba(155, 44, 44, .25);
+}
 
 .empty-state { color: var(--ink-soft); }
 .empty-state i { color: #C7D0D6; }
@@ -646,7 +554,6 @@ body {
   .stat-card { padding: .75rem .85rem; }
   .stat-card .stat-label { font-size: .66rem; }
   .stat-card .stat-value { font-size: 1.15rem; }
-  .status-tab { font-size: .78rem; padding: .7rem .25rem; }
   .table td, .table th { font-size: .8rem; }
   .quote-panel-title { font-size: .88rem; margin-bottom: .8rem; }
   .quote-panel-title .step-icon { width: 24px; height: 24px; font-size: .68rem; }
@@ -664,21 +571,17 @@ body {
   .form-control, .form-select, .input-group-text { font-size: .8rem; padding-top: .4rem; padding-bottom: .4rem; }
   .input-group-text i { font-size: .78rem; }
   .btn { font-size: .8rem; }
-  .btn-ghost, .btn-approve, .btn-reject { font-size: .74rem; padding: .32rem .55rem; }
+  .btn-ghost { font-size: .74rem; padding: .32rem .55rem; }
 
   .stat-card { padding: .6rem .7rem; border-radius: 10px; }
   .stat-card .stat-label { font-size: .6rem; letter-spacing: .03em; }
   .stat-card .stat-value { font-size: 1rem; }
   .stat-card .stat-value.stat-money { font-size: .82rem !important; }
 
-  .status-tabs { padding: 0 .65rem; gap: .75rem; }
-  .status-tab { font-size: .74rem; padding: .6rem .15rem; gap: .3rem; }
-  .status-tab .count-badge { font-size: .6rem; padding: .05rem .38rem; }
-
   .table-responsive { overflow: visible; }
   #quotationsTable thead { display: none; }
   #quotationsTable, #quotationsTable tbody, #quotationsTable tr, #quotationsTable td { display: block; width: 100%; }
-  #quotationsTable tbody tr[data-status] {
+  #quotationsTable tbody tr {
     border: 1px solid var(--line);
     border-radius: 10px;
     margin: .6rem .65rem;
@@ -686,7 +589,7 @@ body {
     background-color: #fff;
   }
   #quotationsTable.table-hover tbody tr:hover { background-color: #fff; }
-  #quotationsTable tbody tr[data-status] td {
+  #quotationsTable tbody tr td {
     display: flex !important;
     justify-content: space-between;
     align-items: flex-start;
@@ -696,7 +599,7 @@ body {
     font-size: .78rem;
     text-align: right;
   }
-  #quotationsTable tbody tr[data-status] td .mobile-row-label {
+  #quotationsTable tbody tr td .mobile-row-label {
     display: block;
     font-size: .62rem;
     font-weight: 700;
@@ -707,14 +610,14 @@ body {
     flex: 0 0 auto;
     padding-top: .1rem;
   }
-  #quotationsTable tbody tr[data-status] td .cell-body { flex: 1 1 auto; min-width: 0; word-break: break-word; }
-  #quotationsTable tbody tr[data-status] td.cell-actions {
+  #quotationsTable tbody tr td .cell-body { flex: 1 1 auto; min-width: 0; word-break: break-word; }
+  #quotationsTable tbody tr td.cell-actions {
     justify-content: flex-end;
     border-top: 1px solid var(--line);
     margin-top: .35rem;
     padding-top: .5rem;
   }
-  #quotationsTable tbody tr[data-status] td.cell-actions .mobile-row-label { display: none; }
+  #quotationsTable tbody tr td.cell-actions .mobile-row-label { display: none; }
 
   .card-footer .pagination .page-link { font-size: .75rem; padding: .25rem .5rem; }
 
@@ -732,7 +635,6 @@ body {
   .request-preview-box { padding: .7rem .75rem; }
   .request-preview-box .request-preview-details { font-size: .78rem; }
   .form-label { font-size: .68rem; }
-  .status-pill { font-size: .64rem; padding: .25rem .55rem; }
   .item-row { padding: .6rem; }
   .line-total-display { font-size: .78rem; }
   .totals-box { padding: .75rem .85rem; }
@@ -744,7 +646,7 @@ body {
 @media (max-width: 575.98px) {
   .dashboard-content { padding: .5rem !important; }
   .stat-card .stat-value { font-size: .95rem; }
-  #quotationsTable tbody tr[data-status] td { font-size: .74rem; }
+  #quotationsTable tbody tr td { font-size: .74rem; }
   .modal-title { font-size: .88rem !important; }
 }
 
@@ -875,7 +777,7 @@ body {
             <div class="col-12 col-lg-6">
               <div class="input-group">
                 <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass" style="color:var(--ink-soft);"></i></span>
-                <input type="text" name="search" id="quotationSearchInput" class="form-control" placeholder="Search quotation #, company, or request" value="<?= htmlspecialchars($searchTerm) ?>" autocomplete="off">
+                <input type="text" name="search" id="quotationSearchInput" class="form-control" placeholder="Search quotation #, company, or transaction" value="<?= htmlspecialchars($searchTerm) ?>" autocomplete="off">
                 <span class="input-group-text bg-white"><span class="search-spinner" id="searchSpinner"></span></span>
               </div>
             </div>
@@ -900,64 +802,37 @@ body {
       </div>
 
       <div class="row g-2 g-md-3 mb-3">
-        <div class="col-6 col-lg-3">
+        <div class="col-6 col-lg-6">
           <div class="stat-card">
             <div class="stat-label">Total Quotations</div>
             <div class="stat-value"><?= (int) $totalQuotations ?></div>
           </div>
         </div>
-        <div class="col-6 col-lg-3">
+        <div class="col-6 col-lg-6">
           <div class="stat-card">
-            <div class="stat-label">Pending (Draft)</div>
-            <div class="stat-value"><?= (int) $statusCounts['Draft'] ?></div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div class="stat-card">
-            <div class="stat-label">Approved</div>
-            <div class="stat-value" style="color:var(--success-text);"><?= (int) $statusCounts['Approved'] ?></div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div class="stat-card">
-            <div class="stat-label">Approved Value</div>
-            <div class="stat-value stat-money" style="font-size:1.15rem; color:var(--success-text);">&#8369;<?= number_format($totalApprovedValue, 2) ?></div>
+            <div class="stat-label">Total Value</div>
+            <div class="stat-value stat-money" style="font-size:1.3rem; color:var(--success-text);">&#8369;<?= number_format($totalApprovedValue, 2) ?></div>
           </div>
         </div>
       </div>
 
       <section class="card overflow-hidden">
-        <nav class="status-tabs">
-          <button type="button" class="status-tab active" data-filter="all">
-            All <span class="count-badge"><?= (int) $totalQuotations ?></span>
-          </button>
-          <button type="button" class="status-tab" data-filter="Draft">
-            Draft <span class="count-badge"><?= (int) $statusCounts['Draft'] ?></span>
-          </button>
-          <button type="button" class="status-tab" data-filter="Approved">
-            Approved <span class="count-badge"><?= (int) $statusCounts['Approved'] ?></span>
-          </button>
-          <button type="button" class="status-tab" data-filter="Rejected">
-            Rejected <span class="count-badge"><?= (int) $statusCounts['Rejected'] ?></span>
-          </button>
-        </nav>
         <div class="table-responsive">
           <table class="table table-hover align-middle mb-0" id="quotationsTable">
             <thead>
               <tr>
                 <th scope="col">Quotation #</th>
-                <th scope="col">Client / Request</th>
+                <th scope="col">Client / Transaction</th>
                 <th scope="col" class="d-none d-md-table-cell">Prepared By</th>
                 <th scope="col">Total</th>
                 <th scope="col" class="d-none d-lg-table-cell">Valid Until</th>
-                <th scope="col">Status</th>
                 <th scope="col" class="text-end">Action</th>
               </tr>
             </thead>
             <tbody id="quotationsTableBody">
               <?php if (empty($quotations)): ?>
                 <tr>
-                  <td colspan="7">
+                  <td colspan="6">
                     <div class="empty-state text-center py-5">
                       <i class="fa-regular fa-file-lines fs-3 mb-2 d-block"></i>
                       <p class="small mb-0">No quotations found.</p>
@@ -966,12 +841,7 @@ body {
                 </tr>
               <?php else: ?>
                 <?php foreach ($quotations as $q): ?>
-                  <?php
-                    $statusClass = 'status-draft';
-                    if ($q['status'] === 'Approved') { $statusClass = 'status-approved'; }
-                    if ($q['status'] === 'Rejected') { $statusClass = 'status-rejected'; }
-                  ?>
-                  <tr data-status="<?= htmlspecialchars($q['status']) ?>">
+                  <tr>
                     <td class="small fw-semibold">
                       <span class="mobile-row-label">Quotation #</span>
                       <span class="cell-body fw-semibold"><?= htmlspecialchars($q['quotation_number']) ?></span>
@@ -995,17 +865,12 @@ body {
                       <span class="mobile-row-label">Valid Until</span>
                       <span class="cell-body"><?= $q['valid_until'] ? htmlspecialchars(date('M d, Y', strtotime($q['valid_until']))) : '&mdash;' ?></span>
                     </td>
-                    <td>
-                      <span class="mobile-row-label">Status</span>
-                      <span class="cell-body"><span class="status-pill <?= $statusClass ?>"><?= htmlspecialchars($q['status']) ?></span></span>
-                    </td>
                     <td class="text-end cell-actions">
                       <span class="mobile-row-label">Action</span>
                       <span class="cell-body d-flex justify-content-end gap-1 flex-wrap">
                         <button type="button" class="btn btn-ghost btn-sm view-quotation-btn" title="View quotation"
                           data-quotation='<?= htmlspecialchars(json_encode([
                             "number" => $q["quotation_number"],
-                            "status" => $q["status"],
                             "company" => $q["company_name"],
                             "request" => $q["request_title"],
                             "project_scope" => $q["project_scope"] ?? '',
@@ -1014,7 +879,6 @@ body {
                             "tax_amount" => number_format((float) $q["tax_amount"], 2),
                             "total" => number_format((float) $q["total_amount"], 2),
                             "valid_until" => $q["valid_until"] ? date('M d, Y', strtotime($q["valid_until"])) : null,
-                            "notes" => $q["notes"] ?? '',
                             "prepared_by" => trim(($q["prepared_by_firstname"] ?? '') . ' ' . ($q["prepared_by_lastname"] ?? '')),
                             "created_at" => $q["created_at"] ? date('M d, Y g:i A', strtotime($q["created_at"])) : null,
                             "items" => array_map(function ($it) {
@@ -1025,26 +889,9 @@ body {
                                     "line_total" => number_format((float) $it["line_total"], 2),
                                 ];
                             }, $itemsByQuotation[$q["quotation_id"]] ?? []),
-                            "quotation_id" => $q["quotation_id"],
                           ]), ENT_QUOTES) ?>'>
                           <i class="fa-solid fa-eye"></i>
                         </button>
-                        <?php if ($q['status'] === 'Draft'): ?>
-                          <form method="POST" class="d-inline-block m-0">
-                            <input type="hidden" name="action" value="update_status">
-                            <input type="hidden" name="quotation_id" value="<?= (int) $q['quotation_id'] ?>">
-                            <button type="submit" name="new_status" value="Approved" class="btn btn-approve btn-sm">
-                              <i class="fa-solid fa-check me-1"></i>Approve
-                            </button>
-                          </form>
-                          <form method="POST" class="d-inline-block m-0">
-                            <input type="hidden" name="action" value="update_status">
-                            <input type="hidden" name="quotation_id" value="<?= (int) $q['quotation_id'] ?>">
-                            <button type="submit" name="new_status" value="Rejected" class="btn btn-reject btn-sm">
-                              <i class="fa-solid fa-xmark me-1"></i>Reject
-                            </button>
-                          </form>
-                        <?php endif; ?>
                       </span>
                     </td>
                   </tr>
@@ -1102,13 +949,13 @@ body {
                   <div class="quote-panel">
                     <div class="quote-panel-title">
                       <span class="step-icon"><i class="fa-solid fa-clipboard-list"></i></span>
-                      Service Request
+                      Service Transaction
                     </div>
 
                     <div class="mb-3">
-                      <label class="form-label">Select Request</label>
+                      <label class="form-label">Select Transaction</label>
                       <select class="form-select" name="request_id" id="requestSelect" required>
-                        <option value="" selected disabled>Select a service request</option>
+                        <option value="" selected disabled>Select a service transaction</option>
                         <?php foreach ($serviceRequests as $req): ?>
                           <option value="<?= $req['request_id'] ?>"
                             data-company="<?= htmlspecialchars($req['company_name']) ?>"
@@ -1128,7 +975,7 @@ body {
                           <div class="small fw-semibold" id="requestPreviewCompany"></div>
                         </div>
                         <div class="col-12 col-sm-4">
-                          <div class="view-section-label">Request Title</div>
+                          <div class="view-section-label">Title</div>
                           <div class="small fw-semibold" id="requestPreviewTitle"></div>
                         </div>
                         <div class="col-12 col-sm-4">
@@ -1182,7 +1029,7 @@ body {
                       </div>
                       <div class="col-6 col-lg-12 col-xl-6">
                         <label class="form-label">Valid Until</label>
-                        <input type="date" class="form-control" name="valid_until">
+                        <input type="date" class="form-control" name="valid_until" min="<?= date('Y-m-d') ?>">
                       </div>
                     </div>
                   </div>
@@ -1199,14 +1046,6 @@ body {
                     </div>
                   </div>
 
-                  <div class="quote-panel">
-                    <div class="quote-panel-title">
-                      <span class="step-icon"><i class="fa-solid fa-note-sticky"></i></span>
-                      Notes
-                    </div>
-                    <textarea class="form-control" name="notes" rows="4" placeholder="Optional notes for this quotation"></textarea>
-                  </div>
-
                 </div>
               </div>
 
@@ -1215,7 +1054,7 @@ body {
         </div>
 
         <div class="modal-footer">
-          <button type="submit" class="btn btn-teal-solid px-4 w-100 w-sm-auto">Save as Draft</button>
+          <button type="submit" class="btn btn-teal-solid px-4 w-100 w-sm-auto">Save Quotation</button>
         </div>
       </form>
     </div>
@@ -1248,11 +1087,7 @@ body {
                       <div class="fw-semibold" id="view_client_name"></div>
                       <div class="small" id="view_request_title" style="color:var(--ink-soft);"></div>
                     </div>
-                    <div class="col-6 col-sm-3">
-                      <div class="view-section-label">Status</div>
-                      <span class="status-pill" id="view_status_badge"></span>
-                    </div>
-                    <div class="col-6 col-sm-3">
+                    <div class="col-6 col-sm-6">
                       <div class="view-section-label">Valid Until</div>
                       <div class="small fw-semibold" id="view_valid_until"></div>
                     </div>
@@ -1311,31 +1146,9 @@ body {
                     <div class="row-line"><span>Tax</span><span id="view_tax"></span></div>
                     <div class="row-line grand"><span>Total</span><span id="view_total"></span></div>
                   </div>
-                </div>
-
-                <div class="quote-panel">
-                  <div class="quote-panel-title">
-                    <span class="step-icon"><i class="fa-solid fa-note-sticky"></i></span>
-                    Notes
-                  </div>
-                  <div class="view-notes-box" id="view_notes"></div>
-                </div>
-
-                <div class="quote-panel" id="view_status_actions">
-                  <div class="quote-panel-title">
-                    <span class="step-icon"><i class="fa-solid fa-gavel"></i></span>
-                    Actions
-                  </div>
-                  <form method="POST" id="statusForm" class="d-flex flex-column gap-2">
-                    <input type="hidden" name="action" value="update_status">
-                    <input type="hidden" name="quotation_id" id="status_quotation_id">
-                    <button type="submit" name="new_status" value="Approved" class="btn btn-approve w-100">
-                      <i class="fa-solid fa-check me-1"></i> Approve Quotation
-                    </button>
-                    <button type="submit" name="new_status" value="Rejected" class="btn btn-reject w-100">
-                      <i class="fa-solid fa-xmark me-1"></i> Reject Quotation
-                    </button>
-                  </form>
+                  <button type="button" class="btn w-100 mt-3" id="printReceiptBtnSummary" style="background-color: transparent; border: none; color: var(--navy); font-weight: 600; box-shadow: none;">
+                    <i class="fa-solid fa-print me-1"></i> Print Receipt
+                  </button>
                 </div>
 
               </div>
@@ -1345,9 +1158,59 @@ body {
         </div>
       </div>
 
+      <div class="modal-footer">
+      </div>
+
     </div>
   </div>
 </div>
+
+<!-- Hidden printable receipt template -->
+<div id="receiptPrintArea"></div>
+
+<style>
+#receiptPrintArea { display: none; }
+
+@media print {
+  @page { margin: 0.3in; }
+  body * { visibility: hidden; }
+  #receiptPrintArea, #receiptPrintArea * { visibility: visible; }
+  #receiptPrintArea {
+    display: flex !important;
+    justify-content: center;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+  }
+  .receipt-box {
+    font-family: "Courier New", Courier, monospace;
+    color: #000 !important;
+    background: #fff;
+    padding: 20px;
+    font-size: 20px;
+    font-weight: 700;
+    width: 620px;
+    text-align: center;
+  }
+  .receipt-box, .receipt-box * {
+    color: #000 !important;
+    opacity: 1 !important;
+    text-decoration: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .receipt-box .r-center { text-align: center; }
+  .receipt-box .r-title { font-size: 24px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+  .receipt-box .r-sub { font-size: 17px; margin-top: 4px; font-weight: 700; }
+  .receipt-box .r-line { border: none; border-top: 2px dashed #000; margin: 14px 0; }
+  .receipt-box .r-row { display: flex; justify-content: space-between; gap: 10px; margin: 5px 0; text-align: left; }
+  .receipt-box .r-item { margin: 10px 0; text-align: left; }
+  .receipt-box .r-item-desc { font-weight: 800; }
+  .receipt-box .r-total-row { display: flex; justify-content: space-between; font-weight: 800; font-size: 22px; margin-top: 8px; }
+}
+</style>
 
 <script src="../assets/vendor/bootstrap-5.3.8/js/bootstrap.bundle.min.js"></script>
 <script>
@@ -1429,7 +1292,7 @@ function updateRequestPreview() {
 
   requestPreviewCompany.textContent = company;
   requestPreviewTitle.textContent = title;
-  requestPreviewDetails.textContent = details !== '' ? details : 'No additional details were provided for this request.';
+  requestPreviewDetails.textContent = details !== '' ? details : 'No additional details were provided for this transaction.';
   requestPreviewSkill.textContent = skill !== '' ? skill : 'Not specified / any skill';
   requestPreviewBox.classList.add('is-visible');
 }
@@ -1508,15 +1371,12 @@ document.getElementById('newQuotationModal').addEventListener('show.bs.modal', f
   recalculateTotals();
 });
 
-const statusPillClassMap = {
-  Draft: 'status-draft',
-  Approved: 'status-approved',
-  Rejected: 'status-rejected',
-};
+let currentQuotationData = null;
 
 document.querySelectorAll('.view-quotation-btn').forEach(function (btn) {
   btn.addEventListener('click', function () {
     const data = JSON.parse(this.dataset.quotation);
+    currentQuotationData = data;
 
     document.getElementById('view_quotation_number').textContent = data.number;
     document.getElementById('view_client_name').textContent = data.company;
@@ -1527,20 +1387,12 @@ document.querySelectorAll('.view-quotation-btn').forEach(function (btn) {
     document.getElementById('view_valid_until').textContent = data.valid_until || '\u2014';
     document.getElementById('view_prepared_by').textContent = (data.prepared_by && data.prepared_by.trim() !== '') ? data.prepared_by : '\u2014';
     document.getElementById('view_created_at').textContent = data.created_at || '\u2014';
-    document.getElementById('status_quotation_id').value = data.quotation_id;
 
-    const statusBadge = document.getElementById('view_status_badge');
-    statusBadge.textContent = data.status;
-    statusBadge.className = 'status-pill ' + (statusPillClassMap[data.status] || 'status-draft');
-
-    document.getElementById('view_notes').textContent = (data.notes && data.notes.trim() !== '') ? data.notes : '\u2014';
     document.getElementById('view_project_scope').textContent = (data.project_scope && data.project_scope.trim() !== '') ? data.project_scope : 'No project scope provided.';
-
-    const statusActions = document.getElementById('view_status_actions');
-    statusActions.style.display = (data.status === 'Draft') ? '' : 'none';
 
     const body = document.getElementById('view_items_body');
     body.innerHTML = '';
+
     if (data.items.length === 0) {
       body.innerHTML = '<tr><td colspan="4" class="small text-center" style="color:var(--ink-soft);">No items recorded.</td></tr>';
     } else {
@@ -1566,16 +1418,54 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-document.querySelectorAll('.status-tab').forEach(function (tab) {
-  tab.addEventListener('click', function () {
-    document.querySelectorAll('.status-tab').forEach(function (t) { t.classList.remove('active'); });
-    tab.classList.add('active');
-    const filter = tab.dataset.filter;
-    document.querySelectorAll('#quotationsTableBody tr[data-status]').forEach(function (row) {
-      row.style.display = (filter === 'all' || row.dataset.status === filter) ? '' : 'none';
-    });
-  });
+document.getElementById('printReceiptBtnSummary').addEventListener('click', function () {
+  if (!currentQuotationData) return;
+  printReceipt(currentQuotationData);
 });
+
+function printReceipt(data) {
+  let itemsHtml = '';
+  if (data.items.length === 0) {
+    itemsHtml = '<div class="r-row"><span>No items recorded.</span></div>';
+  } else {
+    data.items.forEach(function (item) {
+      itemsHtml +=
+        '<div class="r-item">' +
+          '<div class="r-item-desc">' + escapeHtml(item.description) + '</div>' +
+          '<div class="r-row">' +
+            '<span>' + escapeHtml(item.quantity) + ' x \u20B1' + escapeHtml(item.unit_price) + '</span>' +
+            '<span>\u20B1' + escapeHtml(item.line_total) + '</span>' +
+          '</div>' +
+        '</div>';
+    });
+  }
+
+  const html =
+    '<div class="receipt-box">' +
+      '<div class="r-center">' +
+        '<div class="r-title r-underline">KMP Integrated Enterprise, Inc.</div>' +
+        '<div class="r-sub">Quotation Receipt</div>' +
+        '<div class="r-sub">' + escapeHtml(data.number) + '</div>' +
+      '</div>' +
+      '<hr class="r-line">' +
+      '<div class="r-row"><span>Client:</span><span>' + escapeHtml(data.company) + '</span></div>' +
+      '<div class="r-row"><span>Transaction:</span><span>' + escapeHtml(data.request) + '</span></div>' +
+      '<div class="r-row"><span>Date:</span><span>' + escapeHtml(data.created_at || '-') + '</span></div>' +
+      '<div class="r-row"><span>Valid Until:</span><span>' + escapeHtml(data.valid_until || '-') + '</span></div>' +
+      '<div class="r-row"><span>Prepared By:</span><span>' + escapeHtml(data.prepared_by || '-') + '</span></div>' +
+      '<hr class="r-line">' +
+      '<div class="r-center r-underline" style="font-weight:bold;">Scope Items</div>' +
+      itemsHtml +
+      '<hr class="r-line">' +
+      '<div class="r-row"><span>Subtotal</span><span>\u20B1' + escapeHtml(data.subtotal) + '</span></div>' +
+      '<div class="r-row"><span>Tax (' + escapeHtml(data.tax_rate) + '%)</span><span>\u20B1' + escapeHtml(data.tax_amount) + '</span></div>' +
+      '<hr class="r-line">' +
+      '<div class="r-total-row"><span>TOTAL</span><span>\u20B1' + escapeHtml(data.total) + '</span></div>' +
+    '</div>';
+
+  document.getElementById('receiptPrintArea').innerHTML = html;
+  window.print();
+}
 
 <?php if ($alertType && $alertMessage): ?>
 window.addEventListener('DOMContentLoaded', function () {
