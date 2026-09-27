@@ -223,17 +223,12 @@ function navActive(string $page, string $currentPage): string
       </li>
       <li class="nav-item mb-1">
         <a href="cpq_quotations.php" title="CPQ &amp; Quotations" class="nav-link <?= navActive('cpq_quotations.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
-          <i class="fa-solid fa-file-invoice-dollar" style="width:18px;"></i> <span class="sidebar-text">CPQ &amp; Quotations</span>
+          <i class="fa-solid fa-file-invoice-dollar" style="width:18px;"></i> <span class="sidebar-text">CPQ &amp; Scope</span>
         </a>
       </li>
       <li class="nav-item mb-1">
         <a href="calendar_deadlines.php" title="Calendar Deadlines" class="nav-link <?= navActive('calendar_deadlines.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
           <i class="fa-solid fa-calendar-days" style="width:18px;"></i> <span class="sidebar-text">Calendar Deadlines</span>
-        </a>
-      </li>
-      <li class="nav-item mb-1">
-        <a href="schedule.php" title="Schedule" class="nav-link <?= navActive('schedule.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
-          <i class="fa-solid fa-calendar-check" style="width:18px;"></i> <span class="sidebar-text">Schedule</span>
         </a>
       </li>
     </ul>

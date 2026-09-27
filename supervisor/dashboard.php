@@ -11,20 +11,81 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'supervisor') 
 
 $pdo = getConnection();
 
+$filterMode  = $_GET['filter_mode'] ?? '';
+$dateStart   = $_GET['date_start'] ?? '';
+$dateEnd     = $_GET['date_end'] ?? '';
+$dateSingle  = $_GET['date_single'] ?? '';
+
+$validDate = function (string $d): bool {
+    if ($d === '') return false;
+    $dt = DateTime::createFromFormat('Y-m-d', $d);
+    return $dt && $dt->format('Y-m-d') === $d;
+};
+
+$hasFilter = false;
+$filterWhereSr = '';
+$filterWhereQt = '';
+$filterWhereCt = '';
+$filterParams  = [];
+$filterLabel   = '';
+
+if ($filterMode === 'range' && $validDate($dateStart) && $validDate($dateEnd)) {
+    $hasFilter     = true;
+    $filterWhereSr = " AND DATE(sr.created_at) BETWEEN :fstart AND :fend ";
+    $filterWhereQt = " AND DATE(q.created_at) BETWEEN :fstart AND :fend ";
+    $filterWhereCt = " AND DATE(created_at) BETWEEN :fstart AND :fend ";
+    $filterParams  = [':fstart' => $dateStart, ':fend' => $dateEnd];
+    $filterLabel   = 'Filtered: ' . date('M d, Y', strtotime($dateStart)) . ' – ' . date('M d, Y', strtotime($dateEnd));
+} elseif ($filterMode === 'single' && $validDate($dateSingle)) {
+    $hasFilter     = true;
+    $filterWhereSr = " AND DATE(sr.created_at) = :fsingle ";
+    $filterWhereQt = " AND DATE(q.created_at) = :fsingle ";
+    $filterWhereCt = " AND DATE(created_at) = :fsingle ";
+    $filterParams  = [':fsingle' => $dateSingle];
+    $filterLabel   = 'Filtered: ' . date('M d, Y', strtotime($dateSingle));
+}
+
 $totalClients = (int) $pdo->query('SELECT COUNT(*) FROM clients')->fetchColumn();
 
-$newRequests        = (int) $pdo->query("SELECT COUNT(*) FROM service_requests WHERE status = 'New'")->fetchColumn();
-$inProgressRequests = (int) $pdo->query("SELECT COUNT(*) FROM service_requests WHERE status = 'In Progress'")->fetchColumn();
-$completedRequests  = (int) $pdo->query("SELECT COUNT(*) FROM service_requests WHERE status = 'Completed'")->fetchColumn();
-$cancelledRequests  = (int) $pdo->query("SELECT COUNT(*) FROM service_requests WHERE status = 'Cancelled'")->fetchColumn();
+$newRequestsStmt = $pdo->prepare("SELECT COUNT(*) FROM service_requests sr WHERE status = 'New' $filterWhereSr");
+$newRequestsStmt->execute($filterParams);
+$newRequests = (int) $newRequestsStmt->fetchColumn();
 
-$draftQuotations    = (int) $pdo->query("SELECT COUNT(*) FROM quotations WHERE status = 'Draft'")->fetchColumn();
-$approvedQuotations = (int) $pdo->query("SELECT COUNT(*) FROM quotations WHERE status = 'Approved'")->fetchColumn();
-$rejectedQuotations = (int) $pdo->query("SELECT COUNT(*) FROM quotations WHERE status = 'Rejected'")->fetchColumn();
+$inProgressStmt = $pdo->prepare("SELECT COUNT(*) FROM service_requests sr WHERE status = 'In Progress' $filterWhereSr");
+$inProgressStmt->execute($filterParams);
+$inProgressRequests = (int) $inProgressStmt->fetchColumn();
 
-$draftContracts    = (int) $pdo->query("SELECT COUNT(*) FROM contracts WHERE status = 'Draft'")->fetchColumn();
-$approvedContracts = (int) $pdo->query("SELECT COUNT(*) FROM contracts WHERE status = 'Approved'")->fetchColumn();
-$rejectedContracts = (int) $pdo->query("SELECT COUNT(*) FROM contracts WHERE status = 'Rejected'")->fetchColumn();
+$completedStmt = $pdo->prepare("SELECT COUNT(*) FROM service_requests sr WHERE status = 'Completed' $filterWhereSr");
+$completedStmt->execute($filterParams);
+$completedRequests = (int) $completedStmt->fetchColumn();
+
+$cancelledStmt = $pdo->prepare("SELECT COUNT(*) FROM service_requests sr WHERE status = 'Cancelled' $filterWhereSr");
+$cancelledStmt->execute($filterParams);
+$cancelledRequests = (int) $cancelledStmt->fetchColumn();
+
+$draftQuotationsStmt = $pdo->prepare("SELECT COUNT(*) FROM quotations q WHERE status = 'Draft' $filterWhereQt");
+$draftQuotationsStmt->execute($filterParams);
+$draftQuotations = (int) $draftQuotationsStmt->fetchColumn();
+
+$approvedQuotationsStmt = $pdo->prepare("SELECT COUNT(*) FROM quotations q WHERE status = 'Approved' $filterWhereQt");
+$approvedQuotationsStmt->execute($filterParams);
+$approvedQuotations = (int) $approvedQuotationsStmt->fetchColumn();
+
+$rejectedQuotationsStmt = $pdo->prepare("SELECT COUNT(*) FROM quotations q WHERE status = 'Rejected' $filterWhereQt");
+$rejectedQuotationsStmt->execute($filterParams);
+$rejectedQuotations = (int) $rejectedQuotationsStmt->fetchColumn();
+
+$draftContractsStmt = $pdo->prepare("SELECT COUNT(*) FROM contracts WHERE status = 'Draft' $filterWhereCt");
+$draftContractsStmt->execute($filterParams);
+$draftContracts = (int) $draftContractsStmt->fetchColumn();
+
+$approvedContractsStmt = $pdo->prepare("SELECT COUNT(*) FROM contracts WHERE status = 'Approved' $filterWhereCt");
+$approvedContractsStmt->execute($filterParams);
+$approvedContracts = (int) $approvedContractsStmt->fetchColumn();
+
+$rejectedContractsStmt = $pdo->prepare("SELECT COUNT(*) FROM contracts WHERE status = 'Rejected' $filterWhereCt");
+$rejectedContractsStmt->execute($filterParams);
+$rejectedContracts = (int) $rejectedContractsStmt->fetchColumn();
 
 $awaitingAssignment = (int) $pdo->query(
     "SELECT COUNT(*) FROM service_requests sr
@@ -34,22 +95,26 @@ $awaitingAssignment = (int) $pdo->query(
 
 $activeStaffCount = (int) $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'Staff' AND status = 'Active'")->fetchColumn();
 
-$recentRequestsStmt = $pdo->query(
+$recentRequestsStmt = $pdo->prepare(
     "SELECT sr.request_id, sr.request_title, sr.status, sr.created_at, c.company_name
      FROM service_requests sr
      INNER JOIN clients c ON c.client_id = sr.client_id
+     WHERE 1=1 $filterWhereSr
      ORDER BY sr.created_at DESC
      LIMIT 5"
 );
+$recentRequestsStmt->execute($filterParams);
 $recentRequests = $recentRequestsStmt->fetchAll();
 
-$recentQuotationsStmt = $pdo->query(
+$recentQuotationsStmt = $pdo->prepare(
     "SELECT q.quotation_number, q.status, q.total_amount, q.created_at, c.company_name
      FROM quotations q
      INNER JOIN clients c ON c.client_id = q.client_id
+     WHERE 1=1 $filterWhereQt
      ORDER BY q.created_at DESC
      LIMIT 5"
 );
+$recentQuotationsStmt->execute($filterParams);
 $recentQuotations = $recentQuotationsStmt->fetchAll();
 
 $staffWorkloadStmt = $pdo->query(
@@ -155,7 +220,8 @@ body {
   padding: 1rem 1.15rem;
 }
 .card-header h2 { color: var(--ink); letter-spacing: -0.01em; }
-.card-header p { color: var(--ink-soft) !important; }
+.card-header p { color: var(--ink-soft) !important; margin-bottom: 0; }
+.card-header.d-flex { flex-wrap: wrap; row-gap: .5rem; }
 
 .metric-card {
   border-radius: 12px;
@@ -163,6 +229,7 @@ body {
   background-color: var(--card);
   padding: 1.1rem 1.2rem;
   height: 100%;
+  overflow: hidden;
 }
 .metric-icon {
   width: 42px;
@@ -174,7 +241,7 @@ body {
   font-size: 1.05rem;
   flex-shrink: 0;
 }
-.metric-label { font-size: .72rem; color: var(--ink-soft); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+.metric-label { font-size: .72rem; color: var(--ink-soft); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; word-break: break-word; }
 .metric-value { font-size: 1.5rem; font-weight: 700; font-family: 'Lexend', sans-serif; color: var(--navy-deep); }
 
 .chart-legend-item {
@@ -183,6 +250,7 @@ body {
   gap: .5rem;
   font-size: .78rem;
   color: var(--ink-soft);
+  white-space: nowrap;
 }
 .chart-legend-dot {
   width: 9px;
@@ -190,6 +258,98 @@ body {
   border-radius: 50%;
   flex-shrink: 0;
 }
+.chart-legend-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .9rem 1.4rem;
+  justify-content: center;
+}
+
+.approved-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.6rem 0;
+  gap: .4rem;
+}
+.approved-stat .approved-value {
+  font-family: 'Lexend', sans-serif;
+  font-size: 2.4rem;
+  font-weight: 700;
+  color: var(--success-text);
+  line-height: 1;
+}
+.approved-stat .approved-label {
+  font-size: .78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--ink-soft);
+}
+.approved-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background-color: var(--success-soft);
+  color: var(--success-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  margin-bottom: .2rem;
+}
+.approval-split {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 1rem;
+  padding: .6rem 0;
+}
+.approval-split-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: .35rem;
+  flex: 1;
+}
+.approval-split-item .approved-value {
+  font-family: 'Lexend', sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--success-text);
+  line-height: 1;
+}
+.approval-split-item .approved-label {
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  color: var(--ink-soft);
+}
+.approval-divider {
+  width: 1px;
+  align-self: stretch;
+  background-color: var(--line);
+}
+
+body { letter-spacing: -0.005em; }
+
+.card {
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04) !important;
+  transition: box-shadow .15s ease;
+}
+.card:hover { box-shadow: 0 4px 14px rgba(15, 23, 42, .06) !important; }
+
+.metric-card {
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+}
+
+.dashboard-title {
+  font-size: 1.15rem !important;
+}
+.dashboard-topbar { padding-top: .75rem; padding-bottom: .75rem; }
 
 .status-pill {
   font-size: .68rem;
@@ -256,6 +416,164 @@ body {
   font-size: .78rem;
 }
 .btn-view-all:hover { background-color: #E4E8F0; color: var(--navy); }
+
+.btn-ghost {
+  background-color: var(--navy-soft);
+  color: var(--navy);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font-weight: 600;
+  font-size: .8rem;
+}
+.btn-ghost:hover { background-color: #E4E8F0; color: var(--navy); }
+
+.btn-print-text {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  background-color: transparent;
+  color: var(--navy);
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: .85rem;
+  padding: .4rem .7rem;
+  transition: background-color .15s ease;
+}
+.btn-print-text:hover,
+.btn-print-text:focus,
+.btn-print-text:active,
+.btn-print-text:focus-visible {
+  background-color: var(--navy-soft);
+  color: var(--navy);
+  outline: none !important;
+  box-shadow: none !important;
+}
+.btn-print-text:active { background-color: #E4E8F0; }
+.btn-print-text i { font-size: .95rem; }
+
+button, .btn, .btn:focus, .btn:active, .btn:focus-visible, .btn:active:focus,
+input, input:focus, input:focus-visible,
+a:focus, a:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+button::-moz-focus-inner {
+  border: 0 !important;
+}
+
+.filter-bar {
+  background-color: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: .85rem 1.15rem;
+  display: flex;
+  align-items: center;
+  gap: .9rem;
+  flex-wrap: wrap;
+  row-gap: .7rem;
+}
+.filter-bar .filter-mode-toggle {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.filter-bar .filter-mode-toggle label {
+  margin: 0;
+  padding: .45rem .8rem;
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  cursor: pointer;
+  background-color: var(--navy-soft);
+}
+.filter-bar .filter-mode-toggle input { display: none; }
+.filter-bar .filter-mode-toggle input:checked + label {
+  background-color: var(--indigo);
+  color: #fff;
+}
+.filter-bar .filter-fields {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  flex-wrap: wrap;
+  row-gap: .5rem;
+}
+.filter-bar label.field-label {
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  color: var(--ink-soft);
+  margin: 0 0 0 .2rem;
+}
+.filter-bar input[type="date"] {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: .4rem .6rem;
+  font-size: .82rem;
+  color: var(--ink);
+}
+.filter-bar .filter-actions {
+  display: flex;
+  gap: .5rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.filter-active-badge {
+  font-size: .72rem;
+  font-weight: 600;
+  color: var(--indigo-text);
+  background-color: var(--indigo-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: .3rem .7rem;
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  white-space: nowrap;
+}
+
+.print-header { display: none; }
+
+@media print {
+  .no-print { display: none !important; }
+  .print-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    text-align: center;
+    margin-bottom: 24px;
+    padding-bottom: 14px;
+    border-bottom: 2px solid var(--navy);
+  }
+  .print-header img {
+    height: 48px;
+    width: 48px;
+    object-fit: contain;
+  }
+  .print-header h1 {
+    font-family: 'Lexend', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 2px;
+  }
+  .print-header p {
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin: 0;
+  }
+  body { background-color: #fff !important; }
+  .dashboard-layout { display: block !important; }
+  .dashboard-layout > *:not(.dashboard-main) { display: none !important; }
+  .dashboard-main { width: 100% !important; margin: 0 !important; }
+  main.dashboard-content { padding: 0 24px 24px !important; }
+  .card, .metric-card { border: 1px solid #D8DEE3 !important; box-shadow: none !important; break-inside: avoid; }
+}
 </style>
 </head>
 
@@ -267,19 +585,64 @@ body {
 
   <div class="dashboard-main flex-grow-1" style="min-width:0;">
 
-    <header class="dashboard-topbar bg-white d-flex align-items-center justify-content-between px-3 px-md-4">
+    <header class="dashboard-topbar bg-white d-flex align-items-center justify-content-between px-3 px-md-4 no-print">
       <div class="d-flex align-items-center gap-3">
         <button type="button" class="btn btn-link text-dark p-0 d-lg-none" data-bs-toggle="offcanvas" data-bs-target="#sidebarOffcanvas" aria-controls="sidebarOffcanvas" aria-label="Open menu">
           <i class="fa-solid fa-bars fs-5"></i>
         </button>
         <div>
           <h1 class="dashboard-title h6 h5-md fw-bold mb-0">Dashboard</h1>
-          <p class="dashboard-subtitle small mb-0 d-none d-sm-block">Welcome back, <?= htmlspecialchars($_SESSION['supervisor_fullname'] ?? 'Supervisor') ?>.</p>
+          <p class="dashboard-subtitle small mb-0 d-none d-sm-block">Welcome back, <?= htmlspecialchars($_SESSION['manager_fullname'] ?? 'Supervisor') ?>.</p>
         </div>
+      </div>
+      <div class="dashboard-topbar-actions d-flex align-items-center gap-3 gap-md-4">
+        <button type="button" class="btn-print-text" onclick="window.print()">
+          <i class="fa-solid fa-print"></i> <span>Print</span>
+        </button>
       </div>
     </header>
 
     <main class="dashboard-content p-3 p-md-4">
+
+      <div class="print-header">
+        <img src="../assets/img/system_img/logo.png" alt="Company Logo">
+        <div>
+          <h1>KMP Business Consultancy Services</h1>
+          <p>Dashboard Summary &middot; Generated <?= date('M d, Y g:i A') ?></p>
+        </div>
+      </div>
+
+      <form method="GET" class="filter-bar mb-3 no-print" id="filterForm">
+        <div class="filter-mode-toggle">
+          <input type="radio" name="filter_mode" id="mode-range" value="range" <?= $filterMode !== 'single' ? 'checked' : '' ?>>
+          <label for="mode-range"><i class="fa-regular fa-calendar-days me-1"></i>Date Range</label>
+          <input type="radio" name="filter_mode" id="mode-single" value="single" <?= $filterMode === 'single' ? 'checked' : '' ?>>
+          <label for="mode-single"><i class="fa-solid fa-calendar-day me-1"></i>Specific Date</label>
+        </div>
+
+        <div class="filter-fields" id="range-fields" style="<?= $filterMode === 'single' ? 'display:none;' : 'display:flex;' ?>">
+          <label class="field-label" for="date_start">From</label>
+          <input type="date" name="date_start" id="date_start" value="<?= htmlspecialchars($dateStart) ?>" max="<?= date('Y-m-d') ?>">
+          <label class="field-label" for="date_end">To</label>
+          <input type="date" name="date_end" id="date_end" value="<?= htmlspecialchars($dateEnd) ?>" max="<?= date('Y-m-d') ?>">
+        </div>
+
+        <div class="filter-fields" id="single-fields" style="<?= $filterMode === 'single' ? 'display:flex;' : 'display:none;' ?>">
+          <label class="field-label" for="date_single">Date</label>
+          <input type="date" name="date_single" id="date_single" value="<?= htmlspecialchars($dateSingle) ?>" max="<?= date('Y-m-d') ?>">
+        </div>
+
+        <?php if ($hasFilter): ?>
+          <span class="filter-active-badge"><i class="fa-solid fa-filter"></i><?= htmlspecialchars($filterLabel) ?></span>
+        <?php endif; ?>
+
+        <div class="filter-actions">
+          <button type="submit" class="btn btn-ghost btn-sm px-3"><i class="fa-solid fa-magnifying-glass me-1"></i>Apply</button>
+          <?php if ($hasFilter): ?>
+            <a href="dashboard.php" class="btn btn-ghost btn-sm px-3"><i class="fa-solid fa-xmark me-1"></i>Clear</a>
+          <?php endif; ?>
+        </div>
+      </form>
 
       <div class="row g-3 mb-3">
         <div class="col-6 col-lg-3">
@@ -329,39 +692,27 @@ body {
       </div>
 
       <div class="row g-3 mb-3">
-        <div class="col-lg-4">
+        <div class="col-lg-8">
           <section class="card h-100">
             <div class="card-header">
               <h2 class="h6 fw-bold mb-0">Service Requests</h2>
               <p class="small mb-0">Status distribution.</p>
             </div>
             <div class="card-body">
-              <div style="height:150px;">
-                <canvas id="requestsChart"></canvas>
-              </div>
-              <div class="d-flex flex-wrap gap-3 justify-content-center mt-3">
-                <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#1E293B;"></span>New</span>
-                <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#B7791F;"></span>In Progress</span>
-                <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#157A5F;"></span>Completed</span>
-                <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#B4432F;"></span>Cancelled</span>
-              </div>
-            </div>
-          </section>
-        </div>
-        <div class="col-lg-4">
-          <section class="card h-100">
-            <div class="card-header">
-              <h2 class="h6 fw-bold mb-0">Quotations</h2>
-              <p class="small mb-0">Status distribution.</p>
-            </div>
-            <div class="card-body">
-              <div style="height:150px;">
-                <canvas id="quotationsChart"></canvas>
-              </div>
-              <div class="d-flex flex-wrap gap-3 justify-content-center mt-3">
-                <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#1E293B;"></span>Draft</span>
-                <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#157A5F;"></span>Approved</span>
-                <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#B4432F;"></span>Rejected</span>
+              <div class="row align-items-center g-3">
+                <div class="col-md-6">
+                  <div style="height:150px;">
+                    <canvas id="requestsChart"></canvas>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="chart-legend-row" style="flex-direction:column; align-items:flex-start; gap:.7rem;">
+                    <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#1E293B;"></span>New</span>
+                    <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#B7791F;"></span>In Progress</span>
+                    <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#157A5F;"></span>Completed</span>
+                    <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#B4432F;"></span>Cancelled</span>
+                  </div>
+                </div>
               </div>
             </div>
           </section>
@@ -369,17 +720,22 @@ body {
         <div class="col-lg-4">
           <section class="card h-100">
             <div class="card-header">
-              <h2 class="h6 fw-bold mb-0">Contracts</h2>
-              <p class="small mb-0">Status distribution.</p>
+              <h2 class="h6 fw-bold mb-0">Approvals Overview</h2>
+              <p class="small mb-0">Approved totals across records.</p>
             </div>
             <div class="card-body">
-              <div style="height:150px;">
-                <canvas id="contractsChart"></canvas>
-              </div>
-              <div class="d-flex flex-wrap gap-3 justify-content-center mt-3">
-                <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#1E293B;"></span>Draft</span>
-                <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#157A5F;"></span>Approved</span>
-                <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#B4432F;"></span>Rejected</span>
+              <div class="approval-split">
+                <div class="approval-split-item">
+                  <span class="approved-icon"><i class="fa-solid fa-file-invoice-dollar"></i></span>
+                  <div class="approved-value"><?= $approvedQuotations ?></div>
+                  <div class="approved-label">Quotations Approved</div>
+                </div>
+                <div class="approval-divider"></div>
+                <div class="approval-split-item">
+                  <span class="approved-icon"><i class="fa-solid fa-file-signature"></i></span>
+                  <div class="approved-value"><?= $approvedContracts ?></div>
+                  <div class="approved-label">Contracts Approved</div>
+                </div>
               </div>
             </div>
           </section>
@@ -396,7 +752,7 @@ body {
                 <h2 class="h6 fw-bold mb-0">Recent Service Requests</h2>
                 <p class="small mb-0">Latest requests recorded across all clients.</p>
               </div>
-              <a href="client_management.php?tab=requests" class="btn btn-sm btn-view-all">View All</a>
+              <a href="client_management.php?tab=requests" class="btn btn-sm btn-view-all no-print">View All</a>
             </div>
             <div class="table-responsive">
               <table class="table table-hover align-middle mb-0">
@@ -528,8 +884,30 @@ function buildDoughnut(canvasId, values, colors) {
 }
 
 buildDoughnut('requestsChart', [<?= $newRequests ?>, <?= $inProgressRequests ?>, <?= $completedRequests ?>, <?= $cancelledRequests ?>], ['#1E293B', '#B7791F', '#157A5F', '#B4432F']);
-buildDoughnut('quotationsChart', [<?= $draftQuotations ?>, <?= $approvedQuotations ?>, <?= $rejectedQuotations ?>], ['#1E293B', '#157A5F', '#B4432F']);
-buildDoughnut('contractsChart', [<?= $draftContracts ?>, <?= $approvedContracts ?>, <?= $rejectedContracts ?>], ['#1E293B', '#157A5F', '#B4432F']);
+</script>
+<script>
+const rangeFields = document.getElementById('range-fields');
+const singleFields = document.getElementById('single-fields');
+const modeRange = document.getElementById('mode-range');
+const modeSingle = document.getElementById('mode-single');
+
+function syncFilterFields() {
+  if (modeSingle && modeSingle.checked) {
+    rangeFields.style.setProperty('display', 'none');
+    singleFields.style.setProperty('display', 'flex');
+  } else {
+    rangeFields.style.setProperty('display', 'flex');
+    singleFields.style.setProperty('display', 'none');
+  }
+}
+
+if (modeRange && modeSingle && rangeFields && singleFields) {
+  modeRange.addEventListener('change', syncFilterFields);
+  modeSingle.addEventListener('change', syncFilterFields);
+  modeRange.addEventListener('click', syncFilterFields);
+  modeSingle.addEventListener('click', syncFilterFields);
+  syncFilterFields();
+}
 </script>
 
 </body>

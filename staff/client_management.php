@@ -79,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $errors = [];
         if ($clientId === '') $errors[] = 'Please select a client.';
-        if ($requestTitle === '') $errors[] = 'Request title is required.';
+        if ($requestTitle === '') $errors[] = 'Transaction title is required.';
 
         if (empty($errors)) {
             $stmt = $pdo->prepare(
@@ -87,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
             $stmt->execute([$clientId, $requestTitle, $requiredSkill !== '' ? $requiredSkill : null, 'New']);
             $_SESSION['alert_type'] = 'success';
-            $_SESSION['alert_message'] = 'Service request recorded successfully.';
+            $_SESSION['alert_message'] = 'Service transaction recorded successfully.';
         } else {
             $_SESSION['alert_type'] = 'error';
             $_SESSION['alert_message'] = implode(' ', $errors);
@@ -105,7 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $errors = [];
         if ($clientId === '') $errors[] = 'Please select a client.';
-        if ($requestTitle === '') $errors[] = 'Request title is required.';
+        if ($requestTitle === '') $errors[] = 'Transaction title is required.';
 
         if (empty($errors)) {
             $stmt = $pdo->prepare(
@@ -113,7 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
             $stmt->execute([$clientId, $requestTitle, $requiredSkill !== '' ? $requiredSkill : null, $requestId]);
             $_SESSION['alert_type'] = 'success';
-            $_SESSION['alert_message'] = 'Service request updated successfully.';
+            $_SESSION['alert_message'] = 'Service transaction updated successfully.';
         } else {
             $_SESSION['alert_type'] = 'error';
             $_SESSION['alert_message'] = implode(' ', $errors);
@@ -128,7 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $pdo->prepare('DELETE FROM service_requests WHERE request_id = ?');
         $stmt->execute([$requestId]);
         $_SESSION['alert_type'] = 'success';
-        $_SESSION['alert_message'] = 'Service request deleted successfully.';
+        $_SESSION['alert_message'] = 'Service transaction deleted successfully.';
         header('Location: client_management.php?tab=requests');
         exit;
     }
@@ -550,7 +550,7 @@ body {
         </button>
         <div>
           <h1 class="dashboard-title h6 h5-md fw-bold mb-0">Client Management</h1>
-          <p class="dashboard-subtitle small mb-0 d-none d-sm-block">Manage client profiles, service requests, and reports.</p>
+          <p class="dashboard-subtitle small mb-0 d-none d-sm-block">Manage client profiles, service transactions, and reports.</p>
         </div>
       </div>
     </header>
@@ -575,7 +575,7 @@ body {
               <i class="fa-solid fa-clipboard-list" style="color:var(--warn-text);"></i>
             </span>
             <div class="overflow-hidden">
-              <div class="stat-label text-truncate">Total Requests</div>
+              <div class="stat-label text-truncate">Total Transactions</div>
               <div class="stat-value" style="color:var(--warn-text);"><?= $totalRequestsAll ?></div>
             </div>
           </div>
@@ -609,7 +609,7 @@ body {
           <i class="fa-solid fa-building"></i> Clients
         </a>
         <a href="?tab=requests" class="<?= $activeTab === 'requests' ? 'active' : '' ?>">
-          <i class="fa-solid fa-clipboard-list"></i> Service Requests
+          <i class="fa-solid fa-clipboard-list"></i> Service Transactions
         </a>
         <a href="?tab=reports" class="<?= $activeTab === 'reports' ? 'active' : '' ?>">
           <i class="fa-solid fa-chart-simple"></i> Reports
@@ -719,7 +719,7 @@ body {
               <div class="col-12 col-md-4">
                 <div class="input-group">
                   <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass" style="color:var(--ink-soft);"></i></span>
-                  <input type="text" name="search" class="form-control" placeholder="Search request or client" value="<?= htmlspecialchars($searchTerm) ?>">
+                  <input type="text" name="search" class="form-control" placeholder="Search transaction or client" value="<?= htmlspecialchars($searchTerm) ?>">
                 </div>
               </div>
               <div class="col-6 col-md-3">
@@ -739,7 +739,7 @@ body {
               </div>
               <div class="col-12 col-md-2 text-md-end">
                 <button type="button" class="btn btn-teal-solid w-100" data-bs-toggle="modal" data-bs-target="#addRequestModal">
-                  <i class="fa-solid fa-plus"></i> Add Request
+                  <i class="fa-solid fa-plus"></i> Add Transaction
                 </button>
               </div>
             </form>
@@ -751,7 +751,7 @@ body {
             <table class="table table-hover align-middle mb-0">
               <thead>
                 <tr>
-                  <th scope="col">Request</th>
+                  <th scope="col">Transaction</th>
                   <th scope="col" class="d-none d-md-table-cell">Client</th>
                   <th scope="col" class="d-none d-lg-table-cell">Assigned To</th>
                   <th scope="col">Status</th>
@@ -762,7 +762,7 @@ body {
                   <tr>
                     <td colspan="4" class="text-center py-5" style="color:var(--ink-soft);">
                       <i class="fa-regular fa-folder-open fs-3 d-block mb-2"></i>
-                      No service requests found.
+                      No service transactions found.
                     </td>
                   </tr>
                 <?php else: ?>
@@ -794,7 +794,7 @@ body {
           <?php if ($totalPages > 1): ?>
           <div class="card-footer bg-white d-flex justify-content-between align-items-center flex-wrap gap-2 py-3" style="border-top:1px solid var(--line);">
             <span class="small" style="color:var(--ink-soft);">Page <?= $page ?> of <?= $totalPages ?> &middot; <?= $filteredRequestCount ?> total</span>
-            <nav aria-label="Requests pagination">
+            <nav aria-label="Transactions pagination">
               <ul class="pagination pagination-sm mb-0">
                 <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
                   <a class="page-link" href="<?= buildPageUrl($page - 1, 'requests', $searchTerm, $sortOrder, $statusFilter) ?>">Previous</a>
@@ -821,7 +821,7 @@ body {
               <thead>
                 <tr>
                   <th scope="col">Client</th>
-                  <th scope="col">Total Requests</th>
+                  <th scope="col">Total Transactions</th>
                   <th scope="col">Completed</th>
                 </tr>
               </thead>
@@ -1028,7 +1028,7 @@ body {
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <p class="mb-0">Are you sure you want to delete <strong id="delete_client_name"></strong>? This will also remove all related service requests.</p>
+          <p class="mb-0">Are you sure you want to delete <strong id="delete_client_name"></strong>? This will also remove all related service transactions.</p>
         </div>
         <div class="modal-footer">
           <button type="submit" class="btn btn-text-danger">Delete Client</button>
@@ -1044,7 +1044,7 @@ body {
       <form method="POST" novalidate>
         <input type="hidden" name="action" value="add_request">
         <div class="modal-header">
-          <h2 class="modal-title h5 fw-bold">Add Service Request</h2>
+          <h2 class="modal-title h5 fw-bold">Add Service Transaction</h2>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
@@ -1059,7 +1059,7 @@ body {
               </select>
             </div>
             <div class="col-12">
-              <label class="form-label">Request Title</label>
+              <label class="form-label">Transaction Title</label>
               <input type="text" name="request_title" class="form-control" required>
             </div>
             <div class="col-12">
@@ -1074,7 +1074,7 @@ body {
           </div>
         </div>
         <div class="modal-footer">
-          <button type="submit" class="btn btn-teal-solid">Save Request</button>
+          <button type="submit" class="btn btn-teal-solid">Save Transaction</button>
         </div>
       </form>
     </div>
@@ -1088,7 +1088,7 @@ body {
         <input type="hidden" name="action" value="edit_request">
         <input type="hidden" name="request_id" id="manage_request_id">
         <div class="modal-header">
-          <h2 class="modal-title h5 fw-bold">Service Request Details</h2>
+          <h2 class="modal-title h5 fw-bold">Service Transaction Details</h2>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
@@ -1102,7 +1102,7 @@ body {
               </select>
             </div>
             <div class="col-12">
-              <label class="form-label">Request Title</label>
+              <label class="form-label">Transaction Title</label>
               <input type="text" name="request_title" id="manage_request_title" class="form-control" required>
             </div>
             <div class="col-12">
@@ -1117,7 +1117,7 @@ body {
             <div class="col-12">
               <div class="small" style="color:var(--ink-soft);">Status</div>
               <span class="status-pill" id="manage_status_pill"></span>
-              <div class="form-text mt-2">Status is updated once the request has an approved contract, in Resource Matching.</div>
+              <div class="form-text mt-2">Status is updated once the transaction has an approved contract, in Resource Matching.</div>
             </div>
           </div>
         </div>
@@ -1139,14 +1139,14 @@ body {
         <input type="hidden" name="action" value="delete_request">
         <input type="hidden" name="request_id" id="delete_request_id">
         <div class="modal-header">
-          <h2 class="modal-title h5 fw-bold">Delete Request</h2>
+          <h2 class="modal-title h5 fw-bold">Delete Transaction</h2>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <p class="mb-0">Are you sure you want to delete <strong id="delete_request_title"></strong>?</p>
         </div>
         <div class="modal-footer">
-          <button type="submit" class="btn btn-text-danger">Delete Request</button>
+          <button type="submit" class="btn btn-text-danger">Delete Transaction</button>
         </div>
       </form>
     </div>

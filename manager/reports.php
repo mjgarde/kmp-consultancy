@@ -11,52 +11,94 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'manager') {
 
 $pdo = getConnection();
 
-$clientReportStmt = $pdo->query(
-    "SELECT c.client_id, c.company_name,
+$filterMode  = $_GET['filter_mode'] ?? '';
+$dateStart   = $_GET['date_start'] ?? '';
+$dateEnd     = $_GET['date_end'] ?? '';
+$dateSingle  = $_GET['date_single'] ?? '';
+
+$validDate = function (string $d): bool {
+    if ($d === '') return false;
+    $dt = DateTime::createFromFormat('Y-m-d', $d);
+    return $dt && $dt->format('Y-m-d') === $d;
+};
+
+$hasFilter = false;
+$filterWhereSr  = '';
+$filterWhereCt  = '';
+$filterParams   = [];
+$filterLabel    = '';
+
+if ($filterMode === 'range' && $validDate($dateStart) && $validDate($dateEnd)) {
+    $hasFilter     = true;
+    $filterWhereSr = " AND DATE(sr.created_at) BETWEEN :fstart AND :fend ";
+    $filterWhereCt = " AND DATE(ct.created_at) BETWEEN :fstart AND :fend ";
+    $filterParams  = [':fstart' => $dateStart, ':fend' => $dateEnd];
+    $filterLabel   = 'Filtered: ' . date('M d, Y', strtotime($dateStart)) . ' – ' . date('M d, Y', strtotime($dateEnd));
+} elseif ($filterMode === 'single' && $validDate($dateSingle)) {
+    $hasFilter     = true;
+    $filterWhereSr = " AND DATE(sr.created_at) = :fsingle ";
+    $filterWhereCt = " AND DATE(ct.created_at) = :fsingle ";
+    $filterParams  = [':fsingle' => $dateSingle];
+    $filterLabel   = 'Filtered: ' . date('M d, Y', strtotime($dateSingle));
+}
+
+$clientReportSql = "SELECT c.client_id, c.company_name,
             COUNT(sr.request_id) AS total_requests,
             SUM(CASE WHEN sr.status = 'Completed' THEN 1 ELSE 0 END) AS completed,
             SUM(CASE WHEN sr.status = 'Cancelled' THEN 1 ELSE 0 END) AS cancelled,
             AVG(CASE WHEN sr.status != 'New' THEN TIMESTAMPDIFF(HOUR, sr.created_at, sr.updated_at) END) AS avg_response_hours
      FROM clients c
-     LEFT JOIN service_requests sr ON sr.client_id = c.client_id
+     LEFT JOIN service_requests sr ON sr.client_id = c.client_id $filterWhereSr
      GROUP BY c.client_id, c.company_name
-     ORDER BY total_requests DESC"
-);
+     ORDER BY total_requests DESC";
+$clientReportStmt = $pdo->prepare($clientReportSql);
+$clientReportStmt->execute($filterParams);
 $clientReport = $clientReportStmt->fetchAll();
 
-$overallAvgResponse = $pdo->query(
-    "SELECT AVG(TIMESTAMPDIFF(HOUR, created_at, updated_at)) FROM service_requests WHERE status != 'New'"
-)->fetchColumn();
+$overallAvgSql = "SELECT AVG(TIMESTAMPDIFF(HOUR, created_at, updated_at)) FROM service_requests sr WHERE status != 'New' $filterWhereSr";
+$overallAvgStmt = $pdo->prepare($overallAvgSql);
+$overallAvgStmt->execute($filterParams);
+$overallAvgResponse = $overallAvgStmt->fetchColumn();
 $overallAvgResponse = $overallAvgResponse !== null ? round((float) $overallAvgResponse, 1) : null;
 
-$newRequests        = (int) $pdo->query("SELECT COUNT(*) FROM service_requests WHERE status = 'New'")->fetchColumn();
-$inProgressRequests = (int) $pdo->query("SELECT COUNT(*) FROM service_requests WHERE status = 'In Progress'")->fetchColumn();
-$completedRequests  = (int) $pdo->query("SELECT COUNT(*) FROM service_requests WHERE status = 'Completed'")->fetchColumn();
+$newRequestsStmt = $pdo->prepare("SELECT COUNT(*) FROM service_requests sr WHERE status = 'New' $filterWhereSr");
+$newRequestsStmt->execute($filterParams);
+$newRequests = (int) $newRequestsStmt->fetchColumn();
 
-$staffPerfStmt = $pdo->query(
-    "SELECT u.user_id, u.firstname, u.lastname, u.status,
+$inProgressStmt = $pdo->prepare("SELECT COUNT(*) FROM service_requests sr WHERE status = 'In Progress' $filterWhereSr");
+$inProgressStmt->execute($filterParams);
+$inProgressRequests = (int) $inProgressStmt->fetchColumn();
+
+$completedStmt = $pdo->prepare("SELECT COUNT(*) FROM service_requests sr WHERE status = 'Completed' $filterWhereSr");
+$completedStmt->execute($filterParams);
+$completedRequests = (int) $completedStmt->fetchColumn();
+
+$staffPerfSql = "SELECT u.user_id, u.firstname, u.lastname, u.status,
             COUNT(sr.request_id) AS total_assigned,
             SUM(CASE WHEN sr.status = 'In Progress' THEN 1 ELSE 0 END) AS active_tasks,
             SUM(CASE WHEN sr.status = 'Completed' THEN 1 ELSE 0 END) AS completed_tasks
      FROM users u
-     LEFT JOIN service_requests sr ON sr.assigned_to = u.user_id
+     LEFT JOIN service_requests sr ON sr.assigned_to = u.user_id $filterWhereSr
      WHERE u.role = 'Staff'
      GROUP BY u.user_id, u.firstname, u.lastname, u.status
-     ORDER BY total_assigned DESC"
-);
+     ORDER BY total_assigned DESC";
+$staffPerfStmt = $pdo->prepare($staffPerfSql);
+$staffPerfStmt->execute($filterParams);
 $staffPerf = $staffPerfStmt->fetchAll();
 
-$skillDemandStmt = $pdo->query(
-    "SELECT required_skill, COUNT(*) AS demand
-     FROM service_requests
-     WHERE required_skill IS NOT NULL AND required_skill != ''
+$skillDemandSql = "SELECT required_skill, COUNT(*) AS demand
+     FROM service_requests sr
+     WHERE required_skill IS NOT NULL AND required_skill != '' $filterWhereSr
      GROUP BY required_skill
      ORDER BY demand DESC
-     LIMIT 6"
-);
+     LIMIT 6";
+$skillDemandStmt = $pdo->prepare($skillDemandSql);
+$skillDemandStmt->execute($filterParams);
 $skillDemand = $skillDemandStmt->fetchAll();
 
-$contractStatusStmt = $pdo->query("SELECT status, COUNT(*) AS cnt FROM contracts GROUP BY status");
+$contractStatusSql = "SELECT status, COUNT(*) AS cnt FROM contracts ct WHERE 1=1 $filterWhereCt GROUP BY status";
+$contractStatusStmt = $pdo->prepare($contractStatusSql);
+$contractStatusStmt->execute($filterParams);
 $contractStatusCounts = ['Draft' => 0, 'Approved' => 0, 'Rejected' => 0];
 foreach ($contractStatusStmt->fetchAll() as $row) {
     if (isset($contractStatusCounts[$row['status']])) {
@@ -74,9 +116,10 @@ $upcomingExpirationsStmt = $pdo->query(
 );
 $upcomingExpirations = $upcomingExpirationsStmt->fetchAll();
 
-$avgApprovalHours = $pdo->query(
-    "SELECT AVG(TIMESTAMPDIFF(HOUR, created_at, approved_at)) FROM contracts WHERE approved_at IS NOT NULL"
-)->fetchColumn();
+$avgApprovalSql = "SELECT AVG(TIMESTAMPDIFF(HOUR, created_at, approved_at)) FROM contracts ct WHERE approved_at IS NOT NULL $filterWhereCt";
+$avgApprovalStmt = $pdo->prepare($avgApprovalSql);
+$avgApprovalStmt->execute($filterParams);
+$avgApprovalHours = $avgApprovalStmt->fetchColumn();
 $avgApprovalHours = $avgApprovalHours !== null ? round((float) $avgApprovalHours, 1) : null;
 
 ?>
@@ -248,16 +291,101 @@ body {
 .empty-state { color: var(--ink-soft); }
 .empty-state i { color: #C7D0D6; }
 
+/* ---------------- FILTER BAR ---------------- */
+.filter-bar {
+  background-color: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: .85rem 1.15rem;
+  display: flex;
+  align-items: center;
+  gap: .9rem;
+  flex-wrap: wrap;
+}
+.filter-bar .filter-mode-toggle {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.filter-bar .filter-mode-toggle label {
+  margin: 0;
+  padding: .45rem .8rem;
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  cursor: pointer;
+  background-color: var(--navy-soft);
+}
+.filter-bar .filter-mode-toggle input { display: none; }
+.filter-bar .filter-mode-toggle input:checked + label {
+  background-color: var(--indigo);
+  color: #fff;
+}
+.filter-bar .filter-fields {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  flex-wrap: wrap;
+}
+.filter-bar label.field-label {
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  color: var(--ink-soft);
+  margin: 0 0 0 .2rem;
+}
+.filter-bar input[type="date"] {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: .4rem .6rem;
+  font-size: .82rem;
+  color: var(--ink);
+}
+.filter-bar .filter-actions {
+  display: flex;
+  gap: .5rem;
+  margin-left: auto;
+}
+.filter-active-badge {
+  font-size: .72rem;
+  font-weight: 600;
+  color: var(--indigo-text);
+  background-color: var(--indigo-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: .3rem .7rem;
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+}
+.filter-hint {
+  font-size: .74rem;
+  color: var(--ink-soft);
+  margin: -.4rem 0 .75rem 0;
+}
+
 .print-header { display: none; }
+.print-footer { display: none; }
 
 @media print {
   .no-print { display: none !important; }
   .print-header {
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
     text-align: center;
     margin-bottom: 24px;
     padding-bottom: 14px;
     border-bottom: 2px solid var(--navy);
+  }
+  .print-header img {
+    height: 48px;
+    width: 48px;
+    object-fit: contain;
   }
   .print-header h1 {
     font-family: 'Lexend', sans-serif;
@@ -265,6 +393,23 @@ body {
     font-weight: 700;
     color: var(--navy);
     margin-bottom: 2px;
+  }
+  .print-header p {
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin: 0;
+  }
+  .print-footer {
+    display: flex;
+    justify-content: center;
+    margin-top: 24px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+  }
+  .print-footer span {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink-soft);
   }
   body { background-color: #fff !important; }
   .dashboard-layout { display: block !important; }
@@ -305,8 +450,60 @@ body {
     <main class="dashboard-content p-3 p-md-4">
 
       <div class="print-header">
-        <h1>KMP Business Consultancy Services</h1>
+        <img src="../assets/img/system_img/logo.png" alt="Company Logo">
+        <div>
+          <h1>KMP Business Consultancy Services</h1>
+          <p>Reports generated <?= date('M d, Y g:i A') ?></p>
+        </div>
       </div>
+
+      <form method="GET" class="filter-bar mb-2 no-print" id="filterForm">
+        <div class="filter-mode-toggle">
+          <input type="radio" name="filter_mode" id="mode-range" value="range" <?= $filterMode !== 'single' ? 'checked' : '' ?>>
+          <label for="mode-range"><i class="fa-regular fa-calendar-days me-1"></i>Date Range</label>
+          <input type="radio" name="filter_mode" id="mode-single" value="single" <?= $filterMode === 'single' ? 'checked' : '' ?>>
+          <label for="mode-single"><i class="fa-solid fa-calendar-day me-1"></i>Specific Date</label>
+        </div>
+
+        <div class="filter-fields" id="range-fields" style="<?= $filterMode === 'single' ? 'display:none;' : 'display:flex;' ?>">
+          <label class="field-label" for="date_start">From</label>
+          <input type="date" name="date_start" id="date_start" value="<?= htmlspecialchars($dateStart) ?>" max="<?= date('Y-m-d') ?>">
+          <label class="field-label" for="date_end">To</label>
+          <input type="date" name="date_end" id="date_end" value="<?= htmlspecialchars($dateEnd) ?>" max="<?= date('Y-m-d') ?>">
+        </div>
+
+        <div class="filter-fields" id="single-fields" style="<?= $filterMode === 'single' ? 'display:flex;' : 'display:none;' ?>">
+          <label class="field-label" for="date_single">Date</label>
+          <input type="date" name="date_single" id="date_single" value="<?= htmlspecialchars($dateSingle) ?>" max="<?= date('Y-m-d') ?>">
+        </div>
+
+        <?php if ($hasFilter): ?>
+          <span class="filter-active-badge"><i class="fa-solid fa-filter"></i><?= htmlspecialchars($filterLabel) ?></span>
+        <?php endif; ?>
+
+        <div class="filter-actions">
+          <button type="submit" class="btn btn-ghost btn-sm px-3"><i class="fa-solid fa-magnifying-glass me-1"></i>Apply</button>
+          <?php if ($hasFilter): ?>
+            <a href="reports.php" class="btn btn-ghost btn-sm px-3"><i class="fa-solid fa-xmark me-1"></i>Clear</a>
+          <?php endif; ?>
+        </div>
+      </form>
+      <p class="filter-hint no-print">
+        <i class="fa-regular fa-circle-question me-1"></i>
+        <?= $filterMode === 'single' ? 'Showing records for one exact day only.' : 'Showing records between two dates. Switch to "Specific Date" for a single day only.' ?>
+      </p>
+
+      <?php if ($filterMode === 'range' && ($dateStart || $dateEnd) && !$hasFilter): ?>
+        <div class="alert alert-warning py-2 px-3 mb-3 no-print" style="font-size:.8rem;">
+          <i class="fa-solid fa-triangle-exclamation me-1"></i>
+          Please select both a "From" and "To" date to apply the range filter.
+        </div>
+      <?php elseif ($filterMode === 'single' && $dateSingle && !$hasFilter): ?>
+        <div class="alert alert-warning py-2 px-3 mb-3 no-print" style="font-size:.8rem;">
+          <i class="fa-solid fa-triangle-exclamation me-1"></i>
+          That date looks invalid. Please pick a valid date.
+        </div>
+      <?php endif; ?>
 
       <div class="row g-3 mb-3">
         <div class="col-6 col-lg-4">
@@ -512,6 +709,10 @@ body {
 
       </div>
 
+      <div class="print-footer">
+        <span><?= $hasFilter ? htmlspecialchars($filterLabel) : 'Filtered: All records' ?></span>
+      </div>
+
     </main>
 
   </div>
@@ -519,10 +720,10 @@ body {
 </div>
 
 <script src="../assets/vendor/bootstrap-5.3.8/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="../assets/vendor/chartjs/chart.umd.js"></script>
 <script>
 const contractStatusCanvas = document.getElementById('contractStatusChart');
-if (contractStatusCanvas) {
+if (contractStatusCanvas && typeof Chart !== 'undefined') {
   new Chart(contractStatusCanvas, {
     type: 'doughnut',
     data: {
@@ -543,6 +744,31 @@ if (contractStatusCanvas) {
     }
   });
 }
+</script>
+<script>
+const rangeFields = document.getElementById('range-fields');
+const singleFields = document.getElementById('single-fields');
+const modeRange = document.getElementById('mode-range');
+const modeSingle = document.getElementById('mode-single');
+
+function syncFilterFields() {
+  if (modeSingle && modeSingle.checked) {
+    rangeFields.style.setProperty('display', 'none');
+    singleFields.style.setProperty('display', 'flex');
+  } else {
+    rangeFields.style.setProperty('display', 'flex');
+    singleFields.style.setProperty('display', 'none');
+  }
+}
+
+if (modeRange && modeSingle && rangeFields && singleFields) {
+  modeRange.addEventListener('change', syncFilterFields);
+  modeSingle.addEventListener('change', syncFilterFields);
+  modeRange.addEventListener('click', syncFilterFields);
+  modeSingle.addEventListener('click', syncFilterFields);
+  syncFilterFields();
+}
+</script>
 </script>
 
 </body>
