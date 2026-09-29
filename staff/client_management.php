@@ -1,4 +1,8 @@
 <?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 session_name('STAFF_SESSION');
 session_start();
 require_once __DIR__ . '/../config/database.php';
@@ -55,7 +59,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $clientId       = $_POST['client_id'] ?? '';
         $requestTitle   = trim($_POST['request_title'] ?? '');
-        $requestDetails = trim($_POST['request_details'] ?? '');
         $requiredSkill  = trim($_POST['required_skill'] ?? '');
 
         $errors = [];
@@ -64,9 +67,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (empty($errors)) {
             $stmt = $pdo->prepare(
-                'INSERT INTO service_requests (client_id, request_title, request_details, required_skill, status) VALUES (?, ?, ?, ?, ?)'
+                'INSERT INTO service_requests (client_id, request_title, required_skill, status) VALUES (?, ?, ?, ?)'
             );
-            $stmt->execute([$clientId, $requestTitle, $requestDetails, $requiredSkill !== '' ? $requiredSkill : null, 'New']);
+            $stmt->execute([$clientId, $requestTitle, $requiredSkill !== '' ? $requiredSkill : null, 'New']);
             $_SESSION['alert_type'] = 'success';
             $_SESSION['alert_message'] = 'Service transaction recorded successfully.';
         } else {
@@ -449,17 +452,6 @@ body {
 
 .view-detail-label { font-size: .72rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: .2rem; }
 .view-detail-value { font-size: .88rem; color: var(--ink); word-break: break-word; }
-.view-detail-box {
-  background-color: var(--navy-soft);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: .75rem .9rem;
-  white-space: pre-line;
-  word-break: break-word;
-  min-height: 3rem;
-  color: var(--ink);
-  font-size: .875rem;
-}
 
 @media (max-width: 767.98px) {
   .stat-card { padding: .6rem .7rem; gap: .5rem; }
@@ -728,7 +720,6 @@ body {
                       data-title="<?= htmlspecialchars($request['request_title']) ?>"
                       data-client="<?= htmlspecialchars($request['company_name']) ?>"
                       data-assigned="<?= $request['firstname'] ? htmlspecialchars($request['firstname'] . ' ' . $request['lastname']) : '' ?>"
-                      data-details="<?= htmlspecialchars($request['request_details'] ?? '') ?>"
                       data-skill="<?= htmlspecialchars($request['required_skill'] ?? '') ?>"
                       data-status="<?= htmlspecialchars($request['status']) ?>">
                       <td>
@@ -916,9 +907,6 @@ body {
           </div>
         </div>
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-teal-solid" data-bs-dismiss="modal">Close</button>
-      </div>
     </div>
   </div>
 </div>
@@ -956,10 +944,6 @@ body {
                 <?php endforeach; ?>
               </select>
               <div class="form-text">This determines which staff will be recommended in Resource Matching.</div>
-            </div>
-            <div class="col-12">
-              <label class="form-label">Details</label>
-              <textarea name="request_details" class="form-control" rows="4"></textarea>
             </div>
           </div>
         </div>
@@ -1000,14 +984,7 @@ body {
             <div class="view-detail-label">Required Skill</div>
             <div id="view_req_skill_wrap"></div>
           </div>
-          <div class="col-12">
-            <div class="view-detail-label">Details</div>
-            <div class="view-detail-box" id="view_req_details"></div>
-          </div>
         </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-teal-solid" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>
@@ -1038,9 +1015,6 @@ document.getElementById('viewRequestModal').addEventListener('show.bs.modal', fu
   } else {
     skillWrap.innerHTML = '<span class="view-detail-value" style="color:var(--ink-soft);">Not specified / any skill</span>';
   }
-
-  const detailsEl = document.getElementById('view_req_details');
-  detailsEl.textContent = (data.details && data.details.trim() !== '') ? data.details : 'No additional details were provided.';
 
   const statusPill = document.getElementById('view_req_status');
   statusPill.textContent = data.status;

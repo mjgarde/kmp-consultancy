@@ -73,10 +73,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     } elseif ($action === 'add_request') {
 
-        $clientId       = $_POST['client_id'] ?? '';
-        $requestTitle   = trim($_POST['request_title'] ?? '');
-        $requestDetails = trim($_POST['request_details'] ?? '');
-        $requiredSkill  = trim($_POST['required_skill'] ?? '');
+        $clientId      = $_POST['client_id'] ?? '';
+        $requestTitle  = trim($_POST['request_title'] ?? '');
+        $requiredSkill = trim($_POST['required_skill'] ?? '');
 
         $errors = [];
         if ($clientId === '') $errors[] = 'Please select a client.';
@@ -84,9 +83,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (empty($errors)) {
             $stmt = $pdo->prepare(
-                'INSERT INTO service_requests (client_id, request_title, request_details, required_skill, status) VALUES (?, ?, ?, ?, ?)'
+                'INSERT INTO service_requests (client_id, request_title, required_skill, status) VALUES (?, ?, ?, ?)'
             );
-            $stmt->execute([$clientId, $requestTitle, $requestDetails, $requiredSkill !== '' ? $requiredSkill : null, 'New']);
+            $stmt->execute([$clientId, $requestTitle, $requiredSkill !== '' ? $requiredSkill : null, 'New']);
             $_SESSION['alert_type'] = 'success';
             $_SESSION['alert_message'] = 'Service request recorded successfully.';
         } else {
@@ -99,11 +98,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     } elseif ($action === 'edit_request') {
 
-        $requestId      = $_POST['request_id'] ?? null;
-        $clientId       = $_POST['client_id'] ?? '';
-        $requestTitle   = trim($_POST['request_title'] ?? '');
-        $requestDetails = trim($_POST['request_details'] ?? '');
-        $requiredSkill  = trim($_POST['required_skill'] ?? '');
+        $requestId     = $_POST['request_id'] ?? null;
+        $clientId      = $_POST['client_id'] ?? '';
+        $requestTitle  = trim($_POST['request_title'] ?? '');
+        $requiredSkill = trim($_POST['required_skill'] ?? '');
 
         $errors = [];
         if ($clientId === '') $errors[] = 'Please select a client.';
@@ -111,9 +109,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (empty($errors)) {
             $stmt = $pdo->prepare(
-                'UPDATE service_requests SET client_id = ?, request_title = ?, request_details = ?, required_skill = ? WHERE request_id = ?'
+                'UPDATE service_requests SET client_id = ?, request_title = ?, required_skill = ? WHERE request_id = ?'
             );
-            $stmt->execute([$clientId, $requestTitle, $requestDetails, $requiredSkill !== '' ? $requiredSkill : null, $requestId]);
+            $stmt->execute([$clientId, $requestTitle, $requiredSkill !== '' ? $requiredSkill : null, $requestId]);
             $_SESSION['alert_type'] = 'success';
             $_SESSION['alert_message'] = 'Service request updated successfully.';
         } else {
@@ -764,7 +762,6 @@ body {
                       data-id="<?= $request['request_id'] ?>"
                       data-client-id="<?= $request['client_id'] ?>"
                       data-title="<?= htmlspecialchars($request['request_title']) ?>"
-                      data-details="<?= htmlspecialchars($request['request_details'] ?? '') ?>"
                       data-skill="<?= htmlspecialchars($request['required_skill'] ?? '') ?>"
                       data-status="<?= htmlspecialchars($request['status']) ?>">
                       <td>
@@ -1065,10 +1062,6 @@ body {
               </select>
               <div class="form-text">This determines which staff will be recommended in Resource Matching.</div>
             </div>
-            <div class="col-12">
-              <label class="form-label">Details</label>
-              <textarea name="request_details" class="form-control" rows="4"></textarea>
-            </div>
           </div>
         </div>
         <div class="modal-footer">
@@ -1112,10 +1105,6 @@ body {
                 <?php endforeach; ?>
               </select>
               <div class="form-text">This determines which staff will be recommended in Resource Matching.</div>
-            </div>
-            <div class="col-12">
-              <label class="form-label">Details</label>
-              <textarea name="request_details" id="manage_request_details" class="form-control" rows="4"></textarea>
             </div>
             <div class="col-12">
               <div class="small" style="color:var(--ink-soft);">Status</div>
@@ -1197,7 +1186,6 @@ document.getElementById('manageRequestModal').addEventListener('show.bs.modal', 
   document.getElementById('manage_client_id').value = data.clientId;
   document.getElementById('manage_request_title').value = data.title;
   document.getElementById('manage_required_skill').value = data.skill;
-  document.getElementById('manage_request_details').value = data.details;
   const statusPill = document.getElementById('manage_status_pill');
   statusPill.textContent = data.status;
   statusPill.className = 'status-pill ' + ({
