@@ -67,7 +67,6 @@ function buildRequestPayload(array $row, array $itemsByQuotation): array
     return [
         'request_id'       => (int) $row['request_id'],
         'request_title'    => $row['request_title'],
-        'request_details'  => $row['request_details'],
         'required_skill'   => $row['required_skill'],
         'received_at'      => formatDisplayDate($row['created_at']),
         'company'          => $row['company_name'],
@@ -81,7 +80,6 @@ function buildRequestPayload(array $row, array $itemsByQuotation): array
         'start_date'       => formatDisplayDate($row['start_date']),
         'end_date'         => formatDisplayDate($row['end_date']),
         'scope_summary'    => $row['scope_summary'],
-        'terms_conditions' => $row['terms_conditions'],
         'approved_by'      => $approvedBy !== '' ? $approvedBy : null,
         'approved_at'      => formatDisplayDate($row['approved_at']),
         'quotation_number' => $row['quotation_number'],
@@ -89,18 +87,17 @@ function buildRequestPayload(array $row, array $itemsByQuotation): array
         'tax_rate'         => formatQuantity($row['tax_rate']),
         'tax_amount'       => number_format((float) $row['tax_amount'], 2),
         'valid_until'      => formatDisplayDate($row['quotation_valid_until']),
-        'quotation_notes'  => $row['quotation_notes'],
         'items'            => $items,
     ];
 }
 
 $pendingStmt = $pdo->query(
-    "SELECT sr.request_id, sr.request_title, sr.request_details, sr.required_skill, sr.status, sr.created_at,
+    "SELECT sr.request_id, sr.request_title, sr.required_skill, sr.status, sr.created_at,
             c.company_name, c.contact_person, c.email, c.contact_number, c.address, c.industry,
-            ct.contract_number, ct.quotation_id, ct.total_amount, ct.scope_summary, ct.terms_conditions,
+            ct.contract_number, ct.quotation_id, ct.total_amount, ct.scope_summary,
             ct.start_date, ct.end_date, ct.approved_at,
             q.quotation_number, q.subtotal, q.tax_rate, q.tax_amount,
-            q.valid_until AS quotation_valid_until, q.notes AS quotation_notes,
+            q.valid_until AS quotation_valid_until,
             ab.firstname AS approved_firstname, ab.lastname AS approved_lastname
      FROM service_requests sr
      INNER JOIN clients c ON sr.client_id = c.client_id
@@ -558,7 +555,6 @@ body {
 }
 .btn-cancel:hover { background-color: #EAE7E0; color: var(--charcoal); }
 
-/* Full Details Modal (enterprise document style) */
 #requestDetailsModal .modal-content { border-radius: 0; }
 #requestDetailsModal .modal-header {
   padding: .9rem 1.25rem;
@@ -1073,13 +1069,6 @@ body {
                       <div class="section-label">Required Skill</div>
                       <div id="detail_required_skill_display"></div>
                     </div>
-                    <div class="col-12">
-                      <div class="section-label">Request Details</div>
-                      <div class="clamp-block">
-                        <div class="clamp-text" id="detail_request_details"></div>
-                        <button type="button" class="clamp-toggle d-none">See more</button>
-                      </div>
-                    </div>
                   </div>
                 </div>
 
@@ -1090,17 +1079,6 @@ body {
                   </div>
                   <div class="clamp-block">
                     <div class="clamp-text" id="detail_scope"></div>
-                    <button type="button" class="clamp-toggle d-none">See more</button>
-                  </div>
-                </div>
-
-                <div class="quote-panel">
-                  <div class="details-heading">
-                    <span class="step-icon"><i class="fa-solid fa-file-contract"></i></span>
-                    Terms and Conditions
-                  </div>
-                  <div class="clamp-block">
-                    <div class="clamp-text" id="detail_terms"></div>
                     <button type="button" class="clamp-toggle d-none">See more</button>
                   </div>
                 </div>
@@ -1136,13 +1114,6 @@ body {
                   <div class="mt-3">
                     <div class="section-label">Quotation Valid Until</div>
                     <div class="details-value" id="detail_valid_until"></div>
-                  </div>
-                  <div class="mt-3">
-                    <div class="section-label">Quotation Notes</div>
-                    <div class="clamp-block">
-                      <div class="clamp-text" id="detail_quotation_notes"></div>
-                      <button type="button" class="clamp-toggle d-none">See more</button>
-                    </div>
                   </div>
                 </div>
 
@@ -1186,16 +1157,6 @@ function hasText(value) {
 
 function setText(elementId, value, fallback) {
   document.getElementById(elementId).textContent = hasText(value) ? value : (fallback !== undefined ? fallback : EMPTY_VALUE);
-}
-
-function formatTerms(text) {
-  if (!hasText(text)) return '';
-  let formatted = String(text).trim();
-  if (formatted.indexOf('\n') === -1) {
-    formatted = formatted.replace(/\s+(?=\d{1,2}\.\s+[A-Z][A-Z\s&,\/]{3,}\s)/g, '\n\n');
-    formatted = formatted.replace(/\s+-\s+(?=[A-Z0-9])/g, '\n- ');
-  }
-  return formatted;
 }
 
 function setClampText(elementId, value, fallback) {
@@ -1274,10 +1235,7 @@ function renderSelectedRequest(request) {
   setText('detail_received_at', request.received_at);
   setText('detail_contract_approval', approval);
   renderRequiredSkillInto('detail_required_skill_display', request.required_skill);
-  setClampText('detail_request_details', request.request_details, 'No additional details were provided for this request.');
   setClampText('detail_scope', request.scope_summary, 'No project scope provided.');
-  setClampText('detail_terms', formatTerms(request.terms_conditions), 'No terms and conditions provided.');
-  setClampText('detail_quotation_notes', request.quotation_notes, 'No notes provided.');
 
   setText('detail_quotation_number', request.quotation_number ? '\u00B7 ' + request.quotation_number : '', '');
   renderQuotationItems(request.items);

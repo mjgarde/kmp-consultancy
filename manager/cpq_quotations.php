@@ -197,7 +197,7 @@ $alertMessage = $_SESSION['alert_message'] ?? null;
 unset($_SESSION['alert_type'], $_SESSION['alert_message']);
 
 $requestsStmt = $pdo->query(
-    "SELECT sr.request_id, sr.request_title, sr.request_details, sr.required_skill, sr.status,
+    "SELECT sr.request_id, sr.request_title, sr.required_skill, sr.status,
             c.client_id, c.company_name
      FROM service_requests sr
      INNER JOIN clients c ON sr.client_id = c.client_id
@@ -534,15 +534,6 @@ body {
 }
 .request-preview-box.is-visible { display: block; }
 .request-preview-box .view-section-label { margin-bottom: .15rem; }
-.request-preview-box .request-preview-details {
-  white-space: pre-line;
-  word-break: break-word;
-  color: var(--ink);
-  font-size: .85rem;
-}
-.request-preview-box .request-preview-skill {
-  margin-top: .5rem;
-}
 
 #newQuotationModal .modal-content,
 #viewQuotationModal .modal-content,
@@ -719,7 +710,6 @@ body {
   .view-section-label { font-size: .62rem; }
   .view-notes-box { padding: .6rem .7rem; font-size: .8rem; }
   .request-preview-box { padding: .7rem .75rem; }
-  .request-preview-box .request-preview-details { font-size: .78rem; }
   .form-label { font-size: .68rem; }
   .item-row { padding: .6rem; }
   .line-total-display { font-size: .78rem; }
@@ -1081,7 +1071,6 @@ body {
                           <option value="<?= $req['request_id'] ?>"
                             data-company="<?= htmlspecialchars($req['company_name']) ?>"
                             data-title="<?= htmlspecialchars($req['request_title']) ?>"
-                            data-details="<?= htmlspecialchars($req['request_details'] ?? '') ?>"
                             data-skill="<?= htmlspecialchars($req['required_skill'] ?? '') ?>">
                             <?= htmlspecialchars($req['company_name']) ?> &mdash; <?= htmlspecialchars($req['request_title']) ?> (<?= htmlspecialchars($req['status']) ?>)
                           </option>
@@ -1091,21 +1080,17 @@ body {
 
                     <div class="request-preview-box" id="requestPreviewBox">
                       <div class="row g-2 g-md-3">
-                        <div class="col-12 col-sm-4">
+                        <div class="col-12 col-sm-6">
                           <div class="view-section-label">Client</div>
                           <div class="small fw-semibold" id="requestPreviewCompany"></div>
                         </div>
-                        <div class="col-12 col-sm-4">
+                        <div class="col-12 col-sm-6">
                           <div class="view-section-label">Title</div>
                           <div class="small fw-semibold" id="requestPreviewTitle"></div>
                         </div>
-                        <div class="col-12 col-sm-4">
+                        <div class="col-12">
                           <div class="view-section-label">Required Skill</div>
                           <div class="small" id="requestPreviewSkill"></div>
-                        </div>
-                        <div class="col-12">
-                          <div class="view-section-label">Details</div>
-                          <div class="request-preview-details" id="requestPreviewDetails"></div>
                         </div>
                       </div>
                     </div>
@@ -1433,7 +1418,6 @@ const requestSelect = document.getElementById('requestSelect');
 const requestPreviewBox = document.getElementById('requestPreviewBox');
 const requestPreviewCompany = document.getElementById('requestPreviewCompany');
 const requestPreviewTitle = document.getElementById('requestPreviewTitle');
-const requestPreviewDetails = document.getElementById('requestPreviewDetails');
 const requestPreviewSkill = document.getElementById('requestPreviewSkill');
 
 const filterForm = document.getElementById('quotationFilterForm');
@@ -1498,12 +1482,10 @@ function updateRequestPreview() {
 
   const company = option.dataset.company || '';
   const title = option.dataset.title || '';
-  const details = option.dataset.details || '';
   const skill = option.dataset.skill || '';
 
   requestPreviewCompany.textContent = company;
   requestPreviewTitle.textContent = title;
-  requestPreviewDetails.textContent = details !== '' ? details : 'No additional details were provided for this transaction.';
   requestPreviewSkill.textContent = skill !== '' ? skill : 'Not specified / any skill';
   requestPreviewBox.classList.add('is-visible');
 }

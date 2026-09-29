@@ -84,8 +84,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $insertStmt = $pdo->prepare(
             "INSERT INTO contracts
-                (contract_number, quotation_id, request_id, client_id, scope_summary, terms_conditions, total_amount, start_date, end_date, status, prepared_by, approved_by, approved_at)
-             VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, 'Approved', ?, ?, NOW())"
+                (contract_number, quotation_id, request_id, client_id, scope_summary, total_amount, start_date, end_date, status, prepared_by, approved_by, approved_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Approved', ?, ?, NOW())"
         );
         $insertStmt->execute([
             $contractNumber, $quote['quotation_id'], $quote['request_id'], $quote['client_id'],
@@ -106,9 +106,9 @@ unset($_SESSION['alert_type'], $_SESSION['alert_message']);
 
 $availableQuotationsStmt = $pdo->query(
     "SELECT q.quotation_id, q.quotation_number, q.total_amount, q.subtotal, q.tax_rate, q.tax_amount,
-            q.project_scope, q.valid_until, q.notes,
+            q.project_scope, q.valid_until,
             c.client_id, c.company_name, c.contact_person, c.email, c.contact_number, c.address, c.industry,
-            sr.request_title, sr.request_details, sr.required_skill
+            sr.request_title, sr.required_skill
      FROM quotations q
      INNER JOIN clients c ON q.client_id = c.client_id
      INNER JOIN service_requests sr ON q.request_id = sr.request_id
@@ -169,7 +169,7 @@ $totalPages = max(1, (int) ceil($filteredContractCount / $perPage));
 $listQuery = "SELECT ct.contract_id, ct.contract_number, ct.quotation_id, ct.status, ct.total_amount, ct.start_date, ct.end_date,
             ct.scope_summary, ct.created_at, ct.approved_at,
             c.company_name, c.contact_person, c.email, c.contact_number, c.address, c.industry,
-            sr.request_title, sr.request_details, sr.required_skill,
+            sr.request_title, sr.required_skill,
             q.quotation_number, q.subtotal, q.tax_rate, q.tax_amount, q.valid_until AS quotation_valid_until,
             pb.firstname AS prepared_firstname, pb.lastname AS prepared_lastname,
             ab.firstname AS approved_firstname, ab.lastname AS approved_lastname
@@ -1131,7 +1131,6 @@ body {
                             "industry" => $ct["industry"],
 
                             "request" => $ct["request_title"],
-                            "request_details" => $ct["request_details"],
                             "required_skill" => $ct["required_skill"],
 
                             "quotation_number" => $ct["quotation_number"],
@@ -1249,7 +1248,6 @@ body {
                             'address' => $q['address'],
                             'industry' => $q['industry'],
                             'request_title' => $q['request_title'],
-                            'request_details' => $q['request_details'],
                             'required_skill' => $q['required_skill'],
                             'project_scope' => $q['project_scope'],
                             'subtotal' => number_format((float) $q['subtotal'], 2),
@@ -1315,7 +1313,6 @@ body {
                         <div class="view-section-label">Service Request</div>
                         <div class="fw-semibold small" id="preview_request_title"></div>
                         <div class="small mb-1" id="preview_required_skill"></div>
-                        <div class="small" id="preview_request_details" style="white-space:pre-line;"></div>
 
                         <div class="view-section-label">Project Scope</div>
                         <div class="small" id="preview_project_scope" style="white-space:pre-line;"></div>
@@ -1606,7 +1603,6 @@ document.querySelectorAll('.quotation-pick-card').forEach(function (cardEl) {
 
     document.getElementById('preview_request_title').textContent = data.request_title;
     document.getElementById('preview_required_skill').textContent = data.required_skill ? ('Required skill: ' + data.required_skill) : 'Required skill: not specified';
-    document.getElementById('preview_request_details').textContent = data.request_details || 'No additional details were provided for this request.';
 
     document.getElementById('preview_project_scope').textContent = data.project_scope || 'No project scope provided.';
 

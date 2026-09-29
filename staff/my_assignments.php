@@ -1,4 +1,7 @@
 <?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 session_name('STAFF_SESSION');
 session_start();
 require_once __DIR__ . '/../config/database.php';
@@ -76,10 +79,10 @@ $offset     = ($page - 1) * $perPage;
 function buildAssignmentQuery(string $status, string $searchTerm): array
 {
     $query = "SELECT sr.*, c.company_name, c.contact_person, c.email, c.contact_number, c.address, c.industry,
-                     ct.contract_number, ct.quotation_id, ct.total_amount, ct.scope_summary, ct.terms_conditions,
+                     ct.contract_number, ct.quotation_id, ct.total_amount, ct.scope_summary,
                      ct.start_date, ct.end_date, ct.approved_at,
                      q.quotation_number, q.subtotal, q.tax_rate, q.tax_amount,
-                     q.valid_until AS quotation_valid_until, q.notes AS quotation_notes,
+                     q.valid_until AS quotation_valid_until,
                      ab.firstname AS assigned_by_firstname, ab.lastname AS assigned_by_lastname
               FROM service_requests sr
               JOIN clients c ON c.client_id = sr.client_id
@@ -212,14 +215,12 @@ function buildAssignmentPayload(array $row, array $itemsByQuotation): array
         'start_date'       => formatDisplayDate($row['start_date'] ?? null),
         'end_date'         => formatDisplayDate($row['end_date'] ?? null),
         'scope_summary'    => $row['scope_summary'] ?? null,
-        'terms_conditions' => $row['terms_conditions'] ?? null,
         'assigned_by'      => $assignedBy !== '' ? $assignedBy : null,
         'quotation_number' => $row['quotation_number'] ?? null,
         'subtotal'         => isset($row['subtotal']) ? number_format((float) $row['subtotal'], 2) : null,
         'tax_rate'         => isset($row['tax_rate']) ? formatQuantity($row['tax_rate']) : null,
         'tax_amount'       => isset($row['tax_amount']) ? number_format((float) $row['tax_amount'], 2) : null,
         'valid_until'      => formatDisplayDate($row['quotation_valid_until'] ?? null),
-        'quotation_notes'  => $row['quotation_notes'] ?? null,
         'items'            => $items,
     ];
 }
@@ -256,7 +257,6 @@ $emptyCopy = $emptyStateCopy[$activeTab] ?? $emptyStateCopy['new'];
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lexend:wght@500;600;700&display=swap" rel="stylesheet">
   <style>
-    /* Full Details Modal (matches admin resource matching style) */
     #requestDetailsModal .modal-content { border-radius: 0; }
     #requestDetailsModal .modal-header {
       padding: .9rem 1.25rem;
@@ -635,7 +635,6 @@ $emptyCopy = $emptyStateCopy[$activeTab] ?? $emptyStateCopy['new'];
     </div>
   </div>
 
-  <!-- Full Details Modal (same style as admin Resource Matching) -->
   <div class="modal fade" id="requestDetailsModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-fullscreen">
       <div class="modal-content">
@@ -735,17 +734,6 @@ $emptyCopy = $emptyStateCopy[$activeTab] ?? $emptyStateCopy['new'];
                     </div>
                   </div>
 
-                  <div class="quote-panel">
-                    <div class="details-heading">
-                      <span class="step-icon"><i class="fa-solid fa-file-contract"></i></span>
-                      Terms and Conditions
-                    </div>
-                    <div class="clamp-block">
-                      <div class="clamp-text" id="detail_terms"></div>
-                      <button type="button" class="clamp-toggle d-none">See more</button>
-                    </div>
-                  </div>
-
                 </div>
               </div>
 
@@ -777,13 +765,6 @@ $emptyCopy = $emptyStateCopy[$activeTab] ?? $emptyStateCopy['new'];
                     <div class="mt-3">
                       <div class="section-label">Quotation Valid Until</div>
                       <div class="details-value" id="detail_valid_until"></div>
-                    </div>
-                    <div class="mt-3">
-                      <div class="section-label">Quotation Notes</div>
-                      <div class="clamp-block">
-                        <div class="clamp-text" id="detail_quotation_notes"></div>
-                        <button type="button" class="clamp-toggle d-none">See more</button>
-                      </div>
                     </div>
                   </div>
 
@@ -832,7 +813,6 @@ $emptyCopy = $emptyStateCopy[$activeTab] ?? $emptyStateCopy['new'];
     });
     <?php endif; ?>
 
-    /* ---------- Full Details Modal logic (same pattern as admin resource_matching.php) ---------- */
     const EMPTY_VALUE = '\u2014';
     const CLAMP_CHARACTER_LIMIT = 220;
     const CLAMP_LINE_LIMIT = 3;
@@ -849,16 +829,6 @@ $emptyCopy = $emptyStateCopy[$activeTab] ?? $emptyStateCopy['new'];
       const element = document.createElement('div');
       element.textContent = (value === null || value === undefined) ? '' : String(value);
       return element.innerHTML;
-    }
-
-    function formatTerms(text) {
-      if (!hasText(text)) return '';
-      let formatted = String(text).trim();
-      if (formatted.indexOf('\n') === -1) {
-        formatted = formatted.replace(/\s+(?=\d{1,2}\.\s+[A-Z][A-Z\s&,\/]{3,}\s)/g, '\n\n');
-        formatted = formatted.replace(/\s+-\s+(?=[A-Z0-9])/g, '\n- ');
-      }
-      return formatted;
     }
 
     function setClampText(elementId, value, fallback) {
@@ -927,8 +897,6 @@ $emptyCopy = $emptyStateCopy[$activeTab] ?? $emptyStateCopy['new'];
       renderRequiredSkillInto('detail_required_skill_display', request.required_skill);
       setClampText('detail_request_details', request.request_details, 'No additional details were provided for this request.');
       setClampText('detail_scope', request.scope_summary, 'No project scope provided.');
-      setClampText('detail_terms', formatTerms(request.terms_conditions), 'No terms and conditions provided.');
-      setClampText('detail_quotation_notes', request.quotation_notes, 'No notes provided.');
 
       setText('detail_quotation_number', request.quotation_number ? '\u00B7 ' + request.quotation_number : '', '');
       renderQuotationItems(request.items);
