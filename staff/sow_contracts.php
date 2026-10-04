@@ -10,93 +10,92 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'staff') {
 
 $pdo = getConnection();
 
+const CONTRACT_STATUSES = ['Draft', 'Approved', 'Rejected'];
+
+function e($value): string
+{
+    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+}
+
+function flash(string $type, string $message): void
+{
+    $_SESSION['alert_type'] = $type;
+    $_SESSION['alert_message'] = $message;
+    header('Location: sow_contracts.php');
+    exit;
+}
+
 function generateContractNumber(PDO $pdo): string
 {
     $year = date('Y');
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM contracts WHERE contract_number LIKE ?");
+    $stmt = $pdo->prepare("SELECT contract_number FROM contracts WHERE contract_number LIKE ? ORDER BY contract_number DESC LIMIT 1");
     $stmt->execute(["SOW-{$year}-%"]);
-    $count = (int) $stmt->fetchColumn() + 1;
-    return sprintf('SOW-%s-%04d', $year, $count);
+    $last = $stmt->fetchColumn();
+    $next = $last ? ((int) substr($last, -4)) + 1 : 1;
+    return sprintf('SOW-%s-%04d', $year, $next);
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-
     $action = $_POST['action'] ?? '';
 
-    if ($action === 'generate_contract') {
-        $quotationId = $_POST['quotation_id'] ?? null;
-        $startDate   = $_POST['start_date'] ?: null;
-        $endDate     = $_POST['end_date'] ?: null;
-        $today       = date('Y-m-d');
+    try {
+        if ($action === 'generate_contract') {
+            $quotationId = (int) ($_POST['quotation_id'] ?? 0);
+            $startDate   = ($_POST['start_date'] ?? '') ?: null;
+            $endDate     = ($_POST['end_date'] ?? '') ?: null;
+            $today       = date('Y-m-d');
 
-        if (!$quotationId) {
-            $_SESSION['alert_type'] = 'error';
-            $_SESSION['alert_message'] = 'Please select an approved quotation.';
-            header('Location: sow_contracts.php');
-            exit;
+            if ($quotationId <= 0) {
+                flash('error', 'Please select an approved quotation.');
+            }
+            if ($startDate && $startDate < $today) {
+                flash('error', 'Start date cannot be in the past.');
+            }
+            if ($endDate && $endDate < $today) {
+                flash('error', 'End date cannot be in the past.');
+            }
+            if ($startDate && $endDate && $endDate < $startDate) {
+                flash('error', 'End date cannot be earlier than the start date.');
+            }
+
+            $quoteStmt = $pdo->prepare(
+                "SELECT quotation_id, request_id, client_id, project_scope, total_amount
+                 FROM quotations WHERE quotation_id = ? AND status = 'Approved'"
+            );
+            $quoteStmt->execute([$quotationId]);
+            $quote = $quoteStmt->fetch();
+
+            if (!$quote) {
+                flash('error', 'Selected quotation was not found or is not yet approved.');
+            }
+
+            $dupStmt = $pdo->prepare('SELECT COUNT(*) FROM contracts WHERE quotation_id = ?');
+            $dupStmt->execute([$quotationId]);
+            if ((int) $dupStmt->fetchColumn() > 0) {
+                flash('error', 'A contract already exists for this quotation.');
+            }
+
+            $contractNumber = generateContractNumber($pdo);
+
+            $insertStmt = $pdo->prepare(
+                "INSERT INTO contracts
+                    (contract_number, quotation_id, request_id, client_id, scope_summary, total_amount, start_date, end_date, status, prepared_by, approved_by, approved_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Draft', ?, NULL, NULL)"
+            );
+            $insertStmt->execute([
+                $contractNumber, $quote['quotation_id'], $quote['request_id'], $quote['client_id'],
+                $quote['project_scope'], $quote['total_amount'], $startDate, $endDate,
+                $_SESSION['user_id'],
+            ]);
+
+            flash('success', "Contract {$contractNumber} saved as draft.");
         }
-
-        if ($startDate && $startDate < $today) {
-            $_SESSION['alert_type'] = 'error';
-            $_SESSION['alert_message'] = 'Start date cannot be in the past.';
-            header('Location: sow_contracts.php');
-            exit;
+    } catch (Throwable $ex) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
         }
-
-        if ($endDate && $endDate < $today) {
-            $_SESSION['alert_type'] = 'error';
-            $_SESSION['alert_message'] = 'End date cannot be in the past.';
-            header('Location: sow_contracts.php');
-            exit;
-        }
-
-        if ($startDate && $endDate && $endDate < $startDate) {
-            $_SESSION['alert_type'] = 'error';
-            $_SESSION['alert_message'] = 'End date cannot be earlier than the start date.';
-            header('Location: sow_contracts.php');
-            exit;
-        }
-
-        $quoteStmt = $pdo->prepare(
-            "SELECT quotation_id, request_id, client_id, project_scope, total_amount
-             FROM quotations WHERE quotation_id = ? AND status = 'Approved'"
-        );
-        $quoteStmt->execute([$quotationId]);
-        $quote = $quoteStmt->fetch();
-
-        if (!$quote) {
-            $_SESSION['alert_type'] = 'error';
-            $_SESSION['alert_message'] = 'Selected quotation was not found or is not yet approved.';
-            header('Location: sow_contracts.php');
-            exit;
-        }
-
-        $dupStmt = $pdo->prepare('SELECT COUNT(*) FROM contracts WHERE quotation_id = ?');
-        $dupStmt->execute([$quotationId]);
-        if ((int) $dupStmt->fetchColumn() > 0) {
-            $_SESSION['alert_type'] = 'error';
-            $_SESSION['alert_message'] = 'A contract already exists for this quotation.';
-            header('Location: sow_contracts.php');
-            exit;
-        }
-
-        $contractNumber = generateContractNumber($pdo);
-
-        $insertStmt = $pdo->prepare(
-            "INSERT INTO contracts
-                (contract_number, quotation_id, request_id, client_id, scope_summary, total_amount, start_date, end_date, status, prepared_by, approved_by, approved_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Approved', ?, ?, NOW())"
-        );
-        $insertStmt->execute([
-            $contractNumber, $quote['quotation_id'], $quote['request_id'], $quote['client_id'],
-            $quote['project_scope'], $quote['total_amount'], $startDate, $endDate,
-            $_SESSION['user_id'], $_SESSION['user_id'],
-        ]);
-
-        $_SESSION['alert_type'] = 'success';
-        $_SESSION['alert_message'] = "Contract {$contractNumber} generated and approved successfully.";
-        header('Location: sow_contracts.php');
-        exit;
+        error_log('sow_contracts: ' . $ex->getMessage());
+        flash('error', 'Something went wrong while saving. Please try again.');
     }
 }
 
@@ -124,20 +123,11 @@ foreach ($availableQuotationItemsStmt->fetchAll() as $row) {
     $itemsByAvailableQuotation[$row['quotation_id']][] = $row;
 }
 
-$searchTerm = trim($_GET['search'] ?? '');
-$dateFilter = trim($_GET['date'] ?? '');
-$perPage    = 8;
-$page       = max(1, (int) ($_GET['page'] ?? 1));
-$offset     = ($page - 1) * $perPage;
-
-$statsStmt = $pdo->query("SELECT total_amount FROM contracts WHERE status = 'Approved'");
-$statsRows = $statsStmt->fetchAll();
-
-$totalApprovedValue = 0.0;
-foreach ($statsRows as $row) {
-    $totalApprovedValue += (float) $row['total_amount'];
-}
-$totalContracts = count($statsRows);
+$searchTerm   = trim($_GET['search'] ?? '');
+$dateFilter   = trim($_GET['date'] ?? '');
+$statusFilter = in_array($_GET['status'] ?? '', CONTRACT_STATUSES, true) ? $_GET['status'] : '';
+$perPage      = 8;
+$page         = max(1, (int) ($_GET['page'] ?? 1));
 
 $baseQuery = "FROM contracts ct
      INNER JOIN clients c ON ct.client_id = c.client_id
@@ -146,38 +136,58 @@ $baseQuery = "FROM contracts ct
      LEFT JOIN users pb ON ct.prepared_by = pb.user_id
      LEFT JOIN users ab ON ct.approved_by = ab.user_id
      WHERE 1=1";
-$queryParams = [];
+$baseParams = [];
 
 if ($searchTerm !== '') {
     $baseQuery .= " AND (ct.contract_number LIKE ? OR c.company_name LIKE ? OR sr.request_title LIKE ?)";
     $like = '%' . $searchTerm . '%';
-    $queryParams[] = $like;
-    $queryParams[] = $like;
-    $queryParams[] = $like;
+    array_push($baseParams, $like, $like, $like);
 }
 
 if ($dateFilter !== '') {
     $baseQuery .= " AND DATE(ct.created_at) = ?";
-    $queryParams[] = $dateFilter;
+    $baseParams[] = $dateFilter;
 }
 
-$countStmt = $pdo->prepare("SELECT COUNT(*) $baseQuery");
-$countStmt->execute($queryParams);
+$statsStmt = $pdo->prepare("SELECT ct.status, COUNT(*) AS cnt, COALESCE(SUM(ct.total_amount), 0) AS total $baseQuery GROUP BY ct.status");
+$statsStmt->execute($baseParams);
+$statusCounts = ['Draft' => 0, 'Approved' => 0, 'Rejected' => 0];
+$totalApprovedValue = 0.0;
+foreach ($statsStmt->fetchAll() as $row) {
+    $statusCounts[$row['status']] = (int) $row['cnt'];
+    if ($row['status'] === 'Approved') {
+        $totalApprovedValue = (float) $row['total'];
+    }
+}
+$totalContracts = array_sum($statusCounts);
+
+$listQuery = $baseQuery;
+$listParams = $baseParams;
+if ($statusFilter !== '') {
+    $listQuery .= " AND ct.status = ?";
+    $listParams[] = $statusFilter;
+}
+
+$countStmt = $pdo->prepare("SELECT COUNT(*) $listQuery");
+$countStmt->execute($listParams);
 $filteredContractCount = (int) $countStmt->fetchColumn();
 $totalPages = max(1, (int) ceil($filteredContractCount / $perPage));
+$page = min($page, $totalPages);
+$offset = ($page - 1) * $perPage;
 
-$listQuery = "SELECT ct.contract_id, ct.contract_number, ct.quotation_id, ct.status, ct.total_amount, ct.start_date, ct.end_date,
+$contractsStmt = $pdo->prepare(
+    "SELECT ct.contract_id, ct.contract_number, ct.quotation_id, ct.status, ct.total_amount, ct.start_date, ct.end_date,
             ct.scope_summary, ct.created_at, ct.approved_at,
             c.company_name, c.contact_person, c.email, c.contact_number, c.address, c.industry,
             sr.request_title, sr.required_skill,
             q.quotation_number, q.subtotal, q.tax_rate, q.tax_amount, q.valid_until AS quotation_valid_until,
             pb.firstname AS prepared_firstname, pb.lastname AS prepared_lastname,
             ab.firstname AS approved_firstname, ab.lastname AS approved_lastname
-     $baseQuery
+     $listQuery
      ORDER BY ct.created_at DESC
-     LIMIT $perPage OFFSET $offset";
-$contractsStmt = $pdo->prepare($listQuery);
-$contractsStmt->execute($queryParams);
+     LIMIT $perPage OFFSET $offset"
+);
+$contractsStmt->execute($listParams);
 $contracts = $contractsStmt->fetchAll();
 
 $revisionsStmt = $pdo->query(
@@ -191,7 +201,7 @@ foreach ($revisionsStmt->fetchAll() as $row) {
     $revisionsByContract[$row['contract_id']][] = $row;
 }
 
-function buildContractPageUrl(int $targetPage, string $searchTerm, string $dateFilter): string
+function buildContractPageUrl(int $targetPage, string $searchTerm, string $dateFilter, string $statusFilter): string
 {
     $params = ['page' => $targetPage];
     if ($searchTerm !== '') {
@@ -200,8 +210,23 @@ function buildContractPageUrl(int $targetPage, string $searchTerm, string $dateF
     if ($dateFilter !== '') {
         $params['date'] = $dateFilter;
     }
+    if ($statusFilter !== '') {
+        $params['status'] = $statusFilter;
+    }
     return '?' . http_build_query($params);
 }
+
+function statusClass(string $status): string
+{
+    return 'status-' . strtolower($status);
+}
+
+$statusTabs = [
+    ''         => ['label' => 'All', 'count' => $totalContracts],
+    'Draft'    => ['label' => 'Draft', 'count' => $statusCounts['Draft']],
+    'Approved' => ['label' => 'Approved', 'count' => $statusCounts['Approved']],
+    'Rejected' => ['label' => 'Rejected', 'count' => $statusCounts['Rejected']],
+];
 
 ?>
 <!DOCTYPE html>
@@ -314,6 +339,15 @@ body {
 }
 .btn-teal-solid:hover { background-color: var(--indigo-text); color: #fff; }
 
+.btn-approve-solid {
+  background-color: var(--success);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+}
+.btn-approve-solid:hover { background-color: var(--success-text); color: #fff; }
+
 .btn-ghost {
   background-color: var(--navy-soft);
   color: var(--navy);
@@ -341,15 +375,6 @@ body {
   outline: none;
   box-shadow: 0 0 0 .2rem rgba(180, 67, 47, .25);
 }
-.btn-reset:disabled,
-.btn-reset.disabled {
-  background-color: var(--danger);
-  border-color: var(--danger);
-  color: #fff;
-  opacity: 1;
-  cursor: default;
-  pointer-events: none;
-}
 
 .table thead th {
   border-bottom: 1px solid var(--line) !important;
@@ -365,19 +390,84 @@ body {
 .table td { border-bottom: 1px solid var(--line); color: var(--ink); vertical-align: middle; }
 .table-hover tbody tr:hover { background-color: var(--navy-soft); }
 
+.contract-row { cursor: pointer; }
+
+.status-badge,
 .status-pill {
-  font-size: .7rem;
-  font-weight: 700;
-  padding: .32rem .7rem;
+  display: inline-flex;
+  align-items: center;
+  padding: .22rem .65rem;
   border-radius: 999px;
+  font-size: .72rem;
+  font-weight: 700;
   white-space: nowrap;
   letter-spacing: .01em;
   border: 1px solid transparent;
-  display: inline-block;
 }
-.status-draft { background-color: var(--navy-soft); color: var(--slate); border-color: var(--line); }
+.status-draft { background-color: var(--warn-soft); color: var(--warn-text); border-color: var(--warn-border); }
 .status-approved { background-color: var(--success-soft); color: var(--success-text); border-color: var(--success-border); }
 .status-rejected { background-color: var(--danger-soft); color: var(--danger-text); border-color: var(--danger-border); }
+
+.status-tabs { display: flex; gap: .4rem; flex-wrap: wrap; }
+.status-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  padding: .4rem .85rem;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background-color: #fff;
+  color: var(--slate);
+  font-size: .8rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.status-tab:hover { background-color: var(--indigo-soft); border-color: #C9D0E8; color: var(--indigo-text); }
+.status-tab.is-active { background-color: var(--indigo); border-color: var(--indigo); color: #fff; }
+.status-tab.is-active:hover { background-color: var(--indigo-text); border-color: var(--indigo-text); color: #fff; }
+.status-tab .tab-count { font-size: .72rem; opacity: .75; }
+
+.summary-bar {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  background-color: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: .75rem 1.15rem;
+}
+
+.summary-item {
+  display: flex;
+  align-items: baseline;
+  gap: .65rem;
+  min-width: 0;
+}
+
+.summary-label {
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.summary-value {
+  font-family: 'Lexend', 'Inter', sans-serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--navy-deep);
+  word-break: break-word;
+}
+
+.summary-money { color: var(--success-text); }
+
+.summary-divider {
+  width: 1px;
+  align-self: stretch;
+  background-color: var(--line);
+}
 
 .quotation-pick-card {
   border: 1px solid var(--line);
@@ -429,15 +519,6 @@ body {
 
 .empty-state { color: var(--ink-soft); }
 .empty-state i { color: #C7D0D6; }
-
-.stat-card {
-  background-color: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 1rem 1.15rem;
-}
-.stat-card .stat-label { font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-soft); }
-.stat-card .stat-value { font-family: 'Lexend', sans-serif; font-size: 1.5rem; font-weight: 700; color: var(--navy-deep); margin-top: .15rem; word-break: break-word; }
 
 .pagination .page-link { color: var(--indigo-text); border-color: var(--line); }
 .pagination .page-item.active .page-link { background-color: var(--indigo); border-color: var(--indigo); color: #fff; }
@@ -764,17 +845,12 @@ body {
 .mobile-row-label { display: none; }
 
 @media (max-width: 1199.98px) {
-  .stat-card { padding: .85rem .95rem; }
-  .stat-card .stat-value { font-size: 1.3rem; }
   .quote-panel { padding: 1rem 1.05rem; }
 }
 
 @media (max-width: 991.98px) {
   .dashboard-title { font-size: 1rem !important; }
   .dashboard-subtitle { font-size: .78rem !important; }
-  .stat-card { padding: .75rem .85rem; }
-  .stat-card .stat-label { font-size: .66rem; }
-  .stat-card .stat-value { font-size: 1.15rem; }
   .table td, .table th { font-size: .8rem; }
   .quote-panel-title { font-size: .88rem; margin-bottom: .8rem; }
   .quote-panel-title .step-icon { width: 24px; height: 24px; font-size: .68rem; }
@@ -796,10 +872,18 @@ body {
   .btn { font-size: .8rem; }
   .btn-ghost { font-size: .74rem; padding: .32rem .55rem; }
 
-  .stat-card { padding: .6rem .7rem; border-radius: 10px; }
-  .stat-card .stat-label { font-size: .6rem; letter-spacing: .03em; }
-  .stat-card .stat-value { font-size: 1rem; }
-  .stat-card .stat-value.stat-money { font-size: .82rem !important; }
+  .summary-bar {
+    gap: .75rem;
+    padding: .6rem .8rem;
+  }
+  .summary-item {
+    flex: 1 1 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: .1rem;
+  }
+  .summary-label { font-size: .6rem; letter-spacing: .04em; }
+  .summary-value { font-size: .98rem; }
 
   .table-responsive { overflow: visible; }
   #contractsTable thead { display: none; }
@@ -834,13 +918,7 @@ body {
     padding-top: .1rem;
   }
   #contractsTable tbody tr td .cell-body { flex: 1 1 auto; min-width: 0; word-break: break-word; }
-  #contractsTable tbody tr td.cell-actions {
-    justify-content: flex-end;
-    border-top: 1px solid var(--line);
-    margin-top: .35rem;
-    padding-top: .5rem;
-  }
-  #contractsTable tbody tr td.cell-actions .mobile-row-label { display: none; }
+  #contractsTable tbody tr td.cell-empty { display: block !important; text-align: center; }
 
   .card-footer .pagination .page-link { font-size: .75rem; padding: .25rem .5rem; }
 
@@ -856,7 +934,7 @@ body {
   .view-kv-value { font-size: .8rem; }
   .view-text-box { padding: .6rem .7rem; font-size: .8rem; }
   .form-label { font-size: .68rem; }
-  .status-pill { font-size: .64rem; padding: .25rem .55rem; }
+  .status-pill, .status-badge { font-size: .64rem; padding: .25rem .55rem; }
   .btn-print { font-size: .82rem; padding: .35rem .6rem; }
   .btn-print i { font-size: .9rem; }
   .doc-action-label { min-width: 56px; font-size: .6rem; }
@@ -873,7 +951,6 @@ body {
 
 @media (max-width: 575.98px) {
   .dashboard-content { padding: .5rem !important; }
-  .stat-card .stat-value { font-size: .95rem; }
   #contractsTable tbody tr td { font-size: .74rem; }
   .modal-title { font-size: .88rem !important; }
   .agreement-doc { padding: .85rem .85rem; font-size: .74rem; }
@@ -1018,17 +1095,18 @@ body {
       <div class="card mb-3">
         <div class="card-body p-2 p-md-3">
           <form method="GET" class="row g-2 align-items-center" id="contractFilterForm">
+            <input type="hidden" name="status" id="contractStatusInput" value="<?= e($statusFilter) ?>">
             <div class="col-12 col-lg-6">
               <div class="input-group">
                 <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass" style="color:var(--ink-soft);"></i></span>
-                <input type="text" name="search" id="contractSearchInput" class="form-control" placeholder="Search contract #, company, or request" value="<?= htmlspecialchars($searchTerm) ?>" autocomplete="off">
+                <input type="text" name="search" id="contractSearchInput" class="form-control" placeholder="Search contract #, company, or request" value="<?= e($searchTerm) ?>" autocomplete="off">
                 <span class="input-group-text bg-white"><span class="search-spinner" id="searchSpinner"></span></span>
               </div>
             </div>
             <div class="col-8 col-sm-9 col-lg-3">
               <div class="input-group">
                 <span class="input-group-text bg-white"><i class="fa-regular fa-calendar" style="color:var(--ink-soft);"></i></span>
-                <input type="date" name="date" id="contractDateInput" class="form-control" value="<?= htmlspecialchars($dateFilter) ?>">
+                <input type="date" name="date" id="contractDateInput" class="form-control" value="<?= e($dateFilter) ?>">
               </div>
             </div>
             <div class="col-4 col-sm-3 col-lg-1">
@@ -1045,19 +1123,24 @@ body {
         </div>
       </div>
 
-      <div class="row g-2 g-md-3 mb-3">
-        <div class="col-6 col-lg-6">
-          <div class="stat-card">
-            <div class="stat-label">Total Contracts</div>
-            <div class="stat-value"><?= (int) $totalContracts ?></div>
-          </div>
+      <div class="summary-bar mb-3">
+        <div class="summary-item">
+          <span class="summary-label">Total Contracts</span>
+          <span class="summary-value"><?= (int) $totalContracts ?></span>
         </div>
-        <div class="col-6 col-lg-6">
-          <div class="stat-card">
-            <div class="stat-label">Total Value</div>
-            <div class="stat-value stat-money" style="font-size:1.3rem; color:var(--success-text);">&#8369;<?= number_format($totalApprovedValue, 2) ?></div>
-          </div>
+        <div class="summary-divider"></div>
+        <div class="summary-item">
+          <span class="summary-label">Approved Value</span>
+          <span class="summary-value summary-money">&#8369;<?= number_format($totalApprovedValue, 2) ?></span>
         </div>
+      </div>
+
+      <div class="status-tabs mb-3">
+        <?php foreach ($statusTabs as $tabValue => $tab): ?>
+          <a class="status-tab <?= $statusFilter === (string) $tabValue ? 'is-active' : '' ?>" href="<?= buildContractPageUrl(1, $searchTerm, $dateFilter, (string) $tabValue) ?>">
+            <?= e($tab['label']) ?> <span class="tab-count"><?= (int) $tab['count'] ?></span>
+          </a>
+        <?php endforeach; ?>
       </div>
 
       <section class="card overflow-hidden">
@@ -1069,14 +1152,14 @@ body {
                 <th scope="col">Client / Request</th>
                 <th scope="col" class="d-none d-md-table-cell">Quotation</th>
                 <th scope="col">Total</th>
+                <th scope="col">Status</th>
                 <th scope="col" class="d-none d-lg-table-cell">Duration</th>
-                <th scope="col" class="text-end">Action</th>
               </tr>
             </thead>
             <tbody id="contractsTableBody">
               <?php if (empty($contracts)): ?>
                 <tr>
-                  <td colspan="6">
+                  <td colspan="6" class="cell-empty">
                     <div class="empty-state text-center py-5">
                       <i class="fa-regular fa-file-lines fs-3 mb-2 d-block"></i>
                       <p class="small mb-0">No contracts found.</p>
@@ -1085,87 +1168,79 @@ body {
                 </tr>
               <?php else: ?>
                 <?php foreach ($contracts as $ct): ?>
-                  <tr>
+                  <?php
+                    $viewPayload = [
+                        'contract_id' => $ct['contract_id'],
+                        'number' => $ct['contract_number'],
+                        'status' => $ct['status'],
+                        'created_at' => $ct['created_at'] ? date('M d, Y', strtotime($ct['created_at'])) : null,
+                        'company' => $ct['company_name'],
+                        'contact_person' => $ct['contact_person'],
+                        'email' => $ct['email'],
+                        'contact_number' => $ct['contact_number'],
+                        'address' => $ct['address'],
+                        'industry' => $ct['industry'],
+                        'request' => $ct['request_title'],
+                        'required_skill' => $ct['required_skill'],
+                        'quotation_number' => $ct['quotation_number'],
+                        'subtotal' => number_format((float) $ct['subtotal'], 2),
+                        'tax_rate' => rtrim(rtrim(number_format((float) $ct['tax_rate'], 2), '0'), '.'),
+                        'tax_amount' => number_format((float) $ct['tax_amount'], 2),
+                        'total' => number_format((float) $ct['total_amount'], 2),
+                        'quotation_valid_until' => $ct['quotation_valid_until'] ? date('M d, Y', strtotime($ct['quotation_valid_until'])) : null,
+                        'items' => array_map(function ($it) {
+                            return [
+                                'description' => $it['description'],
+                                'quantity' => rtrim(rtrim(number_format((float) $it['quantity'], 2), '0'), '.'),
+                                'unit_price' => number_format((float) $it['unit_price'], 2),
+                                'line_total' => number_format((float) $it['line_total'], 2),
+                            ];
+                        }, $itemsByAvailableQuotation[$ct['quotation_id']] ?? []),
+                        'start_date' => $ct['start_date'] ? date('M d, Y', strtotime($ct['start_date'])) : null,
+                        'end_date' => $ct['end_date'] ? date('M d, Y', strtotime($ct['end_date'])) : null,
+                        'scope_summary' => $ct['scope_summary'],
+                        'prepared_by' => trim(($ct['prepared_firstname'] ?? '') . ' ' . ($ct['prepared_lastname'] ?? '')),
+                        'approved_by' => $ct['approved_firstname'] ? trim($ct['approved_firstname'] . ' ' . $ct['approved_lastname']) : null,
+                        'approved_at' => $ct['approved_at'] ? date('M d, Y', strtotime($ct['approved_at'])) : null,
+                        'revisions' => array_map(function ($r) {
+                            return [
+                                'note' => $r['revision_note'],
+                                'by' => trim(($r['firstname'] ?? '') . ' ' . ($r['lastname'] ?? '')),
+                                'date' => $r['created_at'] ? date('M d, Y g:i A', strtotime($r['created_at'])) : '',
+                            ];
+                        }, $revisionsByContract[$ct['contract_id']] ?? []),
+                    ];
+                  ?>
+                  <tr class="contract-row" data-contract="<?= e(json_encode($viewPayload)) ?>">
                     <td class="small fw-semibold">
                       <span class="mobile-row-label">Contract #</span>
-                      <span class="cell-body fw-semibold"><?= htmlspecialchars($ct['contract_number']) ?></span>
+                      <span class="cell-body fw-semibold"><?= e($ct['contract_number']) ?></span>
                     </td>
                     <td class="small">
                       <span class="mobile-row-label">Client</span>
                       <span class="cell-body">
-                        <span class="fw-semibold d-block"><?= htmlspecialchars($ct['company_name']) ?></span>
-                        <span class="d-block" style="color:var(--ink-soft); font-size:.75rem;"><?= htmlspecialchars($ct['request_title']) ?></span>
+                        <span class="fw-semibold d-block"><?= e($ct['company_name']) ?></span>
+                        <span class="d-block" style="color:var(--ink-soft); font-size:.75rem;"><?= e($ct['request_title']) ?></span>
                       </span>
                     </td>
                     <td class="small d-none d-md-table-cell" style="color:var(--ink-soft);">
                       <span class="mobile-row-label">Quotation</span>
-                      <span class="cell-body"><?= htmlspecialchars($ct['quotation_number']) ?></span>
+                      <span class="cell-body"><?= e($ct['quotation_number']) ?></span>
                     </td>
                     <td class="small fw-semibold">
                       <span class="mobile-row-label">Total</span>
                       <span class="cell-body fw-semibold">&#8369;<?= number_format((float) $ct['total_amount'], 2) ?></span>
                     </td>
+                    <td class="small">
+                      <span class="mobile-row-label">Status</span>
+                      <span class="cell-body"><span class="status-badge <?= statusClass($ct['status']) ?>"><?= e($ct['status']) ?></span></span>
+                    </td>
                     <td class="small d-none d-lg-table-cell" style="color:var(--ink-soft);">
                       <span class="mobile-row-label">Duration</span>
                       <span class="cell-body">
-                        <?= $ct['start_date'] ? htmlspecialchars(date('M d, Y', strtotime($ct['start_date']))) : '&mdash;' ?>
+                        <?= $ct['start_date'] ? e(date('M d, Y', strtotime($ct['start_date']))) : '&mdash;' ?>
                         &ndash;
-                        <?= $ct['end_date'] ? htmlspecialchars(date('M d, Y', strtotime($ct['end_date']))) : '&mdash;' ?>
-                      </span>
-                    </td>
-                    <td class="text-end cell-actions">
-                      <span class="mobile-row-label">Action</span>
-                      <span class="cell-body d-flex justify-content-end gap-1 flex-wrap">
-                        <button type="button" class="btn btn-ghost btn-sm view-contract-btn" title="View contract"
-                          data-contract='<?= htmlspecialchars(json_encode([
-                            "contract_id" => $ct["contract_id"],
-                            "number" => $ct["contract_number"],
-                            "status" => $ct["status"],
-                            "created_at" => $ct["created_at"] ? date('M d, Y', strtotime($ct["created_at"])) : null,
-
-                            "company" => $ct["company_name"],
-                            "contact_person" => $ct["contact_person"],
-                            "email" => $ct["email"],
-                            "contact_number" => $ct["contact_number"],
-                            "address" => $ct["address"],
-                            "industry" => $ct["industry"],
-
-                            "request" => $ct["request_title"],
-                            "required_skill" => $ct["required_skill"],
-
-                            "quotation_number" => $ct["quotation_number"],
-                            "subtotal" => number_format((float) $ct["subtotal"], 2),
-                            "tax_rate" => rtrim(rtrim(number_format((float) $ct["tax_rate"], 2), '0'), '.'),
-                            "tax_amount" => number_format((float) $ct["tax_amount"], 2),
-                            "total" => number_format((float) $ct["total_amount"], 2),
-                            "quotation_valid_until" => $ct["quotation_valid_until"] ? date('M d, Y', strtotime($ct["quotation_valid_until"])) : null,
-                            "items" => array_map(function ($it) {
-                                return [
-                                    "description" => $it["description"],
-                                    "quantity" => rtrim(rtrim(number_format((float) $it["quantity"], 2), '0'), '.'),
-                                    "unit_price" => number_format((float) $it["unit_price"], 2),
-                                    "line_total" => number_format((float) $it["line_total"], 2),
-                                ];
-                            }, $itemsByAvailableQuotation[$ct["quotation_id"]] ?? []),
-
-                            "start_date" => $ct["start_date"] ? date('M d, Y', strtotime($ct["start_date"])) : null,
-                            "end_date" => $ct["end_date"] ? date('M d, Y', strtotime($ct["end_date"])) : null,
-                            "scope_summary" => $ct["scope_summary"],
-
-                            "prepared_by" => trim(($ct["prepared_firstname"] ?? '') . ' ' . ($ct["prepared_lastname"] ?? '')),
-                            "approved_by" => $ct["approved_firstname"] ? trim($ct["approved_firstname"] . ' ' . $ct["approved_lastname"]) : null,
-                            "approved_at" => $ct["approved_at"] ? date('M d, Y', strtotime($ct["approved_at"])) : null,
-
-                            "revisions" => array_map(function ($r) {
-                                return [
-                                    "note" => $r["revision_note"],
-                                    "by" => trim(($r["firstname"] ?? '') . ' ' . ($r["lastname"] ?? '')),
-                                    "date" => $r["created_at"] ? date('M d, Y g:i A', strtotime($r["created_at"])) : '',
-                                ];
-                            }, $revisionsByContract[$ct["contract_id"]] ?? []),
-                          ]), ENT_QUOTES) ?>'>
-                          <i class="fa-solid fa-eye"></i>
-                        </button>
+                        <?= $ct['end_date'] ? e(date('M d, Y', strtotime($ct['end_date']))) : '&mdash;' ?>
                       </span>
                     </td>
                   </tr>
@@ -1180,15 +1255,21 @@ body {
             <nav aria-label="Contracts pagination">
               <ul class="pagination pagination-sm mb-0 flex-wrap">
                 <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
-                  <a class="page-link" href="<?= buildContractPageUrl($page - 1, $searchTerm, $dateFilter) ?>">Prev</a>
+                  <a class="page-link" href="<?= buildContractPageUrl($page - 1, $searchTerm, $dateFilter, $statusFilter) ?>">Prev</a>
                 </li>
+                <?php $lastRendered = 0; ?>
                 <?php for ($i = 1; $i <= $totalPages; $i++): ?>
+                  <?php if ($i !== 1 && $i !== $totalPages && abs($i - $page) > 1) { continue; } ?>
+                  <?php if ($i - $lastRendered > 1): ?>
+                    <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+                  <?php endif; ?>
                   <li class="page-item <?= $i === $page ? 'active' : '' ?>">
-                    <a class="page-link" href="<?= buildContractPageUrl($i, $searchTerm, $dateFilter) ?>"><?= $i ?></a>
+                    <a class="page-link" href="<?= buildContractPageUrl($i, $searchTerm, $dateFilter, $statusFilter) ?>"><?= $i ?></a>
                   </li>
+                  <?php $lastRendered = $i; ?>
                 <?php endfor; ?>
                 <li class="page-item <?= $page >= $totalPages ? 'disabled' : '' ?>">
-                  <a class="page-link" href="<?= buildContractPageUrl($page + 1, $searchTerm, $dateFilter) ?>">Next</a>
+                  <a class="page-link" href="<?= buildContractPageUrl($page + 1, $searchTerm, $dateFilter, $statusFilter) ?>">Next</a>
                 </li>
               </ul>
             </nav>
@@ -1238,8 +1319,8 @@ body {
                               ];
                           }, $itemsByAvailableQuotation[$q['quotation_id']] ?? []);
                         ?>
-                        <div class="quotation-pick-card p-2 p-md-3" data-quotation-id="<?= $q['quotation_id'] ?>"
-                          data-preview='<?= htmlspecialchars(json_encode([
+                        <div class="quotation-pick-card p-2 p-md-3" data-quotation-id="<?= (int) $q['quotation_id'] ?>"
+                          data-preview="<?= e(json_encode([
                             'quotation_number' => $q['quotation_number'],
                             'company' => $q['company_name'],
                             'contact_person' => $q['contact_person'],
@@ -1256,11 +1337,11 @@ body {
                             'total' => number_format((float) $q['total_amount'], 2),
                             'valid_until' => $q['valid_until'] ? date('M d, Y', strtotime($q['valid_until'])) : null,
                             'items' => $quotationItems,
-                          ]), ENT_QUOTES) ?>'>
+                          ])) ?>">
                           <div class="d-flex justify-content-between align-items-start gap-2">
                             <div style="min-width:0;">
-                              <div class="fw-semibold small"><?= htmlspecialchars($q['quotation_number']) ?></div>
-                              <div class="small" style="color:var(--ink-soft); word-break:break-word;"><?= htmlspecialchars($q['company_name']) ?> &mdash; <?= htmlspecialchars($q['request_title']) ?></div>
+                              <div class="fw-semibold small"><?= e($q['quotation_number']) ?></div>
+                              <div class="small" style="color:var(--ink-soft); word-break:break-word;"><?= e($q['company_name']) ?> &mdash; <?= e($q['request_title']) ?></div>
                             </div>
                             <div class="fw-semibold small text-nowrap" style="color:var(--indigo-text);">&#8369;<?= number_format((float) $q['total_amount'], 2) ?></div>
                           </div>
@@ -1535,17 +1616,17 @@ function hasText(v) {
 const filterForm = document.getElementById('contractFilterForm');
 const searchInput = document.getElementById('contractSearchInput');
 const dateInput = document.getElementById('contractDateInput');
+const statusInput = document.getElementById('contractStatusInput');
 const searchSpinner = document.getElementById('searchSpinner');
 
 function submitFilters() {
   const params = new URLSearchParams();
   const term = searchInput.value.trim();
-  const dateVal = dateInput.value;
   if (term !== '') params.set('search', term);
-  if (dateVal !== '') params.set('date', dateVal);
+  if (dateInput.value !== '') params.set('date', dateInput.value);
+  if (statusInput.value !== '') params.set('status', statusInput.value);
   params.set('focus', '1');
-  const query = params.toString();
-  window.location.href = 'sow_contracts.php' + (query ? '?' + query : '');
+  window.location.href = 'sow_contracts.php?' + params.toString();
 }
 
 let filterTimer = null;
@@ -1828,8 +1909,8 @@ function buildSOWHtml(d) {
     '</div>';
 }
 
-document.querySelectorAll('.view-contract-btn').forEach(function (btn) {
-  btn.addEventListener('click', function () {
+document.querySelectorAll('.contract-row').forEach(function (row) {
+  row.addEventListener('click', function () {
     const data = JSON.parse(this.dataset.contract);
     currentContract = data;
 
@@ -1840,7 +1921,7 @@ document.querySelectorAll('.view-contract-btn').forEach(function (btn) {
 
     const statusPill = document.getElementById('view_contract_status');
     statusPill.textContent = data.status;
-    statusPill.className = 'status-pill status-approved';
+    statusPill.className = 'status-pill status-' + data.status.toLowerCase();
 
     document.getElementById('view_client_contact').textContent = data.contact_person || '\u2014';
     document.getElementById('view_client_email').textContent = data.email || '\u2014';
@@ -1882,8 +1963,7 @@ document.querySelectorAll('.view-contract-btn').forEach(function (btn) {
       });
     }
 
-    const modal = new bootstrap.Modal(document.getElementById('viewContractModal'));
-    modal.show();
+    new bootstrap.Modal(document.getElementById('viewContractModal')).show();
   });
 });
 
