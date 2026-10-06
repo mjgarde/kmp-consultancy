@@ -10,7 +10,8 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
 
 $pdo = getConnection();
 
-const QUOTATION_STATUSES = ['Draft', 'Approved', 'Rejected'];
+const QUOTATION_STATUSES = ['Draft', 'Approved', 'Rejected', 'Revert'];
+const LOCKED_MESSAGE = 'This service request is already completed by staff, so this quotation is locked.';
 
 function e($value): string
 {
@@ -58,6 +59,27 @@ function requestHasApproved(PDO $pdo, int $requestId, int $excludeQuotationId = 
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM quotations WHERE request_id = ? AND status = 'Approved' AND quotation_id <> ?");
     $stmt->execute([$requestId, $excludeQuotationId]);
     return (int) $stmt->fetchColumn() > 0;
+}
+
+function requestIsCompleted(PDO $pdo, int $requestId): bool
+{
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM service_requests WHERE request_id = ? AND status = 'Completed'");
+    $stmt->execute([$requestId]);
+    return (int) $stmt->fetchColumn() > 0;
+}
+
+function removeContractsForQuotation(PDO $pdo, int $quotationId): int
+{
+    $pdo->prepare(
+        'DELETE cr FROM contract_revisions cr
+         INNER JOIN contracts ct ON cr.contract_id = ct.contract_id
+         WHERE ct.quotation_id = ?'
+    )->execute([$quotationId]);
+
+    $stmt = $pdo->prepare('DELETE FROM contracts WHERE quotation_id = ?');
+    $stmt->execute([$quotationId]);
+
+    return $stmt->rowCount();
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -142,7 +164,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 flash('error', 'Quotation not found.');
             }
 
-            $targetStatus = $existing['status'] === 'Rejected' ? 'Draft' : $existing['status'];
+            if (requestIsCompleted($pdo, (int) $existing['request_id'])) {
+                flash('error', LOCKED_MESSAGE);
+            }
+
+            $targetStatus = 'Revert';
 
             [$items, $subtotal] = collectItems(
                 $_POST['edit_item_description'] ?? [],
@@ -181,7 +207,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $insertItem->execute([$quotationId, $item[0], $item[1], $item[2], $item[3], $item[4]]);
             }
 
+            $removedContracts = removeContractsForQuotation($pdo, $quotationId);
+
             $pdo->commit();
+
+            if ($removedContracts > 0) {
+                flash('success', 'Quotation reverted. The linked contract was removed; approve the quotation again to generate a new contract.');
+            }
 
             flash('success', 'Quotation updated successfully.');
         }
@@ -189,15 +221,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($action === 'delete_quotation') {
             $quotationId = (int) ($_POST['quotation_id'] ?? 0);
 
-            $stmt = $pdo->prepare('SELECT quotation_number FROM quotations WHERE quotation_id = ?');
+            $stmt = $pdo->prepare('SELECT quotation_number, request_id FROM quotations WHERE quotation_id = ?');
             $stmt->execute([$quotationId]);
-            $number = $stmt->fetchColumn();
+            $quotationRow = $stmt->fetch();
 
-            if (!$number) {
+            if (!$quotationRow) {
                 flash('error', 'Quotation not found.');
             }
 
+            if (requestIsCompleted($pdo, (int) $quotationRow['request_id'])) {
+                flash('error', LOCKED_MESSAGE);
+            }
+
+            $number = $quotationRow['quotation_number'];
+
             $pdo->beginTransaction();
+            removeContractsForQuotation($pdo, $quotationId);
             $pdo->prepare('DELETE FROM quotation_items WHERE quotation_id = ?')->execute([$quotationId]);
             $pdo->prepare('DELETE FROM quotations WHERE quotation_id = ?')->execute([$quotationId]);
             $pdo->commit();
@@ -209,9 +248,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $quotationId = (int) ($_POST['quotation_id'] ?? 0);
 
             $transitions = [
-                'approve_quotation' => ['from' => 'Draft', 'to' => 'Approved', 'done' => 'approved'],
-                'reject_quotation'  => ['from' => 'Draft', 'to' => 'Rejected', 'done' => 'rejected'],
-                'reopen_quotation'  => ['from' => 'Rejected', 'to' => 'Draft', 'done' => 'moved back to draft'],
+                'approve_quotation' => ['from' => ['Draft', 'Revert'], 'to' => 'Approved', 'done' => 'approved'],
+                'reject_quotation'  => ['from' => ['Draft', 'Revert'], 'to' => 'Rejected', 'done' => 'rejected'],
+                'reopen_quotation'  => ['from' => ['Rejected'], 'to' => 'Draft', 'done' => 'moved back to draft'],
             ];
             $rule = $transitions[$action];
 
@@ -223,8 +262,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 flash('error', 'Quotation not found.');
             }
 
-            if ($existing['status'] !== $rule['from']) {
-                flash('error', "Only {$rule['from']} quotations can be {$rule['done']}.");
+            if (requestIsCompleted($pdo, (int) $existing['request_id'])) {
+                flash('error', LOCKED_MESSAGE);
+            }
+
+            if (!in_array($existing['status'], $rule['from'], true)) {
+                flash('error', 'Only ' . implode(' or ', $rule['from']) . " quotations can be {$rule['done']}.");
             }
 
             if ($rule['to'] === 'Approved' && requestHasApproved($pdo, (int) $existing['request_id'], $quotationId)) {
@@ -286,7 +329,7 @@ if ($dateFilter !== '') {
 
 $statsStmt = $pdo->prepare("SELECT q.status, COUNT(*) AS cnt, COALESCE(SUM(q.total_amount), 0) AS total $baseQuery GROUP BY q.status");
 $statsStmt->execute($baseParams);
-$statusCounts = ['Draft' => 0, 'Approved' => 0, 'Rejected' => 0];
+$statusCounts = ['Draft' => 0, 'Approved' => 0, 'Rejected' => 0, 'Revert' => 0];
 $totalApprovedValue = 0.0;
 foreach ($statsStmt->fetchAll() as $row) {
     $statusCounts[$row['status']] = (int) $row['cnt'];
@@ -313,7 +356,8 @@ $offset = ($page - 1) * $perPage;
 $quotationsStmt = $pdo->prepare(
     "SELECT q.quotation_id, q.quotation_number, q.status,
             q.subtotal, q.tax_rate, q.tax_amount, q.total_amount, q.project_scope, q.valid_until, q.created_at,
-            c.company_name, sr.request_title,
+            c.company_name, sr.request_title, sr.status AS request_status,
+            (SELECT COUNT(*) FROM contracts ct WHERE ct.quotation_id = q.quotation_id) AS contract_count,
             u.firstname AS prepared_by_firstname, u.lastname AS prepared_by_lastname
      $listQuery
      ORDER BY q.created_at DESC
@@ -358,6 +402,7 @@ $statusTabs = [
     'Draft'    => ['label' => 'Draft', 'count' => $statusCounts['Draft']],
     'Approved' => ['label' => 'Approved', 'count' => $statusCounts['Approved']],
     'Rejected' => ['label' => 'Rejected', 'count' => $statusCounts['Rejected']],
+    'Revert'   => ['label' => 'Revert', 'count' => $statusCounts['Revert']],
 ];
 
 ?>
@@ -508,8 +553,8 @@ body {
 .btn-action-view { background-color: #2F4A6D; }
 .btn-action-view:hover { background-color: #263C59; color: #fff; }
 
-.btn-action-edit { background-color: #1F6B58; }
-.btn-action-edit:hover { background-color: #195746; color: #fff; }
+.btn-action-edit { background-color: #3B4E8A; }
+.btn-action-edit:hover { background-color: #2E3E70; color: #fff; }
 
 .btn-action-approve { background-color: var(--success); }
 .btn-action-approve:hover { background-color: var(--success-text); color: #fff; }
@@ -555,35 +600,80 @@ body {
 .status-badge {
   display: inline-flex;
   align-items: center;
-  padding: .22rem .65rem;
-  border-radius: 999px;
-  font-size: .72rem;
+  justify-content: center;
+  text-align: center;
+  min-width: 92px;
+  padding: .35rem .75rem;
+  border-radius: 6px;
+  font-size: .75rem;
   font-weight: 700;
+  line-height: 1.2;
   white-space: nowrap;
-  border: 1px solid transparent;
+  color: #FFFFFF;
+  border: none;
 }
-.status-draft { background-color: var(--warn-soft); color: var(--warn-text); border-color: var(--warn-border); }
-.status-approved { background-color: var(--success-soft); color: var(--success-text); border-color: var(--success-border); }
-.status-rejected { background-color: var(--danger-soft); color: var(--danger-text); border-color: var(--danger-border); }
+.status-draft    { background-color: #CA8A04; color: #FFFFFF; }
+.status-revert   { background-color: #3B4E8A; color: #FFFFFF; }
+.status-approved { background-color: var(--success); color: #FFFFFF; }
+.status-rejected { background-color: var(--danger); color: #FFFFFF; }
 
-.status-tabs { display: flex; gap: .4rem; flex-wrap: wrap; }
+.completed-mark {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .15rem;
+  line-height: 1.1;
+  color: var(--success);
+  min-width: 72px;
+}
+.completed-mark i {
+  font-size: 1.05rem;
+  color: var(--success);
+}
+.completed-mark span {
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--success);
+}
+
+.status-tabs { display: flex; gap: .5rem; flex-wrap: wrap; padding: 4px; }
+
 .status-tab {
+  --tab-color: #1F2937;
+  --tab-text: #FFFFFF;
   display: inline-flex;
   align-items: center;
   gap: .45rem;
   padding: .4rem .85rem;
   border-radius: 8px;
-  border: 1px solid var(--line);
-  background-color: #fff;
-  color: var(--slate);
+  border: 2px solid var(--tab-color);
+  background-color: var(--tab-color);
+  color: #FFFFFF !important;
   font-size: .8rem;
   font-weight: 600;
   text-decoration: none;
+  transition: box-shadow .15s ease, transform .1s ease;
 }
-.status-tab:hover { background-color: var(--indigo-soft); border-color: #C9D0E8; color: var(--indigo-text); }
-.status-tab.is-active { background-color: var(--indigo); border-color: var(--indigo); color: #fff; }
-.status-tab.is-active:hover { background-color: var(--indigo-text); border-color: var(--indigo-text); color: #fff; }
-.status-tab .tab-count { font-size: .72rem; opacity: .75; }
+.status-tab.tab-all      { --tab-color: #1F2937; --tab-text: #FFFFFF; }
+.status-tab.tab-draft    { --tab-color: #CA8A04; --tab-text: #FFFFFF; }
+.status-tab.tab-approved { --tab-color: var(--success); --tab-text: #FFFFFF; }
+.status-tab.tab-rejected { --tab-color: var(--danger); --tab-text: #FFFFFF; }
+.status-tab.tab-revert   { --tab-color: #3B4E8A; --tab-text: #FFFFFF; }
+
+.status-tab:hover {
+  color: #FFFFFF !important;
+  transform: translateY(-1px);
+}
+
+.status-tab.is-active {
+  box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--tab-color);
+}
+.status-tab.is-active:hover { color: #FFFFFF !important; }
+
+.status-tab .tab-count { font-size: .72rem; color: #FFFFFF; opacity: 1; }
 
 .search-spinner {
   display: none;
@@ -1039,6 +1129,19 @@ body {
 
 .quotation-row { cursor: pointer; }
 
+.revert-notice {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  background-color: #E9ECF6;
+  border: 1px solid #C9D0E8;
+  border-left: 4px solid #3B4E8A;
+  border-radius: 8px;
+  padding: .65rem .9rem;
+  color: #2E3E70;
+  font-size: .82rem;
+}
+
 .btn-action-text {
   width: auto;
   padding: 0 .8rem;
@@ -1160,7 +1263,8 @@ body {
 
       <div class="status-tabs mb-3">
         <?php foreach ($statusTabs as $tabValue => $tab): ?>
-          <a class="status-tab <?= $statusFilter === $tabValue ? 'is-active' : '' ?>" href="<?= buildQuotationPageUrl(1, $searchTerm, $dateFilter, (string) $tabValue) ?>">
+          <?php $tabClass = 'tab-' . ($tabValue === '' ? 'all' : strtolower((string) $tabValue)); ?>
+          <a class="status-tab <?= $tabClass ?> <?= $statusFilter === (string) $tabValue ? 'is-active' : '' ?>" href="<?= buildQuotationPageUrl(1, $searchTerm, $dateFilter, (string) $tabValue) ?>">
             <?= e($tab['label']) ?> <span class="tab-count"><?= (int) $tab['count'] ?></span>
           </a>
         <?php endforeach; ?>
@@ -1195,6 +1299,7 @@ body {
                   <?php
                     $qItems = $itemsByQuotation[$q['quotation_id']] ?? [];
                     $preparedBy = trim(($q['prepared_by_firstname'] ?? '') . ' ' . ($q['prepared_by_lastname'] ?? ''));
+                    $isLocked = ($q['request_status'] ?? '') === 'Completed';
                     $viewPayload = [
                         'number' => $q['quotation_number'],
                         'company' => $q['company_name'],
@@ -1256,34 +1361,43 @@ body {
                     <td class="text-end cell-actions">
                       <span class="mobile-row-label">Action</span>
                       <span class="cell-body d-flex justify-content-end gap-1 flex-wrap">
-                        <?php if ($q['status'] === 'Draft'): ?>
-                          <button type="button" class="btn-action btn-action-text btn-action-approve status-action-btn" title="Approve"
-                            data-action="approve_quotation" data-quotation-id="<?= (int) $q['quotation_id'] ?>" data-number="<?= e($q['quotation_number']) ?>">
-                            <i class="fa-solid fa-check"></i><span>Approve</span>
+                        <?php if ($isLocked): ?>
+                          <span class="completed-mark">
+                            <i class="fa-solid fa-circle-check"></i>
+                            <span>Completed</span>
+                          </span>
+                        <?php else: ?>
+                          <?php if (in_array($q['status'], ['Draft', 'Revert'], true)): ?>
+                            <button type="button" class="btn-action btn-action-text btn-action-approve status-action-btn" title="Approve"
+                              data-action="approve_quotation" data-quotation-id="<?= (int) $q['quotation_id'] ?>" data-number="<?= e($q['quotation_number']) ?>">
+                              <i class="fa-solid fa-check"></i><span>Approve</span>
+                            </button>
+                            <button type="button" class="btn-action btn-action-text btn-action-reject status-action-btn" title="Reject"
+                              data-action="reject_quotation" data-quotation-id="<?= (int) $q['quotation_id'] ?>" data-number="<?= e($q['quotation_number']) ?>">
+                              <i class="fa-solid fa-xmark"></i><span>Reject</span>
+                            </button>
+                          <?php elseif ($q['status'] === 'Rejected'): ?>
+                            <button type="button" class="btn-action btn-action-text btn-action-reopen status-action-btn" title="Move back to draft"
+                              data-action="reopen_quotation" data-quotation-id="<?= (int) $q['quotation_id'] ?>" data-number="<?= e($q['quotation_number']) ?>">
+                              <i class="fa-solid fa-rotate-left"></i><span>Reopen</span>
+                            </button>
+                          <?php endif; ?>
+                          <?php $editLabel = $q['status'] === 'Revert' ? 'Edit' : 'Revert'; ?>
+                          <button type="button" class="btn-action btn-action-text btn-action-edit edit-quotation-btn" title="<?= e($editLabel) ?> quotation"
+                            data-quotation-id="<?= (int) $q['quotation_id'] ?>"
+                            data-number="<?= e($q['quotation_number']) ?>"
+                            data-project-scope="<?= e($q['project_scope'] ?? '') ?>"
+                            data-tax-rate="<?= e(rtrim(rtrim(number_format((float) $q['tax_rate'], 2), '0'), '.')) ?>"
+                            data-valid-until="<?= e($q['valid_until'] ?? '') ?>"
+                            data-has-contract="<?= (int) $q['contract_count'] > 0 ? '1' : '0' ?>"
+                            data-items="<?= e(json_encode($editPayload)) ?>">
+                            <i class="fa-solid fa-pen"></i><span><?= e($editLabel) ?></span>
                           </button>
-                          <button type="button" class="btn-action btn-action-text btn-action-reject status-action-btn" title="Reject"
-                            data-action="reject_quotation" data-quotation-id="<?= (int) $q['quotation_id'] ?>" data-number="<?= e($q['quotation_number']) ?>">
-                            <i class="fa-solid fa-xmark"></i><span>Reject</span>
-                          </button>
-                        <?php elseif ($q['status'] === 'Rejected'): ?>
-                          <button type="button" class="btn-action btn-action-text btn-action-reopen status-action-btn" title="Move back to draft"
-                            data-action="reopen_quotation" data-quotation-id="<?= (int) $q['quotation_id'] ?>" data-number="<?= e($q['quotation_number']) ?>">
-                            <i class="fa-solid fa-rotate-left"></i><span>Reopen</span>
+                          <button type="button" class="btn-action btn-action-delete status-action-btn" title="Delete quotation"
+                            data-action="delete_quotation" data-quotation-id="<?= (int) $q['quotation_id'] ?>" data-number="<?= e($q['quotation_number']) ?>">
+                            <i class="fa-solid fa-trash-can"></i>
                           </button>
                         <?php endif; ?>
-                        <button type="button" class="btn-action btn-action-edit edit-quotation-btn" title="Edit quotation"
-                          data-quotation-id="<?= (int) $q['quotation_id'] ?>"
-                          data-number="<?= e($q['quotation_number']) ?>"
-                          data-project-scope="<?= e($q['project_scope'] ?? '') ?>"
-                          data-tax-rate="<?= e(rtrim(rtrim(number_format((float) $q['tax_rate'], 2), '0'), '.')) ?>"
-                          data-valid-until="<?= e($q['valid_until'] ?? '') ?>"
-                          data-items="<?= e(json_encode($editPayload)) ?>">
-                          <i class="fa-solid fa-pen"></i>
-                        </button>
-                        <button type="button" class="btn-action btn-action-delete status-action-btn" title="Delete quotation"
-                          data-action="delete_quotation" data-quotation-id="<?= (int) $q['quotation_id'] ?>" data-number="<?= e($q['quotation_number']) ?>">
-                          <i class="fa-solid fa-trash-can"></i>
-                        </button>
                       </span>
                     </td>
                   </tr>
@@ -1461,13 +1575,20 @@ body {
         <input type="hidden" name="quotation_id" id="edit_quotation_id">
 
         <div class="modal-header">
-          <h2 class="modal-title h5 fw-bold mb-0">Edit Quotation <span id="edit_quotation_number_label" style="color:var(--ink-soft); font-weight:600;"></span></h2>
+          <h2 class="modal-title h5 fw-bold mb-0">Revert Quotation <span id="edit_quotation_number_label" style="color:var(--ink-soft); font-weight:600;"></span></h2>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
 
         <div class="modal-body">
           <div class="quote-shell">
             <div class="row g-2 g-md-3">
+
+              <div class="col-12 d-none" id="editContractNotice">
+                <div class="revert-notice">
+                  <i class="fa-solid fa-triangle-exclamation"></i>
+                  <span>This quotation already has a contract. Saving will remove that contract, and the quotation must be approved again before a new contract can be generated.</span>
+                </div>
+              </div>
 
               <div class="col-lg-8">
                 <div class="d-flex flex-column gap-2 gap-md-3">
@@ -1536,7 +1657,7 @@ body {
         </div>
 
         <div class="modal-footer">
-          <button type="submit" class="btn btn-teal-solid px-4 w-100 w-sm-auto">Save Changes</button>
+          <button type="submit" class="btn btn-teal-solid px-4 w-100 w-sm-auto">Save &amp; Revert</button>
         </div>
       </form>
     </div>
@@ -1870,6 +1991,7 @@ document.querySelectorAll('.edit-quotation-btn').forEach(function (btn) {
     document.getElementById('edit_project_scope').value = this.dataset.projectScope || '';
     document.getElementById('edit_tax_rate').value = this.dataset.taxRate || '12';
     document.getElementById('edit_valid_until').value = this.dataset.validUntil || '';
+    document.getElementById('editContractNotice').classList.toggle('d-none', this.dataset.hasContract !== '1');
 
     editItemsContainer.innerHTML = '';
 
@@ -1953,7 +2075,7 @@ const statusConfig = {
   },
   delete_quotation: {
     title: 'Delete quotation',
-    text: 'This will permanently delete the quotation and its scope items. This cannot be undone.',
+    text: 'This will permanently delete the quotation and its scope items. If a contract was generated from it, that contract will also be deleted. This cannot be undone.',
     button: 'Delete',
     buttonClass: 'btn btn-reset'
   },

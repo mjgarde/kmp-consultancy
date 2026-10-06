@@ -1,8 +1,4 @@
 <?php
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
 session_name('STAFF_SESSION');
 session_start();
 require_once __DIR__ . '/../config/database.php';
@@ -13,6 +9,27 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'staff') {
 }
 
 $pdo = getConnection();
+
+function getClientFilesFolderId(PDO $pdo): int
+{
+    $stmt = $pdo->prepare(
+        "SELECT document_id FROM knowledge_documents
+         WHERE item_type = 'folder' AND parent_id IS NULL AND title = 'Client Files'
+         ORDER BY document_id ASC LIMIT 1"
+    );
+    $stmt->execute();
+    $id = $stmt->fetchColumn();
+    if ($id !== false) {
+        return (int) $id;
+    }
+
+    $ins = $pdo->prepare(
+        "INSERT INTO knowledge_documents (item_type, parent_id, title, uploaded_by, uploaded_by_role)
+         VALUES ('folder', NULL, 'Client Files', ?, ?)"
+    );
+    $ins->execute([$_SESSION['user_id'], $_SESSION['role']]);
+    return (int) $pdo->lastInsertId();
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
@@ -39,16 +56,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if ($address === '') $errors[] = 'Address is required.';
 
+        $duplicateFound = false;
         if (empty($errors)) {
-            $stmt = $pdo->prepare(
-                'INSERT INTO clients (company_name, contact_person, email, contact_number, address, industry)
-                 VALUES (?, ?, ?, ?, ?, ?)'
-            );
-            $stmt->execute([$companyName, $contactPerson, $email, $contactNumber, $address, $industry]);
-            $_SESSION['alert_type'] = 'success';
-            $_SESSION['alert_message'] = 'Client profile added successfully.';
+            $dupClient = $pdo->prepare('SELECT COUNT(*) FROM clients WHERE company_name = ?');
+            $dupClient->execute([$companyName]);
+            if ((int) $dupClient->fetchColumn() > 0) {
+                $duplicateFound = true;
+                $errors[] = 'A client named "' . $companyName . '" already exists. Please use a different company name.';
+            }
+        }
+
+        if (empty($errors)) {
+            try {
+                $pdo->beginTransaction();
+
+                $stmt = $pdo->prepare(
+                    'INSERT INTO clients (company_name, contact_person, email, contact_number, address, industry)
+                     VALUES (?, ?, ?, ?, ?, ?)'
+                );
+                $stmt->execute([$companyName, $contactPerson, $email, $contactNumber, $address, $industry]);
+
+                $clientFilesId = getClientFilesFolderId($pdo);
+
+                $dup = $pdo->prepare(
+                    "SELECT COUNT(*) FROM knowledge_documents
+                     WHERE item_type = 'folder' AND parent_id = ? AND title = ?"
+                );
+                $dup->execute([$clientFilesId, $companyName]);
+
+                if ((int) $dup->fetchColumn() === 0) {
+                    $folderStmt = $pdo->prepare(
+                        "INSERT INTO knowledge_documents (item_type, parent_id, title, uploaded_by, uploaded_by_role)
+                         VALUES ('folder', ?, ?, ?, ?)"
+                    );
+                    $folderStmt->execute([$clientFilesId, $companyName, $_SESSION['user_id'], $_SESSION['role']]);
+                }
+
+                $pdo->commit();
+                $_SESSION['alert_type'] = 'success';
+                $_SESSION['alert_message'] = 'Client profile added and folder created in Repository / Client Files.';
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                error_log('add_client failed: ' . $e->getMessage());
+                $_SESSION['alert_type'] = 'error';
+                $_SESSION['alert_message'] = 'Failed to add client. Please try again.';
+            }
         } else {
-            $_SESSION['alert_type'] = 'error';
+            $_SESSION['alert_type'] = $duplicateFound ? 'warning' : 'error';
             $_SESSION['alert_message'] = implode(' ', $errors);
         }
 
@@ -374,26 +428,34 @@ body {
 
 .client-management-tabs {
   display: flex;
-  gap: .4rem;
+  gap: .75rem;
   flex-wrap: wrap;
-  border-bottom: 1px solid var(--line);
+  padding: 3px;
 }
 .client-management-tabs a {
-  border: none;
-  background: none;
-  padding: .75rem .3rem;
+  padding: .6rem 1.15rem;
   font-size: .85rem;
   font-weight: 600;
-  color: var(--ink-soft);
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
+  color: #fff;
+  background-color: var(--tab-base);
+  border: none;
+  border-radius: 8px;
   text-decoration: none;
   display: flex;
   align-items: center;
-  gap: .4rem;
+  gap: .45rem;
+  transition: background-color .12s ease;
 }
-.client-management-tabs a:hover { color: var(--navy-deep); }
-.client-management-tabs a.active { color: var(--indigo-text); border-bottom-color: var(--indigo); }
+.client-management-tabs a:hover { background-color: var(--tab-dark); color: #fff; }
+.client-management-tabs a.active {
+  background-color: var(--tab-dark);
+  color: #fff;
+  outline: 2px solid var(--tab-dark);
+  outline-offset: 2px;
+}
+.client-management-tabs a.tab-clients { --tab-base: #3B4E8A; --tab-dark: #2A3A6D; }
+.client-management-tabs a.tab-requests { --tab-base: #9A6A1C; --tab-dark: #744F13; }
+.client-management-tabs a.tab-reports { --tab-base: #1F6B68; --tab-dark: #154F4D; }
 
 .table thead th {
   border-bottom: 1px solid var(--line) !important;
@@ -453,16 +515,35 @@ body {
 .view-detail-label { font-size: .72rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: .2rem; }
 .view-detail-value { font-size: .88rem; color: var(--ink); word-break: break-word; }
 
+#alertModal .modal-content { text-align: center; }
+#alertModal .modal-body { padding: 1.75rem 1.5rem 1rem; }
+#alertModal .modal-footer { justify-content: center; border-top: none; padding: .25rem 1.5rem 1.5rem; }
+.alert-modal-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem;
+  font-size: 1.6rem;
+}
+.alert-modal-icon.is-success { background-color: var(--success-soft); color: var(--success-text); }
+.alert-modal-icon.is-error { background-color: var(--danger-soft); color: var(--danger-text); }
+.alert-modal-icon.is-warning { background-color: var(--warn-soft); color: var(--warn-text); }
+
 @media (max-width: 767.98px) {
   .stat-card { padding: .6rem .7rem; gap: .5rem; }
   .stat-icon { width: 30px; height: 30px; font-size: .78rem; border-radius: 7px; }
   .stat-label { font-size: .6rem; }
   .stat-value { font-size: 1rem; }
 
-  .client-management-tabs { gap: .9rem; }
-  .client-management-tabs a { font-size: .78rem; padding: .6rem .2rem; }
+  .client-management-tabs { gap: .4rem; }
+  .client-management-tabs a { flex: 1 1 0; justify-content: center; text-align: center; font-size: .74rem; padding: .5rem .4rem; gap: .3rem; }
 
   .btn { font-size: .82rem; padding: .4rem .7rem; }
+  .btn-icon-neutral,
+  .btn-icon-danger { width: 28px; height: 28px; font-size: .75rem; }
 
   .form-control, .form-select { font-size: .85rem; padding: .4rem .65rem; }
   .form-label { font-size: .78rem; }
@@ -554,13 +635,13 @@ body {
       </section>
 
       <nav class="client-management-tabs mb-3">
-        <a href="?tab=clients" class="<?= $activeTab === 'clients' ? 'active' : '' ?>">
+        <a href="?tab=clients" class="tab-clients <?= $activeTab === 'clients' ? 'active' : '' ?>">
           <i class="fa-solid fa-building"></i> Clients
         </a>
-        <a href="?tab=requests" class="<?= $activeTab === 'requests' ? 'active' : '' ?>">
+        <a href="?tab=requests" class="tab-requests <?= $activeTab === 'requests' ? 'active' : '' ?>">
           <i class="fa-solid fa-clipboard-list"></i> Service Transactions
         </a>
-        <a href="?tab=reports" class="<?= $activeTab === 'reports' ? 'active' : '' ?>">
+        <a href="?tab=reports" class="tab-reports <?= $activeTab === 'reports' ? 'active' : '' ?>">
           <i class="fa-solid fa-chart-simple"></i> Reports
         </a>
       </nav>
@@ -616,6 +697,7 @@ body {
                   <?php foreach ($clients as $client): ?>
                     <tr class="client-management-row"
                       data-bs-toggle="modal" data-bs-target="#viewClientModal"
+                      data-id="<?= $client['client_id'] ?>"
                       data-company="<?= htmlspecialchars($client['company_name']) ?>"
                       data-contact="<?= htmlspecialchars($client['contact_person']) ?>"
                       data-email="<?= htmlspecialchars($client['email']) ?>"
@@ -990,6 +1072,21 @@ body {
   </div>
 </div>
 
+<div class="modal fade" id="alertModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:380px;">
+    <div class="modal-content">
+      <div class="modal-body">
+        <div class="alert-modal-icon" id="alertModalIcon"><i class="fa-solid"></i></div>
+        <h2 class="h5 fw-bold mb-2" id="alertModalTitle"></h2>
+        <p class="small mb-0" id="alertModalMessage" style="color:var(--ink-soft);"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-teal-solid px-5" data-bs-dismiss="modal">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="../assets/vendor/bootstrap-5.3.8/js/bootstrap.bundle.min.js"></script>
 <script>
 document.getElementById('viewClientModal').addEventListener('show.bs.modal', function (event) {
@@ -1026,9 +1123,23 @@ document.getElementById('viewRequestModal').addEventListener('show.bs.modal', fu
   }[data.status] || 'status-draft');
 });
 
+function showAlertModal(type, message) {
+  const config = {
+    success: { title: 'Success', icon: 'fa-circle-check', cls: 'is-success' },
+    warning: { title: 'Already Exists', icon: 'fa-triangle-exclamation', cls: 'is-warning' },
+    error:   { title: 'Something Went Wrong', icon: 'fa-circle-xmark', cls: 'is-error' }
+  }[type] || { title: 'Notice', icon: 'fa-circle-info', cls: 'is-warning' };
+
+  document.getElementById('alertModalIcon').className = 'alert-modal-icon ' + config.cls;
+  document.getElementById('alertModalIcon').innerHTML = '<i class="fa-solid ' + config.icon + '"></i>';
+  document.getElementById('alertModalTitle').textContent = config.title;
+  document.getElementById('alertModalMessage').textContent = message;
+  new bootstrap.Modal(document.getElementById('alertModal')).show();
+}
+
 <?php if ($alertType && $alertMessage): ?>
 window.addEventListener('DOMContentLoaded', function () {
-  alert(<?= json_encode($alertMessage) ?>);
+  showAlertModal(<?= json_encode($alertType) ?>, <?= json_encode($alertMessage) ?>);
 });
 <?php endif; ?>
 </script>

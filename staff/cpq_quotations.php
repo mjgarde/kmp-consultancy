@@ -10,7 +10,7 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'staff') {
 
 $pdo = getConnection();
 
-const QUOTATION_STATUSES = ['Draft', 'Approved', 'Rejected'];
+const QUOTATION_STATUSES = ['Draft', 'Approved', 'Rejected', 'Revert'];
 
 function e($value): string
 {
@@ -170,7 +170,7 @@ if ($dateFilter !== '') {
 
 $statsStmt = $pdo->prepare("SELECT q.status, COUNT(*) AS cnt, COALESCE(SUM(q.total_amount), 0) AS total $baseQuery GROUP BY q.status");
 $statsStmt->execute($baseParams);
-$statusCounts = ['Draft' => 0, 'Approved' => 0, 'Rejected' => 0];
+$statusCounts = ['Draft' => 0, 'Approved' => 0, 'Rejected' => 0, 'Revert' => 0];
 $totalApprovedValue = 0.0;
 foreach ($statsStmt->fetchAll() as $row) {
     $statusCounts[$row['status']] = (int) $row['cnt'];
@@ -197,7 +197,8 @@ $offset = ($page - 1) * $perPage;
 $quotationsStmt = $pdo->prepare(
     "SELECT q.quotation_id, q.quotation_number, q.status,
             q.subtotal, q.tax_rate, q.tax_amount, q.total_amount, q.project_scope, q.valid_until, q.created_at,
-            c.company_name, sr.request_title,
+            c.company_name, sr.request_title, sr.status AS request_status,
+            (SELECT COUNT(*) FROM contracts ct WHERE ct.quotation_id = q.quotation_id) AS contract_count,
             u.firstname AS prepared_by_firstname, u.lastname AS prepared_by_lastname
      $listQuery
      ORDER BY q.created_at DESC
@@ -242,6 +243,7 @@ $statusTabs = [
     'Draft'    => ['label' => 'Draft', 'count' => $statusCounts['Draft']],
     'Approved' => ['label' => 'Approved', 'count' => $statusCounts['Approved']],
     'Rejected' => ['label' => 'Rejected', 'count' => $statusCounts['Rejected']],
+    'Revert'   => ['label' => 'Revert', 'count' => $statusCounts['Revert']],
 ];
 
 ?>
@@ -336,15 +338,6 @@ body {
 
 .form-label { font-size: .8rem; font-weight: 600; color: var(--slate); text-transform: uppercase; letter-spacing: .02em; }
 
-.btn-primary-solid {
-  background-color: var(--navy-deep);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  font-weight: 600;
-}
-.btn-primary-solid:hover { background-color: #060B14; color: #fff; }
-
 .btn-teal-solid {
   background-color: var(--indigo);
   color: #fff;
@@ -353,15 +346,6 @@ body {
   font-weight: 600;
 }
 .btn-teal-solid:hover { background-color: var(--indigo-text); color: #fff; }
-
-.btn-approve-solid {
-  background-color: var(--success);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  font-weight: 600;
-}
-.btn-approve-solid:hover { background-color: var(--success-text); color: #fff; }
 
 .btn-ghost {
   background-color: var(--navy-soft);
@@ -408,35 +392,58 @@ body {
 .status-badge {
   display: inline-flex;
   align-items: center;
-  padding: .22rem .65rem;
-  border-radius: 999px;
-  font-size: .72rem;
+  justify-content: center;
+  text-align: center;
+  min-width: 92px;
+  padding: .35rem .75rem;
+  border-radius: 6px;
+  font-size: .75rem;
   font-weight: 700;
+  line-height: 1.2;
   white-space: nowrap;
-  border: 1px solid transparent;
+  color: #FFFFFF;
+  border: none;
 }
-.status-draft { background-color: var(--warn-soft); color: var(--warn-text); border-color: var(--warn-border); }
-.status-approved { background-color: var(--success-soft); color: var(--success-text); border-color: var(--success-border); }
-.status-rejected { background-color: var(--danger-soft); color: var(--danger-text); border-color: var(--danger-border); }
+.status-draft    { background-color: #CA8A04; color: #FFFFFF; }
+.status-revert   { background-color: #3B4E8A; color: #FFFFFF; }
+.status-approved { background-color: var(--success); color: #FFFFFF; }
+.status-rejected { background-color: var(--danger); color: #FFFFFF; }
 
-.status-tabs { display: flex; gap: .4rem; flex-wrap: wrap; }
+.status-tabs { display: flex; gap: .5rem; flex-wrap: wrap; padding: 4px; }
+
 .status-tab {
+  --tab-color: #1F2937;
+  --tab-text: #FFFFFF;
   display: inline-flex;
   align-items: center;
   gap: .45rem;
   padding: .4rem .85rem;
   border-radius: 8px;
-  border: 1px solid var(--line);
-  background-color: #fff;
-  color: var(--slate);
+  border: 2px solid var(--tab-color);
+  background-color: var(--tab-color);
+  color: #FFFFFF !important;
   font-size: .8rem;
   font-weight: 600;
   text-decoration: none;
+  transition: box-shadow .15s ease, transform .1s ease;
 }
-.status-tab:hover { background-color: var(--indigo-soft); border-color: #C9D0E8; color: var(--indigo-text); }
-.status-tab.is-active { background-color: var(--indigo); border-color: var(--indigo); color: #fff; }
-.status-tab.is-active:hover { background-color: var(--indigo-text); border-color: var(--indigo-text); color: #fff; }
-.status-tab .tab-count { font-size: .72rem; opacity: .75; }
+.status-tab.tab-all      { --tab-color: #1F2937; --tab-text: #FFFFFF; }
+.status-tab.tab-draft    { --tab-color: #CA8A04; --tab-text: #FFFFFF; }
+.status-tab.tab-approved { --tab-color: var(--success); --tab-text: #FFFFFF; }
+.status-tab.tab-rejected { --tab-color: var(--danger); --tab-text: #FFFFFF; }
+.status-tab.tab-revert   { --tab-color: #3B4E8A; --tab-text: #FFFFFF; }
+
+.status-tab:hover {
+  color: #FFFFFF !important;
+  transform: translateY(-1px);
+}
+
+.status-tab.is-active {
+  box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--tab-color);
+}
+.status-tab.is-active:hover { color: #FFFFFF !important; }
+
+.status-tab .tab-count { font-size: .72rem; color: #FFFFFF; opacity: 1; }
 
 .search-spinner {
   display: none;
@@ -969,7 +976,8 @@ body {
 
       <div class="status-tabs mb-3">
         <?php foreach ($statusTabs as $tabValue => $tab): ?>
-          <a class="status-tab <?= $statusFilter === $tabValue ? 'is-active' : '' ?>" href="<?= buildQuotationPageUrl(1, $searchTerm, $dateFilter, (string) $tabValue) ?>">
+          <?php $tabClass = 'tab-' . ($tabValue === '' ? 'all' : strtolower((string) $tabValue)); ?>
+          <a class="status-tab <?= $tabClass ?> <?= $statusFilter === (string) $tabValue ? 'is-active' : '' ?>" href="<?= buildQuotationPageUrl(1, $searchTerm, $dateFilter, (string) $tabValue) ?>">
             <?= e($tab['label']) ?> <span class="tab-count"><?= (int) $tab['count'] ?></span>
           </a>
         <?php endforeach; ?>

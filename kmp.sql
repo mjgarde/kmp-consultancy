@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost
--- Generation Time: Sep 27, 2026 at 10:18 AM
+-- Generation Time: Oct 07, 2026 at 12:55 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.1.25
 
@@ -67,7 +67,10 @@ CREATE TABLE `clients` (
 --
 
 INSERT INTO `clients` (`client_id`, `company_name`, `contact_person`, `email`, `contact_number`, `address`, `industry`, `created_at`, `updated_at`) VALUES
-(36, 'Cotabato Trans Rentals', 'Mark Anthony Santos', 'mark.santos@ctransrentals.com', '091784526', 'Cotabato City, Maguindanao del Norte', 'Transportation and Logistics', '2026-09-22 05:51:22', '2026-09-22 05:51:22');
+(36, 'Cotabato Trans Rentals', 'Mark Anthony Santos', 'mark.santos@ctransrentals.com', '091784526', 'Cotabato City, Maguindanao del Norte', 'Transportation and Logistics', '2026-09-22 05:51:22', '2026-09-22 05:51:22'),
+(37, 'CodeWave Technologies', 'Juan Pablo Deigo', 'juan1@gmail.com', '09070909099', 'Rizal 3, Banga, South Cotabato', 'Information Technology', '2026-09-29 00:35:25', '2026-09-29 00:35:25'),
+(38, 'Gryk\'s Food House', 'Juan Pablo Deigos', 'juan1@gmail.com', '09070909011', 'Rizal 3, Banga, South Cotabato', 'Information Technology', '2026-10-06 22:02:12', '2026-10-06 22:02:12'),
+(39, 'Gryk\'s Food House', 's', 's@d.c', '09090909099', 'banga', 'Information Technology', '2026-10-06 22:02:46', '2026-10-06 22:02:46');
 
 -- --------------------------------------------------------
 
@@ -82,11 +85,10 @@ CREATE TABLE `contracts` (
   `request_id` int(10) UNSIGNED NOT NULL,
   `client_id` int(10) UNSIGNED NOT NULL,
   `scope_summary` text DEFAULT NULL,
-  `terms_conditions` text DEFAULT NULL,
   `total_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
   `start_date` date DEFAULT NULL,
   `end_date` date DEFAULT NULL,
-  `status` enum('Draft','Pending Approval','Approved','Rejected') NOT NULL DEFAULT 'Draft',
+  `status` enum('Draft','Approved','Rejected','Revert') NOT NULL DEFAULT 'Draft',
   `prepared_by` int(10) UNSIGNED DEFAULT NULL,
   `approved_by` int(10) UNSIGNED DEFAULT NULL,
   `approved_at` timestamp NULL DEFAULT NULL,
@@ -101,8 +103,9 @@ CREATE TABLE `contracts` (
 -- Dumping data for table `contracts`
 --
 
-INSERT INTO `contracts` (`contract_id`, `contract_number`, `quotation_id`, `request_id`, `client_id`, `scope_summary`, `terms_conditions`, `total_amount`, `start_date`, `end_date`, `status`, `prepared_by`, `approved_by`, `approved_at`, `created_at`, `updated_at`, `contract_file_name`, `contract_file_path`, `contract_file_size`) VALUES
-(7, 'SOW-2026-0001', 15, 42, 36, 'Conduct a comprehensive fleet risk assessment covering vehicle operations, safety practices, operational risks, and existing risk controls. The project will include risk identification, assessment of current controls, and preparation of a report with recommended improvements.', NULL, 11200.00, '2026-09-23', '2026-09-24', 'Approved', 1, 1, '2026-09-22 06:50:14', '2026-09-22 06:50:14', '2026-09-22 06:50:14', NULL, NULL, NULL);
+INSERT INTO `contracts` (`contract_id`, `contract_number`, `quotation_id`, `request_id`, `client_id`, `scope_summary`, `total_amount`, `start_date`, `end_date`, `status`, `prepared_by`, `approved_by`, `approved_at`, `created_at`, `updated_at`, `contract_file_name`, `contract_file_path`, `contract_file_size`) VALUES
+(7, 'SOW-2026-0001', 15, 42, 36, 'Conduct a comprehensive fleet risk assessment covering vehicle operations, safety practices, operational risks, and existing risk controls. The project will include risk identification, assessment of current controls, and preparation of a report with recommended improvements.', 11200.00, '2026-09-23', '2026-09-24', 'Approved', 1, 1, '2026-09-22 06:50:14', '2026-09-22 06:50:14', '2026-09-22 06:50:14', NULL, NULL, NULL),
+(11, 'SOW-2026-0002', 18, 46, 37, 'Hello sample revert', 100.80, '2026-10-08', '2026-10-09', 'Draft', 2, NULL, NULL, '2026-10-06 21:50:00', '2026-10-06 21:50:00', NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -146,37 +149,14 @@ CREATE TABLE `knowledge_documents` (
 --
 
 INSERT INTO `knowledge_documents` (`document_id`, `item_type`, `parent_id`, `title`, `category`, `description`, `file_name`, `file_path`, `file_size`, `file_type`, `uploaded_by`, `uploaded_by_role`, `created_at`, `updated_at`) VALUES
-(11, 'folder', NULL, 'Client Files', NULL, NULL, NULL, NULL, 0, NULL, NULL, 'admin', '2026-09-17 05:49:04', '2026-09-17 05:49:04'),
 (12, 'folder', NULL, 'Company Templates', NULL, NULL, NULL, NULL, 0, NULL, NULL, 'admin', '2026-09-17 05:49:04', '2026-09-17 05:49:04'),
-(13, 'folder', 11, 'Michael Jude Garde', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-09-17 05:50:21', '2026-09-17 05:50:21'),
-(14, 'folder', 11, 'Kent Kyle Cali', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-09-17 06:02:11', '2026-09-17 06:02:11'),
-(17, 'folder', 11, 'Juan Carlos', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-09-18 13:32:20', '2026-09-18 13:32:20'),
-(18, 'folder', 11, 'Juan Dela Cruz', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-09-18 13:33:58', '2026-09-18 13:33:58'),
-(19, 'folder', 11, 'Maria Santos', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-09-18 13:34:26', '2026-09-18 13:34:26'),
-(20, 'folder', 11, 'Jose Garcia', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-09-18 13:34:42', '2026-09-18 13:34:42'),
-(21, 'folder', 11, 'Ana Reyes', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-09-18 13:34:56', '2026-09-18 13:34:56'),
-(22, 'folder', 11, 'Mark Bautista', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-09-18 13:35:29', '2026-09-18 13:35:29'),
-(23, 'folder', 11, 'John Mendoza', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-09-18 13:35:41', '2026-09-18 13:35:41'),
-(24, 'folder', 11, 'Michael Cruz', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-09-18 13:35:59', '2026-09-18 13:35:59'),
-(25, 'folder', 11, 'Angelica Ramos', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-09-18 13:36:50', '2026-09-18 13:36:50'),
-(26, 'folder', 11, 'Christian Flores', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-09-18 13:37:02', '2026-09-18 13:37:02'),
-(27, 'folder', 11, 'Patricia Aquino', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-09-18 13:37:15', '2026-09-18 13:37:15'),
-(28, 'folder', 11, 'Carlo Fernandez', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-09-18 13:37:26', '2026-09-18 13:37:26'),
-(29, 'folder', 11, 'Michelle Navarro', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-09-18 13:37:39', '2026-09-18 13:37:39'),
-(30, 'folder', 11, 'Daniel Castillo', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-09-18 13:37:51', '2026-09-18 13:37:51'),
-(31, 'folder', 11, 'Christine Torres', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-09-18 13:38:04', '2026-09-18 13:38:04'),
-(32, 'folder', 11, 'Kevin Villanueva', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-09-18 13:38:19', '2026-09-18 13:38:19'),
-(33, 'file', 12, 'GARDE_MICHAEL_JUDE_RESUME.pdf', NULL, NULL, 'GARDE_MICHAEL_JUDE_RESUME.pdf', 'repository/doc_6ab12e234dd804.60280232_GARDE_MICHAEL_JUDE_RESUME.pdf', 1806116, 'pdf', 2, 'admin', '2026-09-21 13:16:19', '2026-09-21 13:16:19'),
-(36, 'file', 12, 'Consultant-Proposal-Template.docx', NULL, NULL, 'Consultant-Proposal-Template.docx', 'repository/doc_6ab1968fdc4338.69547789_Consultant-Proposal-Template.docx', 36668, 'docx', 2, 'admin', '2026-09-21 20:41:51', '2026-09-21 20:41:51'),
-(37, 'file', 21, '2x2 PHOTO.jpg', NULL, NULL, '9a34803572876920a0d6254bbc0d0346(1).jpg', 'repository/doc_6ab197a20cf838.57862832_9a34803572876920a0d6254bbc0d0346_1_.jpg', 44037, 'jpg', 2, 'admin', '2026-09-21 20:46:26', '2026-09-21 20:47:07'),
-(38, 'file', 21, 'SOW-2026-0003.docx', NULL, NULL, 'SOW-2026-0003.docx', 'repository/doc_6ab198007010e3.45606119_SOW-2026-0003.docx', 4923, 'docx', 2, 'admin', '2026-09-21 20:48:00', '2026-09-21 20:48:00'),
-(39, 'file', 21, 'Proposal.docx', NULL, NULL, 'Consultant-Proposal-Template.docx', 'repository/doc_6ab198338b7e97.13915112_Consultant-Proposal-Template.docx', 36668, 'docx', 2, 'admin', '2026-09-21 20:48:51', '2026-09-21 20:49:06'),
-(44, 'folder', 11, 'ABC Company', NULL, NULL, NULL, NULL, 0, NULL, 1, 'staff', '2026-09-22 01:57:28', '2026-09-22 01:57:28'),
-(45, 'file', 44, ' Statement of work (SOW) template_.docx', NULL, NULL, ' Statement of work (SOW) template_.docx', 'repository/doc_6ab1e09d616d64.65539751__Statement_of_work__SOW__template_.docx', 952432, 'docx', 1, 'staff', '2026-09-22 01:57:49', '2026-09-22 01:57:49'),
-(46, 'file', 44, '9a34803572876920a0d6254bbc0d0346(1).jpg', NULL, NULL, '9a34803572876920a0d6254bbc0d0346(1).jpg', 'repository/doc_6ab1e0a9d898f8.12389695_9a34803572876920a0d6254bbc0d0346_1_.jpg', 44037, 'jpg', 1, 'staff', '2026-09-22 01:58:01', '2026-09-22 01:58:01'),
-(47, 'file', 44, 'Statement of work (SOW) template_.docx', NULL, NULL, 'Statement of work (SOW) template_.docx', 'repository/doc_6ab1e9adad4bf9.06315591_Statement_of_work__SOW__template_.docx', 30826, 'docx', 4, 'manager', '2026-09-22 02:36:29', '2026-09-22 02:36:29'),
-(48, 'file', 44, 'Statement of work (SOW) template_.docx', NULL, NULL, 'Statement of work (SOW) template_.docx', 'repository/doc_6ab1e9c843cd83.45112854_Statement_of_work__SOW__template_.docx', 30826, 'docx', 4, 'manager', '2026-09-22 02:36:56', '2026-09-22 02:36:56'),
-(49, 'file', 12, 'contracts.docx', NULL, NULL, 'contract.docx', 'repository/doc_6ab235313d4da9.79917704_contract.docx', 41017, 'docx', 2, 'admin', '2026-09-22 07:58:41', '2026-09-22 07:58:51');
+(50, 'file', 12, 'Consultancy_Services_Agreement.docx', NULL, NULL, 'Consultancy_Services_Agreement_KMP-2.docx', 'repository/doc_6ab8d6189154c4.06247243_Consultancy_Services_Agreement_KMP-2.docx', 39621, 'docx', 2, 'supervisor', '2026-09-27 08:38:48', '2026-09-27 08:38:59'),
+(51, 'file', 12, 'contract.docx', NULL, NULL, 'contract (1).docx', 'repository/doc_6ab8d62fa57687.93802817_contract__1_.docx', 41017, 'docx', 2, 'supervisor', '2026-09-27 08:39:11', '2026-09-27 08:39:22'),
+(52, 'folder', NULL, 'Client Files', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-09-29 01:37:49', '2026-09-29 01:37:49'),
+(53, 'folder', 52, 'CodeWave Technologies', NULL, NULL, NULL, NULL, 0, NULL, 1, 'staff', '2026-09-29 01:38:41', '2026-09-29 01:38:41'),
+(54, 'folder', 52, 'ABC Company', NULL, NULL, NULL, NULL, 0, NULL, 1, 'staff', '2026-09-29 01:38:49', '2026-09-29 01:38:49'),
+(55, 'folder', 52, 'Gryk\'s Food House', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-10-06 22:02:12', '2026-10-06 22:02:12'),
+(56, 'folder', 52, 'ABCD Company', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-10-06 22:07:41', '2026-10-06 22:07:41');
 
 -- --------------------------------------------------------
 
@@ -190,13 +170,12 @@ CREATE TABLE `quotations` (
   `request_id` int(10) UNSIGNED NOT NULL,
   `client_id` int(10) UNSIGNED NOT NULL,
   `project_scope` text DEFAULT NULL,
-  `status` enum('Draft','Sent','Approved','Rejected') NOT NULL DEFAULT 'Draft',
+  `status` enum('Draft','Approved','Rejected','Revert') NOT NULL DEFAULT 'Draft',
   `subtotal` decimal(12,2) NOT NULL DEFAULT 0.00,
   `tax_rate` decimal(5,2) NOT NULL DEFAULT 0.00,
   `tax_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
   `total_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
   `valid_until` date DEFAULT NULL,
-  `notes` text DEFAULT NULL,
   `prepared_by` int(10) UNSIGNED DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
@@ -206,8 +185,11 @@ CREATE TABLE `quotations` (
 -- Dumping data for table `quotations`
 --
 
-INSERT INTO `quotations` (`quotation_id`, `quotation_number`, `request_id`, `client_id`, `project_scope`, `status`, `subtotal`, `tax_rate`, `tax_amount`, `total_amount`, `valid_until`, `notes`, `prepared_by`, `created_at`, `updated_at`) VALUES
-(15, 'QT-2026-0001', 42, 36, 'Conduct a comprehensive fleet risk assessment covering vehicle operations, safety practices, operational risks, and existing risk controls. The project will include risk identification, assessment of current controls, and preparation of a report with recommended improvements.', 'Approved', 10000.00, 12.00, 1200.00, 11200.00, '2026-09-23', NULL, 1, '2026-09-22 05:55:00', '2026-09-22 05:55:00');
+INSERT INTO `quotations` (`quotation_id`, `quotation_number`, `request_id`, `client_id`, `project_scope`, `status`, `subtotal`, `tax_rate`, `tax_amount`, `total_amount`, `valid_until`, `prepared_by`, `created_at`, `updated_at`) VALUES
+(15, 'QT-2026-0001', 42, 36, 'Conduct a comprehensive fleet risk assessment covering vehicle operations, safety practices, operational risks, and existing risk controls. The project will include risk identification, assessment of current controls, and preparation of a report with recommended improvements.', 'Approved', 10000.00, 12.00, 1200.00, 11200.00, '2026-09-23', 1, '2026-09-22 05:55:00', '2026-09-22 05:55:00'),
+(16, 'QT-2026-0002', 44, 37, 'Assistance with business registration filing', 'Revert', 6000.00, 12.00, 720.00, 6720.00, '2026-09-30', 1, '2026-09-29 01:34:29', '2026-10-06 04:12:09'),
+(17, 'QT-2026-0003', 45, 36, 'Revert\r\nRevert', 'Revert', 101.00, 12.00, 12.12, 113.12, NULL, 2, '2026-10-04 01:48:28', '2026-10-06 04:11:31'),
+(18, 'QT-2026-0004', 46, 37, 'Hello sample revert', 'Approved', 90.00, 12.00, 10.80, 100.80, '2026-10-08', 4, '2026-10-04 03:33:39', '2026-10-06 21:49:44');
 
 -- --------------------------------------------------------
 
@@ -230,7 +212,11 @@ CREATE TABLE `quotation_items` (
 --
 
 INSERT INTO `quotation_items` (`item_id`, `quotation_id`, `description`, `quantity`, `unit_price`, `line_total`, `sort_order`) VALUES
-(20, 15, 'Prepare a detailed report containing findings and recommended risk controls', 1.00, 10000.00, 10000.00, 0);
+(20, 15, 'Prepare a detailed report containing findings and recommended risk controls', 1.00, 10000.00, 10000.00, 0),
+(27, 17, 's', 1.00, 101.00, 101.00, 0),
+(28, 16, 'Assistance with business registration filing', 1.00, 3000.00, 3000.00, 0),
+(29, 16, 'Business registration consultation', 1.00, 3000.00, 3000.00, 1),
+(31, 18, 's', 1.00, 90.00, 90.00, 0);
 
 -- --------------------------------------------------------
 
@@ -242,7 +228,6 @@ CREATE TABLE `service_requests` (
   `request_id` int(10) UNSIGNED NOT NULL,
   `client_id` int(10) UNSIGNED NOT NULL,
   `request_title` varchar(150) NOT NULL,
-  `request_details` text DEFAULT NULL,
   `required_skill` varchar(100) DEFAULT NULL,
   `status` enum('New','In Progress','Completed','Cancelled') NOT NULL DEFAULT 'New',
   `assigned_to` int(10) UNSIGNED DEFAULT NULL,
@@ -255,8 +240,11 @@ CREATE TABLE `service_requests` (
 -- Dumping data for table `service_requests`
 --
 
-INSERT INTO `service_requests` (`request_id`, `client_id`, `request_title`, `request_details`, `required_skill`, `status`, `assigned_to`, `assigned_by`, `created_at`, `updated_at`) VALUES
-(42, 36, 'Fleet Risk Assessment', NULL, 'Risk Assessment', 'Completed', 1, 2, '2026-09-22 05:51:22', '2026-09-27 07:28:40');
+INSERT INTO `service_requests` (`request_id`, `client_id`, `request_title`, `required_skill`, `status`, `assigned_to`, `assigned_by`, `created_at`, `updated_at`) VALUES
+(42, 36, 'Fleet Risk Assessment', 'Risk Assessment', 'Completed', 1, 2, '2026-09-22 05:51:22', '2026-09-27 07:28:40'),
+(44, 37, 'Business Registration', 'Business Registration', 'New', NULL, NULL, '2026-09-29 01:19:48', '2026-09-29 01:19:48'),
+(45, 36, 's', 'Quality Assurance', 'New', NULL, NULL, '2026-10-04 01:48:05', '2026-10-04 01:48:05'),
+(46, 37, 'test', 'Risk Assessment', 'New', NULL, NULL, '2026-10-04 03:33:09', '2026-10-04 03:33:09');
 
 -- --------------------------------------------------------
 
@@ -380,7 +368,8 @@ ALTER TABLE `quotations`
   ADD UNIQUE KEY `quotation_number` (`quotation_number`),
   ADD KEY `fk_quotations_request` (`request_id`),
   ADD KEY `fk_quotations_client` (`client_id`),
-  ADD KEY `fk_quotations_prepared_by` (`prepared_by`);
+  ADD KEY `fk_quotations_prepared_by` (`prepared_by`),
+  ADD KEY `idx_quotations_status` (`status`);
 
 --
 -- Indexes for table `quotation_items`
@@ -426,13 +415,13 @@ ALTER TABLE `administrator`
 -- AUTO_INCREMENT for table `clients`
 --
 ALTER TABLE `clients`
-  MODIFY `client_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=37;
+  MODIFY `client_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=41;
 
 --
 -- AUTO_INCREMENT for table `contracts`
 --
 ALTER TABLE `contracts`
-  MODIFY `contract_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `contract_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
 -- AUTO_INCREMENT for table `contract_revisions`
@@ -444,25 +433,25 @@ ALTER TABLE `contract_revisions`
 -- AUTO_INCREMENT for table `knowledge_documents`
 --
 ALTER TABLE `knowledge_documents`
-  MODIFY `document_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=50;
+  MODIFY `document_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=57;
 
 --
 -- AUTO_INCREMENT for table `quotations`
 --
 ALTER TABLE `quotations`
-  MODIFY `quotation_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `quotation_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
 
 --
 -- AUTO_INCREMENT for table `quotation_items`
 --
 ALTER TABLE `quotation_items`
-  MODIFY `item_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
+  MODIFY `item_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=32;
 
 --
 -- AUTO_INCREMENT for table `service_requests`
 --
 ALTER TABLE `service_requests`
-  MODIFY `request_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=43;
+  MODIFY `request_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=47;
 
 --
 -- AUTO_INCREMENT for table `staff_skills`

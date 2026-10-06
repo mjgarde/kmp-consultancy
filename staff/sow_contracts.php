@@ -10,7 +10,7 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'staff') {
 
 $pdo = getConnection();
 
-const CONTRACT_STATUSES = ['Draft', 'Approved', 'Rejected'];
+const CONTRACT_STATUSES = ['Draft', 'Approved', 'Rejected', 'Revert'];
 
 function e($value): string
 {
@@ -151,7 +151,7 @@ if ($dateFilter !== '') {
 
 $statsStmt = $pdo->prepare("SELECT ct.status, COUNT(*) AS cnt, COALESCE(SUM(ct.total_amount), 0) AS total $baseQuery GROUP BY ct.status");
 $statsStmt->execute($baseParams);
-$statusCounts = ['Draft' => 0, 'Approved' => 0, 'Rejected' => 0];
+$statusCounts = ['Draft' => 0, 'Approved' => 0, 'Rejected' => 0, 'Revert' => 0];
 $totalApprovedValue = 0.0;
 foreach ($statsStmt->fetchAll() as $row) {
     $statusCounts[$row['status']] = (int) $row['cnt'];
@@ -179,7 +179,7 @@ $contractsStmt = $pdo->prepare(
     "SELECT ct.contract_id, ct.contract_number, ct.quotation_id, ct.status, ct.total_amount, ct.start_date, ct.end_date,
             ct.scope_summary, ct.created_at, ct.approved_at,
             c.company_name, c.contact_person, c.email, c.contact_number, c.address, c.industry,
-            sr.request_title, sr.required_skill,
+            sr.request_title, sr.required_skill, sr.status AS request_status,
             q.quotation_number, q.subtotal, q.tax_rate, q.tax_amount, q.valid_until AS quotation_valid_until,
             pb.firstname AS prepared_firstname, pb.lastname AS prepared_lastname,
             ab.firstname AS approved_firstname, ab.lastname AS approved_lastname
@@ -226,6 +226,7 @@ $statusTabs = [
     'Draft'    => ['label' => 'Draft', 'count' => $statusCounts['Draft']],
     'Approved' => ['label' => 'Approved', 'count' => $statusCounts['Approved']],
     'Rejected' => ['label' => 'Rejected', 'count' => $statusCounts['Rejected']],
+    'Revert'   => ['label' => 'Revert', 'count' => $statusCounts['Revert']],
 ];
 
 ?>
@@ -321,15 +322,6 @@ body {
 
 .form-label { font-size: .8rem; font-weight: 600; color: var(--slate); text-transform: uppercase; letter-spacing: .02em; }
 
-.btn-primary-solid {
-  background-color: var(--navy-deep);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  font-weight: 600;
-}
-.btn-primary-solid:hover { background-color: #060B14; color: #fff; }
-
 .btn-teal-solid {
   background-color: var(--indigo);
   color: #fff;
@@ -338,15 +330,6 @@ body {
   font-weight: 600;
 }
 .btn-teal-solid:hover { background-color: var(--indigo-text); color: #fff; }
-
-.btn-approve-solid {
-  background-color: var(--success);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  font-weight: 600;
-}
-.btn-approve-solid:hover { background-color: var(--success-text); color: #fff; }
 
 .btn-ghost {
   background-color: var(--navy-soft);
@@ -396,36 +379,58 @@ body {
 .status-pill {
   display: inline-flex;
   align-items: center;
-  padding: .22rem .65rem;
-  border-radius: 999px;
-  font-size: .72rem;
+  justify-content: center;
+  text-align: center;
+  min-width: 92px;
+  padding: .35rem .75rem;
+  border-radius: 6px;
+  font-size: .75rem;
   font-weight: 700;
+  line-height: 1.2;
   white-space: nowrap;
-  letter-spacing: .01em;
-  border: 1px solid transparent;
+  color: #FFFFFF;
+  border: none;
 }
-.status-draft { background-color: var(--warn-soft); color: var(--warn-text); border-color: var(--warn-border); }
-.status-approved { background-color: var(--success-soft); color: var(--success-text); border-color: var(--success-border); }
-.status-rejected { background-color: var(--danger-soft); color: var(--danger-text); border-color: var(--danger-border); }
+.status-draft    { background-color: #CA8A04; color: #FFFFFF; }
+.status-revert   { background-color: #3B4E8A; color: #FFFFFF; }
+.status-approved { background-color: var(--success); color: #FFFFFF; }
+.status-rejected { background-color: var(--danger); color: #FFFFFF; }
 
-.status-tabs { display: flex; gap: .4rem; flex-wrap: wrap; }
+.status-tabs { display: flex; gap: .5rem; flex-wrap: wrap; padding: 4px; }
+
 .status-tab {
+  --tab-color: #1F2937;
+  --tab-text: #FFFFFF;
   display: inline-flex;
   align-items: center;
   gap: .45rem;
   padding: .4rem .85rem;
   border-radius: 8px;
-  border: 1px solid var(--line);
-  background-color: #fff;
-  color: var(--slate);
+  border: 2px solid var(--tab-color);
+  background-color: var(--tab-color);
+  color: #FFFFFF !important;
   font-size: .8rem;
   font-weight: 600;
   text-decoration: none;
+  transition: box-shadow .15s ease, transform .1s ease;
 }
-.status-tab:hover { background-color: var(--indigo-soft); border-color: #C9D0E8; color: var(--indigo-text); }
-.status-tab.is-active { background-color: var(--indigo); border-color: var(--indigo); color: #fff; }
-.status-tab.is-active:hover { background-color: var(--indigo-text); border-color: var(--indigo-text); color: #fff; }
-.status-tab .tab-count { font-size: .72rem; opacity: .75; }
+.status-tab.tab-all      { --tab-color: #1F2937; --tab-text: #FFFFFF; }
+.status-tab.tab-draft    { --tab-color: #CA8A04; --tab-text: #FFFFFF; }
+.status-tab.tab-approved { --tab-color: var(--success); --tab-text: #FFFFFF; }
+.status-tab.tab-rejected { --tab-color: var(--danger); --tab-text: #FFFFFF; }
+.status-tab.tab-revert   { --tab-color: #3B4E8A; --tab-text: #FFFFFF; }
+
+.status-tab:hover {
+  color: #FFFFFF !important;
+  transform: translateY(-1px);
+}
+
+.status-tab.is-active {
+  box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--tab-color);
+}
+.status-tab.is-active:hover { color: #FFFFFF !important; }
+
+.status-tab .tab-count { font-size: .72rem; color: #FFFFFF; opacity: 1; }
 
 .summary-bar {
   display: flex;
@@ -514,7 +519,7 @@ body {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background-color: var(--warn);
+  background-color: #3B4E8A;
 }
 
 .empty-state { color: var(--ink-soft); }
@@ -720,7 +725,6 @@ body {
 .btn-print:disabled { opacity: .7; cursor: wait; }
 .btn-print i { font-size: 1.05rem; }
 
-.modal-header-col { flex: 1 1 0; min-width: 0; }
 #view_contract_number { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .doc-action-row {
@@ -729,15 +733,6 @@ body {
   justify-content: center;
   gap: .5rem;
   flex-wrap: wrap;
-}
-.doc-action-label {
-  font-size: .68rem;
-  font-weight: 700;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  color: #8A8E90;
-  min-width: 64px;
-  text-align: right;
 }
 .btn-print.btn-print-sm {
   font-size: .8rem;
@@ -934,10 +929,9 @@ body {
   .view-kv-value { font-size: .8rem; }
   .view-text-box { padding: .6rem .7rem; font-size: .8rem; }
   .form-label { font-size: .68rem; }
-  .status-pill, .status-badge { font-size: .64rem; padding: .25rem .55rem; }
+  .status-pill, .status-badge { font-size: .68rem; padding: .3rem .6rem; min-width: 80px; }
   .btn-print { font-size: .82rem; padding: .35rem .6rem; }
   .btn-print i { font-size: .9rem; }
-  .doc-action-label { min-width: 56px; font-size: .6rem; }
   .btn-print.btn-print-sm { font-size: .72rem; padding: .26rem .5rem; }
   .revision-item { padding-left: .7rem; }
   #quotationPickList { max-height: 240px !important; }
@@ -1085,7 +1079,7 @@ body {
         </button>
         <div>
           <h1 class="dashboard-title h6 h5-md fw-bold mb-0">SOW and Contract Automation</h1>
-          <p class="dashboard-subtitle small mb-0 d-none d-sm-block">Generate and manage Statements of Work and contracts.</p>
+          <p class="dashboard-subtitle small mb-0 d-none d-sm-block">Generate and view Statements of Work and contracts.</p>
         </div>
       </div>
     </header>
@@ -1137,7 +1131,8 @@ body {
 
       <div class="status-tabs mb-3">
         <?php foreach ($statusTabs as $tabValue => $tab): ?>
-          <a class="status-tab <?= $statusFilter === (string) $tabValue ? 'is-active' : '' ?>" href="<?= buildContractPageUrl(1, $searchTerm, $dateFilter, (string) $tabValue) ?>">
+          <?php $tabClass = 'tab-' . ($tabValue === '' ? 'all' : strtolower((string) $tabValue)); ?>
+          <a class="status-tab <?= $tabClass ?> <?= $statusFilter === (string) $tabValue ? 'is-active' : '' ?>" href="<?= buildContractPageUrl(1, $searchTerm, $dateFilter, (string) $tabValue) ?>">
             <?= e($tab['label']) ?> <span class="tab-count"><?= (int) $tab['count'] ?></span>
           </a>
         <?php endforeach; ?>

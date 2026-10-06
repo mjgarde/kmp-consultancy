@@ -10,7 +10,7 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'supervisor') 
 
 $pdo = getConnection();
 
-const CONTRACT_STATUSES = ['Draft', 'Approved', 'Rejected'];
+const CONTRACT_STATUSES = ['Draft', 'Approved', 'Rejected', 'Revert'];
 
 function e($value): string
 {
@@ -33,6 +33,13 @@ function generateContractNumber(PDO $pdo): string
     $last = $stmt->fetchColumn();
     $next = $last ? ((int) substr($last, -4)) + 1 : 1;
     return sprintf('SOW-%s-%04d', $year, $next);
+}
+
+function contractIsLocked(PDO $pdo, int $contractId): bool
+{
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM contracts ct INNER JOIN service_requests sr ON ct.request_id = sr.request_id WHERE ct.contract_id = ? AND sr.status = 'Completed'");
+    $stmt->execute([$contractId]);
+    return (int) $stmt->fetchColumn() > 0;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -111,13 +118,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 flash('error', 'Contract not found.');
             }
 
-            $targetStatus = $existing['status'] === 'Rejected' ? 'Draft' : $existing['status'];
+            if (contractIsLocked($pdo, $contractId)) {
+                flash('error', 'This service request is already completed by staff, so this contract is locked.');
+            }
+
+            $targetStatus = 'Revert';
 
             $pdo->beginTransaction();
 
             $updateStmt = $pdo->prepare(
                 "UPDATE contracts
-                 SET scope_summary = ?, total_amount = ?, start_date = ?, end_date = ?, status = ?
+                 SET scope_summary = ?, total_amount = ?, start_date = ?, end_date = ?, status = ?,
+                     approved_by = NULL, approved_at = NULL
                  WHERE contract_id = ?"
             );
             $updateStmt->execute([$scopeSummary, $totalAmount, $startDate, $endDate, $targetStatus, $contractId]);
@@ -139,9 +151,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $contractId = (int) ($_POST['contract_id'] ?? 0);
 
             $transitions = [
-                'approve_contract' => ['from' => 'Draft', 'to' => 'Approved', 'done' => 'approved'],
-                'reject_contract'  => ['from' => 'Draft', 'to' => 'Rejected', 'done' => 'rejected'],
-                'reopen_contract'  => ['from' => 'Rejected', 'to' => 'Draft', 'done' => 'moved back to draft'],
+                'approve_contract' => ['from' => ['Draft', 'Revert'], 'to' => 'Approved', 'done' => 'approved'],
+                'reject_contract'  => ['from' => ['Draft', 'Revert'], 'to' => 'Rejected', 'done' => 'rejected'],
+                'reopen_contract'  => ['from' => ['Rejected'], 'to' => 'Draft', 'done' => 'moved back to draft'],
             ];
             $rule = $transitions[$action];
 
@@ -153,8 +165,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 flash('error', 'Contract not found.');
             }
 
-            if ($existing['status'] !== $rule['from']) {
-                flash('error', "Only {$rule['from']} contracts can be {$rule['done']}.");
+            if (contractIsLocked($pdo, $contractId)) {
+                flash('error', 'This service request is already completed by staff, so this contract is locked.');
+            }
+
+            if (!in_array($existing['status'], $rule['from'], true)) {
+                flash('error', 'Only ' . implode(' or ', $rule['from']) . " contracts can be {$rule['done']}.");
             }
 
             if ($rule['to'] === 'Approved') {
@@ -228,7 +244,7 @@ if ($dateFilter !== '') {
 
 $statsStmt = $pdo->prepare("SELECT ct.status, COUNT(*) AS cnt, COALESCE(SUM(ct.total_amount), 0) AS total $baseQuery GROUP BY ct.status");
 $statsStmt->execute($baseParams);
-$statusCounts = ['Draft' => 0, 'Approved' => 0, 'Rejected' => 0];
+$statusCounts = ['Draft' => 0, 'Approved' => 0, 'Rejected' => 0, 'Revert' => 0];
 $totalApprovedValue = 0.0;
 foreach ($statsStmt->fetchAll() as $row) {
     $statusCounts[$row['status']] = (int) $row['cnt'];
@@ -256,7 +272,7 @@ $contractsStmt = $pdo->prepare(
     "SELECT ct.contract_id, ct.contract_number, ct.quotation_id, ct.status, ct.total_amount, ct.start_date, ct.end_date,
             ct.scope_summary, ct.created_at, ct.approved_at,
             c.company_name, c.contact_person, c.email, c.contact_number, c.address, c.industry,
-            sr.request_title, sr.required_skill,
+            sr.request_title, sr.required_skill, sr.status AS request_status,
             q.quotation_number, q.subtotal, q.tax_rate, q.tax_amount, q.valid_until AS quotation_valid_until,
             pb.firstname AS prepared_firstname, pb.lastname AS prepared_lastname,
             ab.firstname AS approved_firstname, ab.lastname AS approved_lastname
@@ -303,6 +319,7 @@ $statusTabs = [
     'Draft'    => ['label' => 'Draft', 'count' => $statusCounts['Draft']],
     'Approved' => ['label' => 'Approved', 'count' => $statusCounts['Approved']],
     'Rejected' => ['label' => 'Rejected', 'count' => $statusCounts['Rejected']],
+    'Revert'   => ['label' => 'Revert', 'count' => $statusCounts['Revert']],
 ];
 
 ?>
@@ -459,8 +476,8 @@ body {
   font-size: .78rem;
 }
 
-.btn-action-edit { background-color: #1F6B58; }
-.btn-action-edit:hover { background-color: #195746; color: #fff; }
+.btn-action-edit { background-color: #3B4E8A; }
+.btn-action-edit:hover { background-color: #2E3E70; color: #fff; }
 
 .btn-action-approve { background-color: var(--success); }
 .btn-action-approve:hover { background-color: var(--success-text); color: #fff; }
@@ -509,36 +526,80 @@ body {
 .status-pill {
   display: inline-flex;
   align-items: center;
-  padding: .22rem .65rem;
-  border-radius: 999px;
-  font-size: .72rem;
+  justify-content: center;
+  text-align: center;
+  min-width: 92px;
+  padding: .35rem .75rem;
+  border-radius: 6px;
+  font-size: .75rem;
   font-weight: 700;
+  line-height: 1.2;
   white-space: nowrap;
-  letter-spacing: .01em;
-  border: 1px solid transparent;
+  color: #FFFFFF;
+  border: none;
 }
-.status-draft { background-color: var(--warn-soft); color: var(--warn-text); border-color: var(--warn-border); }
-.status-approved { background-color: var(--success-soft); color: var(--success-text); border-color: var(--success-border); }
-.status-rejected { background-color: var(--danger-soft); color: var(--danger-text); border-color: var(--danger-border); }
+.status-draft    { background-color: #CA8A04; color: #FFFFFF; }
+.status-revert   { background-color: #3B4E8A; color: #FFFFFF; }
+.status-approved { background-color: var(--success); color: #FFFFFF; }
+.status-rejected { background-color: var(--danger); color: #FFFFFF; }
 
-.status-tabs { display: flex; gap: .4rem; flex-wrap: wrap; }
+.completed-mark {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .15rem;
+  line-height: 1.1;
+  color: var(--success);
+  min-width: 72px;
+}
+.completed-mark i {
+  font-size: 1.05rem;
+  color: var(--success);
+}
+.completed-mark span {
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--success);
+}
+
+.status-tabs { display: flex; gap: .5rem; flex-wrap: wrap; padding: 4px; }
+
 .status-tab {
+  --tab-color: #1F2937;
+  --tab-text: #FFFFFF;
   display: inline-flex;
   align-items: center;
   gap: .45rem;
   padding: .4rem .85rem;
   border-radius: 8px;
-  border: 1px solid var(--line);
-  background-color: #fff;
-  color: var(--slate);
+  border: 2px solid var(--tab-color);
+  background-color: var(--tab-color);
+  color: #FFFFFF !important;
   font-size: .8rem;
   font-weight: 600;
   text-decoration: none;
+  transition: box-shadow .15s ease, transform .1s ease;
 }
-.status-tab:hover { background-color: var(--indigo-soft); border-color: #C9D0E8; color: var(--indigo-text); }
-.status-tab.is-active { background-color: var(--indigo); border-color: var(--indigo); color: #fff; }
-.status-tab.is-active:hover { background-color: var(--indigo-text); border-color: var(--indigo-text); color: #fff; }
-.status-tab .tab-count { font-size: .72rem; opacity: .75; }
+.status-tab.tab-all      { --tab-color: #1F2937; --tab-text: #FFFFFF; }
+.status-tab.tab-draft    { --tab-color: #CA8A04; --tab-text: #FFFFFF; }
+.status-tab.tab-approved { --tab-color: var(--success); --tab-text: #FFFFFF; }
+.status-tab.tab-rejected { --tab-color: var(--danger); --tab-text: #FFFFFF; }
+.status-tab.tab-revert   { --tab-color: #3B4E8A; --tab-text: #FFFFFF; }
+
+.status-tab:hover {
+  color: #FFFFFF !important;
+  transform: translateY(-1px);
+}
+
+.status-tab.is-active {
+  box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--tab-color);
+}
+.status-tab.is-active:hover { color: #FFFFFF !important; }
+
+.status-tab .tab-count { font-size: .72rem; color: #FFFFFF; opacity: 1; }
 
 .summary-bar {
   display: flex;
@@ -627,7 +688,20 @@ body {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background-color: var(--warn);
+  background-color: #3B4E8A;
+}
+
+.revert-notice {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  background-color: #E9ECF6;
+  border: 1px solid #C9D0E8;
+  border-left: 4px solid #3B4E8A;
+  border-radius: 8px;
+  padding: .65rem .9rem;
+  color: #2E3E70;
+  font-size: .82rem;
 }
 
 .empty-state { color: var(--ink-soft); }
@@ -674,6 +748,8 @@ body {
   border-radius: 0;
   background-color: #FFFEFC;
 }
+
+#editContractModal .modal-content { border-radius: 14px; }
 
 #generateContractModal .modal-header,
 #viewContractModal .modal-header,
@@ -1072,7 +1148,7 @@ body {
   .view-kv-value { font-size: .8rem; }
   .view-text-box { padding: .6rem .7rem; font-size: .8rem; }
   .form-label { font-size: .68rem; }
-  .status-pill, .status-badge { font-size: .64rem; padding: .25rem .55rem; }
+  .status-pill, .status-badge { font-size: .68rem; padding: .3rem .6rem; min-width: 80px; }
   .btn-print { font-size: .82rem; padding: .35rem .6rem; }
   .btn-print i { font-size: .9rem; }
   .doc-action-label { min-width: 56px; font-size: .6rem; }
@@ -1275,7 +1351,8 @@ body {
 
       <div class="status-tabs mb-3">
         <?php foreach ($statusTabs as $tabValue => $tab): ?>
-          <a class="status-tab <?= $statusFilter === (string) $tabValue ? 'is-active' : '' ?>" href="<?= buildContractPageUrl(1, $searchTerm, $dateFilter, (string) $tabValue) ?>">
+          <?php $tabClass = 'tab-' . ($tabValue === '' ? 'all' : strtolower((string) $tabValue)); ?>
+          <a class="status-tab <?= $tabClass ?> <?= $statusFilter === (string) $tabValue ? 'is-active' : '' ?>" href="<?= buildContractPageUrl(1, $searchTerm, $dateFilter, (string) $tabValue) ?>">
             <?= e($tab['label']) ?> <span class="tab-count"><?= (int) $tab['count'] ?></span>
           </a>
         <?php endforeach; ?>
@@ -1385,7 +1462,14 @@ body {
                     <td class="text-end cell-actions">
                       <span class="mobile-row-label">Action</span>
                       <span class="cell-body d-flex justify-content-end gap-1 flex-wrap">
-                        <?php if ($ct['status'] === 'Draft'): ?>
+                        <?php $isLocked = ($ct['request_status'] ?? '') === 'Completed'; ?>
+                        <?php if ($isLocked): ?>
+                          <span class="completed-mark">
+                            <i class="fa-solid fa-circle-check"></i>
+                            <span>Completed</span>
+                          </span>
+                        <?php else: ?>
+                        <?php if (in_array($ct['status'], ['Draft', 'Revert'], true)): ?>
                           <button type="button" class="btn-action btn-action-text btn-action-approve status-action-btn" title="Approve"
                             data-action="approve_contract" data-contract-id="<?= (int) $ct['contract_id'] ?>" data-number="<?= e($ct['contract_number']) ?>">
                             <i class="fa-solid fa-check"></i><span>Approve</span>
@@ -1400,15 +1484,17 @@ body {
                             <i class="fa-solid fa-rotate-left"></i><span>Reopen</span>
                           </button>
                         <?php endif; ?>
-                        <button type="button" class="btn-action btn-action-edit edit-contract-btn" title="Edit contract"
+                        <?php $editLabel = $ct['status'] === 'Revert' ? 'Edit' : 'Revert'; ?>
+                        <button type="button" class="btn-action btn-action-text btn-action-edit edit-contract-btn" title="<?= e($editLabel) ?> contract"
                           data-contract-id="<?= (int) $ct['contract_id'] ?>"
                           data-scope-summary="<?= e($ct['scope_summary'] ?? '') ?>"
                           data-total-amount="<?= e((string) $ct['total_amount']) ?>"
                           data-start-date="<?= e($ct['start_date'] ?? '') ?>"
                           data-end-date="<?= e($ct['end_date'] ?? '') ?>"
                           data-number="<?= e($ct['contract_number']) ?>">
-                          <i class="fa-solid fa-pen"></i>
+                          <i class="fa-solid fa-pen"></i><span><?= e($editLabel) ?></span>
                         </button>
+                        <?php endif; ?>
                       </span>
                     </td>
                   </tr>
@@ -1613,7 +1699,7 @@ body {
         <input type="hidden" name="contract_id" id="edit_contract_id">
 
         <div class="modal-header d-flex align-items-center justify-content-between">
-          <h2 class="modal-title h5 fw-bold mb-0">Edit Contract <span id="edit_contract_number_label" style="color:var(--ink-soft); font-weight:600;"></span></h2>
+          <h2 class="modal-title h5 fw-bold mb-0">Revert Contract <span id="edit_contract_number_label" style="color:var(--ink-soft); font-weight:600;"></span></h2>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
 
@@ -1650,7 +1736,7 @@ body {
 
         <div class="modal-footer">
           <button type="button" class="btn btn-ghost px-4" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-teal-solid px-4">Save Changes</button>
+          <button type="submit" class="btn btn-teal-solid px-4">Save &amp; Revert</button>
         </div>
       </form>
     </div>
@@ -1989,7 +2075,7 @@ const statusConfig = {
   },
   reject_contract: {
     title: 'Reject contract',
-    text: 'This contract will be marked as rejected. You can still edit it or move it back to draft later.',
+    text: 'This contract will be marked as rejected. You can still move it back to draft later.',
     button: 'Reject',
     buttonClass: 'btn btn-reset'
   },

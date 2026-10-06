@@ -61,16 +61,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: client_management.php?tab=clients');
         exit;
 
-    } elseif ($action === 'delete_client') {
-
-        $clientId = $_POST['client_id'] ?? null;
-        $stmt = $pdo->prepare('DELETE FROM clients WHERE client_id = ?');
-        $stmt->execute([$clientId]);
-        $_SESSION['alert_type'] = 'success';
-        $_SESSION['alert_message'] = 'Client profile deleted successfully.';
-        header('Location: client_management.php?tab=clients');
-        exit;
-
     } elseif ($action === 'add_request') {
 
         $clientId      = $_POST['client_id'] ?? '';
@@ -119,16 +109,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['alert_message'] = implode(' ', $errors);
         }
 
-        header('Location: client_management.php?tab=requests');
-        exit;
-
-    } elseif ($action === 'delete_request') {
-
-        $requestId = $_POST['request_id'] ?? null;
-        $stmt = $pdo->prepare('DELETE FROM service_requests WHERE request_id = ?');
-        $stmt->execute([$requestId]);
-        $_SESSION['alert_type'] = 'success';
-        $_SESSION['alert_message'] = 'Service request deleted successfully.';
         header('Location: client_management.php?tab=requests');
         exit;
     }
@@ -426,26 +406,34 @@ body {
 
 .client-management-tabs {
   display: flex;
-  gap: .4rem;
+  gap: .75rem;
   flex-wrap: wrap;
-  border-bottom: 1px solid var(--line);
+  padding: 3px;
 }
 .client-management-tabs a {
-  border: none;
-  background: none;
-  padding: .75rem .3rem;
+  padding: .6rem 1.15rem;
   font-size: .85rem;
   font-weight: 600;
-  color: var(--ink-soft);
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
+  color: #fff;
+  background-color: var(--tab-base);
+  border: none;
+  border-radius: 8px;
   text-decoration: none;
   display: flex;
   align-items: center;
-  gap: .4rem;
+  gap: .45rem;
+  transition: background-color .12s ease;
 }
-.client-management-tabs a:hover { color: var(--navy-deep); }
-.client-management-tabs a.active { color: var(--indigo-text); border-bottom-color: var(--indigo); }
+.client-management-tabs a:hover { background-color: var(--tab-dark); color: #fff; }
+.client-management-tabs a.active {
+  background-color: var(--tab-dark);
+  color: #fff;
+  outline: 2px solid var(--tab-dark);
+  outline-offset: 2px;
+}
+.client-management-tabs a.tab-clients { --tab-base: #3B4E8A; --tab-dark: #2A3A6D; }
+.client-management-tabs a.tab-requests { --tab-base: #9A6A1C; --tab-dark: #744F13; }
+.client-management-tabs a.tab-reports { --tab-base: #1F6B68; --tab-dark: #154F4D; }
 
 .table thead th {
   border-bottom: 1px solid var(--line) !important;
@@ -498,8 +486,8 @@ body {
   .stat-label { font-size: .6rem; }
   .stat-value { font-size: 1rem; }
 
-  .client-management-tabs { gap: .9rem; }
-  .client-management-tabs a { font-size: .78rem; padding: .6rem .2rem; }
+  .client-management-tabs { gap: .4rem; }
+  .client-management-tabs a { flex: 1 1 0; justify-content: center; text-align: center; font-size: .74rem; padding: .5rem .4rem; gap: .3rem; }
 
   .btn { font-size: .82rem; padding: .4rem .7rem; }
   .btn-icon-neutral,
@@ -595,13 +583,13 @@ body {
       </section>
 
       <nav class="client-management-tabs mb-3">
-        <a href="?tab=clients" class="<?= $activeTab === 'clients' ? 'active' : '' ?>">
+        <a href="?tab=clients" class="tab-clients <?= $activeTab === 'clients' ? 'active' : '' ?>">
           <i class="fa-solid fa-building"></i> Clients
         </a>
-        <a href="?tab=requests" class="<?= $activeTab === 'requests' ? 'active' : '' ?>">
+        <a href="?tab=requests" class="tab-requests <?= $activeTab === 'requests' ? 'active' : '' ?>">
           <i class="fa-solid fa-clipboard-list"></i> Service Requests
         </a>
-        <a href="?tab=reports" class="<?= $activeTab === 'reports' ? 'active' : '' ?>">
+        <a href="?tab=reports" class="tab-reports <?= $activeTab === 'reports' ? 'active' : '' ?>">
           <i class="fa-solid fa-chart-simple"></i> Reports
         </a>
       </nav>
@@ -996,34 +984,10 @@ body {
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-icon-danger" title="Delete" id="view_delete_btn" data-bs-dismiss="modal">
-          <i class="fa-regular fa-trash-can"></i>
-        </button>
         <button type="button" class="btn btn-teal-solid" id="view_edit_btn" data-bs-dismiss="modal">
           <i class="fa-regular fa-pen-to-square"></i> Edit
         </button>
       </div>
-    </div>
-  </div>
-</div>
-
-<div class="modal fade" id="deleteClientModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <form method="POST">
-        <input type="hidden" name="action" value="delete_client">
-        <input type="hidden" name="client_id" id="delete_client_id">
-        <div class="modal-header">
-          <h2 class="modal-title h5 fw-bold">Delete Client</h2>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <p class="mb-0">Are you sure you want to delete <strong id="delete_client_name"></strong>? This will also remove all related service requests.</p>
-        </div>
-        <div class="modal-footer">
-          <button type="submit" class="btn btn-text-danger">Delete Client</button>
-        </div>
-      </form>
     </div>
   </div>
 </div>
@@ -1114,31 +1078,7 @@ body {
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-icon-danger" title="Delete" id="manage_delete_btn" data-bs-dismiss="modal">
-            <i class="fa-regular fa-trash-can"></i>
-          </button>
-          <button type="submit" class="btn btn-teal-solid">Save Changes</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
-<div class="modal fade" id="deleteRequestModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <form method="POST">
-        <input type="hidden" name="action" value="delete_request">
-        <input type="hidden" name="request_id" id="delete_request_id">
-        <div class="modal-header">
-          <h2 class="modal-title h5 fw-bold">Delete Request</h2>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <p class="mb-0">Are you sure you want to delete <strong id="delete_request_title"></strong>?</p>
-        </div>
-        <div class="modal-footer">
-          <button type="submit" class="btn btn-text-danger">Delete Request</button>
+            <button type="submit" class="btn btn-teal-solid">Save Changes</button>
         </div>
       </form>
     </div>
@@ -1169,14 +1109,6 @@ document.getElementById('viewClientModal').addEventListener('show.bs.modal', fun
     const editModal = new bootstrap.Modal(document.getElementById('editClientModal'));
     editModal.show();
   };
-
-  const deleteBtn = document.getElementById('view_delete_btn');
-  deleteBtn.onclick = function () {
-    document.getElementById('delete_client_id').value = data.id;
-    document.getElementById('delete_client_name').textContent = data.company;
-    const deleteModal = new bootstrap.Modal(document.getElementById('deleteClientModal'));
-    deleteModal.show();
-  };
 });
 
 document.getElementById('manageRequestModal').addEventListener('show.bs.modal', function (event) {
@@ -1194,14 +1126,6 @@ document.getElementById('manageRequestModal').addEventListener('show.bs.modal', 
     'Completed': 'status-approved',
     'Cancelled': 'status-rejected'
   }[data.status] || 'status-draft');
-
-  const deleteBtn = document.getElementById('manage_delete_btn');
-  deleteBtn.onclick = function () {
-    document.getElementById('delete_request_id').value = data.id;
-    document.getElementById('delete_request_title').textContent = data.title;
-    const deleteModal = new bootstrap.Modal(document.getElementById('deleteRequestModal'));
-    deleteModal.show();
-  };
 });
 
 <?php if ($alertType && $alertMessage): ?>

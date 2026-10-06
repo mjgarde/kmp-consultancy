@@ -1,9 +1,0 @@
-ALTER TABLE service_requests MODIFY request_details TEXT NULL; //
-ALTER TABLE quotations MODIFY notes TEXT NULL;//
-
-ALTER TABLE contracts MODIFY terms_conditions TEXT NULL; //
-
-
-
-
-ALTER TABLE quotation_items MODIFY description TEXT NULL;  ///Seperate
