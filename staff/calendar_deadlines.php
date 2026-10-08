@@ -1,10 +1,10 @@
 <?php
 
-session_name('MANAGER_SESSION');
+session_name('STAFF_SESSION');
 session_start();
 require_once __DIR__ . '/../config/database.php';
 
-if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'manager') {
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'staff') {
     header('Location: ../login.php');
     exit;
 }
@@ -858,7 +858,7 @@ h3,
 <body>
 <div class="dashboard-layout d-flex">
 
-<?php require __DIR__ . '/../includes/manager/sidebar.php'; ?>
+<?php require __DIR__ . '/../includes/staff/sidebar.php'; ?>
 
   <div class="dashboard-main flex-grow-1">
 

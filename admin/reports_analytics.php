@@ -11,7 +11,35 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
 
 $pdo = getConnection();
 
+function parseDateInput(?string $value, DateTime $fallback): DateTime
+{
+    $date = DateTime::createFromFormat('!Y-m-d', (string) $value);
+    $errors = DateTime::getLastErrors();
+    $clean = !$errors || ($errors['warning_count'] === 0 && $errors['error_count'] === 0);
+    return ($date && $clean) ? $date : clone $fallback;
+}
+
+function formatDisplayDate(?string $date): ?string
+{
+    return $date ? date('M d, Y', strtotime($date)) : null;
+}
+
+function statusClass(string $status): string
+{
+    return match ($status) {
+        'New', 'Draft' => 'status-new',
+        'In Progress' => 'status-progress',
+        'Completed', 'Approved', 'Active' => 'status-approved',
+        'Cancelled', 'Rejected', 'Inactive' => 'status-rejected',
+        'Revert' => 'status-revert',
+        default => 'status-new',
+    };
+}
+
 $preset = $_GET['preset'] ?? '6m';
+if (!in_array($preset, ['3m', '6m', '12m', 'ytd', 'custom'], true)) {
+    $preset = '6m';
+}
 $today = new DateTime('today');
 
 $presetMonths = match ($preset) {
@@ -33,19 +61,8 @@ if ($preset === 'ytd') {
     $defaultTo = clone $today;
 }
 
-$fromInput = $_GET['from'] ?? $defaultFrom->format('Y-m-d');
-$toInput = $_GET['to'] ?? $defaultTo->format('Y-m-d');
-
-try {
-    $fromDate = new DateTime($fromInput);
-} catch (Exception $e) {
-    $fromDate = $defaultFrom;
-}
-try {
-    $toDate = new DateTime($toInput);
-} catch (Exception $e) {
-    $toDate = $defaultTo;
-}
+$fromDate = parseDateInput($_GET['from'] ?? null, $defaultFrom);
+$toDate = parseDateInput($_GET['to'] ?? null, $defaultTo);
 if ($fromDate > $toDate) {
     [$fromDate, $toDate] = [$toDate, $fromDate];
 }
@@ -54,26 +71,10 @@ $rangeFrom = $fromDate->format('Y-m-d 00:00:00');
 $rangeTo = $toDate->format('Y-m-d 23:59:59');
 $rangeLabel = $fromDate->format('M d, Y') . ' – ' . $toDate->format('M d, Y');
 
-function formatDisplayDate(?string $date): ?string
-{
-    return $date ? date('M d, Y', strtotime($date)) : null;
-}
-
-function statusClass(string $status): string
-{
-    return match ($status) {
-        'New', 'Draft' => 'status-new',
-        'In Progress' => 'status-progress',
-        'Completed', 'Approved', 'Active' => 'status-approved',
-        'Cancelled', 'Rejected', 'Inactive' => 'status-rejected',
-        default => 'status-new',
-    };
-}
-
 $revenueStmt = $pdo->prepare(
-    "SELECT DATE_FORMAT(created_at, '%Y-%m') AS ym, SUM(total_amount) AS total
+    "SELECT DATE_FORMAT(COALESCE(approved_at, created_at), '%Y-%m') AS ym, SUM(total_amount) AS total
      FROM contracts
-     WHERE status = 'Approved' AND created_at BETWEEN :from AND :to
+     WHERE status = 'Approved' AND COALESCE(approved_at, created_at) BETWEEN :from AND :to
      GROUP BY ym
      ORDER BY ym ASC"
 );
@@ -148,7 +149,7 @@ $quotationStatusStmt = $pdo->prepare(
     'SELECT status, COUNT(*) AS cnt FROM quotations WHERE created_at BETWEEN :from AND :to GROUP BY status'
 );
 $quotationStatusStmt->execute(['from' => $rangeFrom, 'to' => $rangeTo]);
-$quotationStatusCounts = ['Draft' => 0, 'Approved' => 0, 'Rejected' => 0];
+$quotationStatusCounts = ['Draft' => 0, 'Approved' => 0, 'Rejected' => 0, 'Revert' => 0];
 foreach ($quotationStatusStmt->fetchAll() as $row) {
     if (isset($quotationStatusCounts[$row['status']])) {
         $quotationStatusCounts[$row['status']] = (int) $row['cnt'];
@@ -160,7 +161,8 @@ $conversionRate = $totalQuotationsInRange > 0
     : 0.0;
 
 $avgDealSizeStmt = $pdo->prepare(
-    "SELECT COALESCE(AVG(total_amount), 0) FROM contracts WHERE status = 'Approved' AND created_at BETWEEN :from AND :to"
+    "SELECT COALESCE(AVG(total_amount), 0) FROM contracts
+     WHERE status = 'Approved' AND COALESCE(approved_at, created_at) BETWEEN :from AND :to"
 );
 $avgDealSizeStmt->execute(['from' => $rangeFrom, 'to' => $rangeTo]);
 $avgDealSize = (float) $avgDealSizeStmt->fetchColumn();
@@ -174,7 +176,8 @@ $draftContractValue = (float) $draftContractRow[0];
 $draftContractCount = (int) $draftContractRow[1];
 
 $totalContractValueStmt = $pdo->prepare(
-    "SELECT COALESCE(SUM(total_amount), 0) FROM contracts WHERE status = 'Approved' AND created_at BETWEEN :from AND :to"
+    "SELECT COALESCE(SUM(total_amount), 0) FROM contracts
+     WHERE status = 'Approved' AND COALESCE(approved_at, created_at) BETWEEN :from AND :to"
 );
 $totalContractValueStmt->execute(['from' => $rangeFrom, 'to' => $rangeTo]);
 $totalContractValue = (float) $totalContractValueStmt->fetchColumn();
@@ -195,7 +198,8 @@ $topClientsStmt = $pdo->prepare(
     "SELECT c.client_id, c.company_name, c.industry, c.contact_person, c.email, c.contact_number, c.address,
             COALESCE(SUM(ct.total_amount), 0) AS total_value, COUNT(ct.contract_id) AS contract_count
      FROM clients c
-     LEFT JOIN contracts ct ON ct.client_id = c.client_id AND ct.status = 'Approved' AND ct.created_at BETWEEN :from AND :to
+     LEFT JOIN contracts ct ON ct.client_id = c.client_id AND ct.status = 'Approved'
+          AND COALESCE(ct.approved_at, ct.created_at) BETWEEN :from AND :to
      GROUP BY c.client_id
      HAVING total_value > 0
      ORDER BY total_value DESC
@@ -209,11 +213,14 @@ if (!empty($topClients)) {
     $clientIds = array_column($topClients, 'client_id');
     $placeholders = implode(',', array_fill(0, count($clientIds), '?'));
     $clientContractsStmt = $pdo->prepare(
-        "SELECT ct.client_id, ct.contract_number, ct.total_amount, ct.start_date, ct.end_date, ct.created_at, sr.request_title
+        "SELECT ct.client_id, ct.contract_number, ct.total_amount, ct.start_date, ct.end_date,
+                COALESCE(ct.approved_at, ct.created_at) AS approved_on, sr.request_title
          FROM contracts ct
          INNER JOIN service_requests sr ON sr.request_id = ct.request_id
-         WHERE ct.status = 'Approved' AND ct.created_at BETWEEN ? AND ? AND ct.client_id IN ($placeholders)
-         ORDER BY ct.created_at DESC"
+         WHERE ct.status = 'Approved'
+           AND COALESCE(ct.approved_at, ct.created_at) BETWEEN ? AND ?
+           AND ct.client_id IN ($placeholders)
+         ORDER BY approved_on DESC"
     );
     $clientContractsStmt->execute(array_merge([$rangeFrom, $rangeTo], $clientIds));
     foreach ($clientContractsStmt->fetchAll() as $row) {
@@ -222,7 +229,7 @@ if (!empty($topClients)) {
             'request' => $row['request_title'],
             'start'   => formatDisplayDate($row['start_date']),
             'end'     => formatDisplayDate($row['end_date']),
-            'date'    => formatDisplayDate($row['created_at']),
+            'date'    => formatDisplayDate($row['approved_on']),
             'value'   => (float) $row['total_amount'],
         ];
     }
@@ -234,7 +241,7 @@ $staffPerformanceStmt = $pdo->prepare(
             (SELECT COUNT(*) FROM service_requests sr WHERE sr.assigned_to = u.user_id AND sr.status = 'In Progress') AS active_count,
             (SELECT COUNT(*) FROM service_requests sr WHERE sr.assigned_to = u.user_id AND sr.created_at BETWEEN :from2 AND :to2) AS total_assigned
      FROM users u
-     WHERE u.role IN ('Staff', 'Supervisor')
+     WHERE u.role IN ('staff', 'supervisor')
      ORDER BY completed_count DESC, active_count DESC"
 );
 $staffPerformanceStmt->execute([
@@ -292,7 +299,7 @@ $staffList = array_map(function ($staff) use ($skillsByStaff, $requestsByStaff) 
         'id'        => (int) $staff['user_id'],
         'name'      => $staff['firstname'] . ' ' . $staff['lastname'],
         'status'    => $staff['status'],
-        'role'      => $staff['role'],
+        'role'      => ucfirst($staff['role']),
         'completed' => (int) $staff['completed_count'],
         'active'    => (int) $staff['active_count'],
         'assigned'  => (int) $staff['total_assigned'],
@@ -379,6 +386,10 @@ $presetOptions = [
   --danger-soft: #F8E9E5;
   --danger-text: #8C3D2E;
   --danger-border: #E8C8BF;
+
+  --plum-soft: #F0E6F1;
+  --plum-text: #5E3A60;
+  --plum-border: #DCC8DE;
 }
 
 * { -webkit-tap-highlight-color: transparent; }
@@ -544,6 +555,7 @@ body {
 .status-progress { background-color: var(--warn-soft); color: var(--warn-text); border-color: var(--warn-border); }
 .status-approved { background-color: var(--success-soft); color: var(--success-text); border-color: var(--success-border); }
 .status-rejected { background-color: var(--danger-soft); color: var(--danger-text); border-color: var(--danger-border); }
+.status-revert { background-color: var(--plum-soft); color: var(--plum-text); border-color: var(--plum-border); }
 
 .table thead th {
   background-color: var(--surface) !important;
@@ -640,9 +652,8 @@ body {
   border: 1px solid var(--line);
 }
 
-#printArea { display: none; }
-
 #printArea {
+  display: none;
   color: #111;
   font-family: 'Inter', Arial, Helvetica, sans-serif;
   font-size: 10pt;
@@ -698,20 +709,11 @@ body {
 }
 #printArea .p-items td { border: 1px solid #bbb; padding: 5px 7px; font-size: 9.5pt; vertical-align: top; }
 #printArea .p-items .r { text-align: right; white-space: nowrap; }
-#printArea .p-items .c { text-align: center; width: 6%; }
 #printArea .p-items tr { break-inside: avoid; page-break-inside: avoid; }
 #printArea .p-items tr.total td { font-weight: 700; background: #F5F5F5; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 #printArea .p-chart { display: block; width: 100%; max-height: 72mm; object-fit: contain; margin-bottom: 8px; }
 #printArea .p-note { font-size: 9pt; color: #555; margin-top: 4px; }
 #printArea .p-block { break-inside: avoid; page-break-inside: avoid; }
-#printArea .p-footer {
-  margin-top: 26px;
-  padding-top: 8px;
-  border-top: 1px solid #aaa;
-  text-align: center;
-  font-size: 8.5pt;
-  color: #555;
-}
 
 @media (max-width: 1199.98px) {
   .metric-card { padding: .9rem 1rem; }
@@ -963,7 +965,7 @@ body {
           <section class="card mb-3">
             <div class="card-header">
               <h2 class="h6 fw-bold mb-0">Quotation Pipeline</h2>
-              <p class="small mb-0">Draft, Approved, Rejected.</p>
+              <p class="small mb-0">Draft, Approved, Rejected, Revert.</p>
             </div>
             <div class="card-body">
               <?php if ($totalQuotationsInRange === 0): ?>
@@ -1167,7 +1169,8 @@ const statusClassMap = {
   'Active': 'status-approved',
   'Cancelled': 'status-rejected',
   'Rejected': 'status-rejected',
-  'Inactive': 'status-rejected'
+  'Inactive': 'status-rejected',
+  'Revert': 'status-revert'
 };
 
 const clientMap = {};
@@ -1205,9 +1208,9 @@ const chartColors = {
   accent: '#2F6F6A',
   accentSoft: 'rgba(47, 111, 106, 0.12)',
   sage: '#3E7D5A',
-  sageSoft: 'rgba(62, 125, 90, 0.10)',
   amber: '#B07A2A',
   terracotta: '#B5523F',
+  plum: '#7B4F7D',
   slate: '#7A7E81',
   grid: '#E6E2DA'
 };
@@ -1298,7 +1301,7 @@ if (document.getElementById('quotationStatusChart')) {
       labels: Object.keys(reportData.quotationStatus),
       datasets: [{
         data: Object.values(reportData.quotationStatus),
-        backgroundColor: [chartColors.slate, chartColors.sage, chartColors.terracotta],
+        backgroundColor: [chartColors.slate, chartColors.sage, chartColors.terracotta, chartColors.plum],
         borderWidth: 0
       }]
     },
