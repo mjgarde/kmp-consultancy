@@ -288,18 +288,31 @@ body {
 .stat-strip {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: .75rem;
+  gap: .7rem;
 }
 .stat-strip-item {
   background-color: var(--card);
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 1.1rem 1rem;
+  padding: 1rem .9rem;
   box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
   text-align: center;
 }
-.stat-strip-label { font-size: .66rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-soft); }
-.stat-strip-value { font-size: 1.55rem; font-weight: 700; font-family: 'Lexend', sans-serif; color: var(--navy-deep); margin-top: .4rem; line-height: 1; }
+.stat-strip-label {
+  font-size: .74rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.stat-strip-value {
+  font-size: 1.7rem;
+  font-weight: 700;
+  font-family: 'Lexend', sans-serif;
+  color: var(--navy-deep);
+  margin-top: .4rem;
+  line-height: 1;
+}
 
 .filter-toolbar {
   border: 1px solid var(--line);
@@ -309,7 +322,7 @@ body {
   box-shadow: 0 1px 2px rgba(15, 23, 42, .03);
 }
 .filter-toolbar .form-label {
-  font-size: .66rem;
+  font-size: .72rem;
   font-weight: 700;
   letter-spacing: .05em;
   text-transform: uppercase;
@@ -320,7 +333,7 @@ body {
 .filter-toolbar .form-select {
   border: 1px solid var(--line);
   border-radius: 7px;
-  font-size: .82rem;
+  font-size: .88rem;
   color: var(--ink);
 }
 .filter-toolbar .form-control:focus,
@@ -342,7 +355,7 @@ body {
   border: 1px solid var(--danger-border);
   border-radius: 7px;
   font-weight: 600;
-  font-size: .8rem;
+  font-size: .85rem;
 }
 .btn-filter-clear:hover { background-color: var(--danger-soft); color: var(--danger); }
 
@@ -357,26 +370,32 @@ body {
   border-bottom: 1px solid var(--line) !important;
   color: var(--ink-soft);
   font-weight: 700;
-  font-size: .66rem;
+  font-size: .74rem;
   letter-spacing: .06em;
   text-transform: uppercase;
   background-color: #FAFBFC !important;
-  padding: .8rem 1.1rem;
+  padding: .85rem 1.1rem;
   white-space: nowrap;
 }
-.table td { border-bottom: 1px solid var(--line); vertical-align: middle; font-size: .83rem; color: var(--ink); padding: .75rem 1.1rem; }
+.table td {
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+  font-size: .88rem;
+  color: var(--ink);
+  padding: .8rem 1.1rem;
+}
 .table tbody tr:last-child td { border-bottom: none; }
 .table-hover tbody tr:hover { background-color: #F8F9FC; }
 .log-row { cursor: pointer; }
 
 .actor-avatar {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: .7rem;
+  font-size: .78rem;
   font-weight: 700;
   flex-shrink: 0;
   background-color: var(--indigo-soft);
@@ -384,7 +403,7 @@ body {
 }
 
 .role-label {
-  font-size: .78rem;
+  font-size: .82rem;
   font-weight: 600;
   color: var(--ink);
 }
@@ -392,14 +411,14 @@ body {
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: .35rem;
-  font-size: .7rem;
+  gap: .38rem;
+  font-size: .76rem;
   font-weight: 700;
   white-space: nowrap;
-  padding: .28rem .6rem;
+  padding: .3rem .7rem;
   border-radius: 999px;
 }
-.chip i { font-size: .68rem; }
+.chip i { font-size: .74rem; }
 .chip-indigo  { color: var(--indigo-text); background-color: var(--indigo-soft); }
 .chip-navy    { color: #33495C; background-color: #E7ECEF; }
 .chip-warn    { color: var(--warn-text); background-color: var(--warn-soft); }
@@ -407,7 +426,7 @@ body {
 .chip-danger  { color: var(--danger-text); background-color: var(--danger-soft); }
 .chip-slate   { color: var(--slate); background-color: var(--navy-soft); }
 
-.log-pagination .page-link { color: var(--indigo-text); border-color: var(--line); font-size: .8rem; border-radius: 6px; }
+.log-pagination .page-link { color: var(--indigo-text); border-color: var(--line); font-size: .85rem; border-radius: 6px; }
 .log-pagination .page-item { margin-right: 2px; }
 .log-pagination .page-item.active .page-link { background-color: var(--indigo); border-color: var(--indigo); color: #fff; }
 .log-pagination .page-item.disabled .page-link { color: #adb5bd; }
@@ -418,25 +437,56 @@ body {
 .modal-content { border-radius: 14px; border: none; }
 .modal-header { border-bottom: 1px solid var(--line); }
 .modal-footer { border-top: 1px solid var(--line); }
-.detail-row { padding: .6rem 0; border-bottom: 1px solid var(--line); }
+
+#logDetailModal .modal-title { font-size: 1.35rem; }
+#logDetailModal .modal-body { padding: 1.5rem 1.75rem; }
+.detail-row { padding: .75rem 0; border-bottom: 1px solid var(--line); }
 .detail-row:last-child { border-bottom: none; }
-.detail-label { font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-soft); }
-.detail-value { font-size: .88rem; font-weight: 600; color: var(--ink); margin-top: .15rem; word-break: break-word; }
+.detail-label {
+  font-size: .78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--ink-soft);
+}
+.detail-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin-top: .25rem;
+  word-break: break-word;
+  line-height: 1.35;
+}
 
 .mobile-row-label { display: none; }
 
 @media (max-width: 1199.98px) {
-  .stat-strip-item { padding: .9rem .85rem; }
-  .stat-strip-value { font-size: 1.35rem; }
+  .stat-strip-item { padding: .9rem .8rem; }
+  .stat-strip-value { font-size: 1.45rem; }
+  .stat-strip-label { font-size: .68rem; }
+
+  .table thead th { font-size: .7rem; padding: .75rem 1rem; }
+  .table td { font-size: .82rem; padding: .7rem 1rem; }
+  .actor-avatar { width: 32px; height: 32px; font-size: .72rem; }
+  .role-label { font-size: .78rem; }
+  .chip { font-size: .72rem; padding: .28rem .62rem; }
+  .chip i { font-size: .7rem; }
+  .filter-toolbar .form-control,
+  .filter-toolbar .form-select { font-size: .82rem; }
+  .filter-toolbar .form-label { font-size: .66rem; }
+
+  #logDetailModal .modal-title { font-size: 1.2rem; }
+  #logDetailModal .modal-body { padding: 1.2rem 1.35rem; }
+  .detail-label { font-size: .7rem; }
+  .detail-value { font-size: .98rem; }
 }
 
 @media (max-width: 991.98px) {
   .dashboard-title { font-size: 1rem !important; }
   .dashboard-subtitle { font-size: .78rem !important; }
   .stat-strip { grid-template-columns: repeat(3, 1fr); }
-  .stat-strip-value { font-size: 1.2rem; }
-  .stat-strip-label { font-size: .6rem; }
-  .table td, .table th { font-size: .8rem; }
+  .stat-strip-value { font-size: 1.3rem; }
+  .stat-strip-label { font-size: .64rem; }
 }
 
 @media (max-width: 767.98px) {
@@ -490,10 +540,11 @@ body {
   .actor-avatar { width: 26px; height: 26px; font-size: .62rem; }
 
   .modal-header { padding: .7rem .8rem !important; }
-  .modal-title { font-size: .95rem !important; }
-  .modal-body { padding: .9rem !important; }
-  .detail-label { font-size: .6rem; }
-  .detail-value { font-size: .8rem; }
+  #logDetailModal .modal-title { font-size: 1.05rem; }
+  #logDetailModal .modal-body { padding: .9rem !important; }
+  .detail-label { font-size: .65rem; }
+  .detail-value { font-size: .92rem; margin-top: .2rem; }
+  .detail-row { padding: .55rem 0; }
 
   .log-pagination .page-link { font-size: .72rem; padding: .25rem .5rem; }
 }
@@ -502,7 +553,6 @@ body {
   .dashboard-content { padding: .5rem !important; }
   .stat-strip { grid-template-columns: repeat(2, 1fr); }
   .stat-strip-value { font-size: .95rem; }
-  .modal-title { font-size: .88rem !important; }
 }
 </style>
 </head>
@@ -629,7 +679,7 @@ body {
                       <span class="cell-body d-flex align-items-center gap-2 text-start">
                         <span class="actor-avatar"><?= htmlspecialchars($initials) ?></span>
                         <span>
-                          <span class="fw-semibold small d-block"><?= htmlspecialchars(trim($log['firstname'] . ' ' . $log['lastname'])) ?></span>
+                          <span class="fw-semibold d-block" style="font-size:.88rem;"><?= htmlspecialchars(trim($log['firstname'] . ' ' . $log['lastname'])) ?></span>
                           <span class="d-md-none role-label d-block"><?= htmlspecialchars($log['role']) ?></span>
                         </span>
                       </span>
@@ -642,14 +692,14 @@ body {
                       <span class="mobile-row-label">Action</span>
                       <span class="cell-body">
                         <span class="chip <?= actionTypeClass($log['action_type']) ?>"><i class="fa-solid <?= actionTypeIcon($log['action_type']) ?>"></i><?= htmlspecialchars($log['action_type']) ?></span>
-                        <span class="small d-block mt-1" style="color:var(--ink-soft);"><?= htmlspecialchars($log['action_label']) ?></span>
+                        <span class="d-block mt-1" style="color:var(--ink-soft); font-size:.8rem;"><?= htmlspecialchars($log['action_label']) ?></span>
                       </span>
                     </td>
-                    <td class="small d-none d-lg-table-cell" style="color:var(--ink-soft);">
+                    <td class="d-none d-lg-table-cell" style="color:var(--ink-soft);">
                       <span class="mobile-row-label">Record</span>
                       <span class="cell-body"><?= htmlspecialchars($log['target_label'] ?? '—') ?></span>
                     </td>
-                    <td class="small" style="color:var(--ink-soft); white-space:nowrap;">
+                    <td style="color:var(--ink-soft); white-space:nowrap;">
                       <span class="mobile-row-label">When</span>
                       <span class="cell-body"><?= htmlspecialchars(date('M d, Y g:i A', strtotime($log['occurred_at']))) ?></span>
                     </td>
@@ -691,7 +741,7 @@ body {
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h2 class="modal-title h5 fw-bold">Activity Detail</h2>
+        <h2 class="modal-title fw-bold">Activity Detail</h2>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
