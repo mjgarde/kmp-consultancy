@@ -16,6 +16,15 @@ $progressCountStmt = $pdo->prepare('SELECT COUNT(*) FROM service_requests WHERE 
 $progressCountStmt->execute([$staffId, 'In Progress']);
 $progressAssignmentCount = (int) $progressCountStmt->fetchColumn();
 
+$assignmentTipParts = [];
+if ($newAssignmentCount > 0) {
+    $assignmentTipParts[] = $newAssignmentCount . ' new';
+}
+if ($progressAssignmentCount > 0) {
+    $assignmentTipParts[] = $progressAssignmentCount . ' in progress';
+}
+$assignmentTip = 'My Assignments' . (empty($assignmentTipParts) ? '' : ' · ' . implode(', ', $assignmentTipParts));
+
 function maskEmail(string $email): string
 {
     if ($email === '' || !str_contains($email, '@')) {
@@ -95,6 +104,46 @@ function badgeCount(int $count): string
 
   .sidebar-toggle-btn i {
     transition: transform .25s ease;
+  }
+
+  .sidebar-tip {
+    position: fixed;
+    z-index: 2000;
+    left: 0;
+    top: 0;
+    padding: .45rem .8rem;
+    background: #1E293B;
+    color: #fff;
+    font-size: .82rem;
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: .005em;
+    white-space: nowrap;
+    border-radius: 8px;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, .28);
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transform: translate(-6px, -50%);
+    transition: opacity .14s ease, transform .14s ease, visibility .14s ease;
+  }
+
+  .sidebar-tip::before {
+    content: '';
+    position: absolute;
+    left: -5px;
+    top: 50%;
+    width: 10px;
+    height: 10px;
+    background: #1E293B;
+    border-radius: 2px;
+    transform: translateY(-50%) rotate(45deg);
+  }
+
+  .sidebar-tip.is-visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(0, -50%);
   }
 
   .sidebar-badge-group {
@@ -224,16 +273,20 @@ function badgeCount(int $count): string
       min-width: 200px;
     }
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sidebar-tip { transition: none; }
+  }
 </style>
 
 <aside class="dashboard-sidebar offcanvas-lg offcanvas-start bg-white border-end d-flex flex-column" tabindex="-1" id="sidebarOffcanvas">
 
   <div class="dashboard-sidebar-brand d-flex align-items-center justify-content-between gap-2 border-bottom px-3 py-3">
-    <a href="../index.php" class="brand-link d-flex align-items-center gap-2 text-decoration-none">
+    <a href="../index.php" class="brand-link d-flex align-items-center gap-2 text-decoration-none" data-tip="KMP ConsultHub" aria-label="KMP ConsultHub">
       <img src="../assets/img/system_img/logo.png" alt="KMP ConsultHub">
       <span class="sidebar-text fw-bold fs-6" style="color: #000000;">KMP ConsultHub</span>
     </a>
-    <button type="button" id="sidebarToggle" class="sidebar-toggle-btn d-none d-lg-flex" aria-label="Toggle sidebar" title="Collapse / Expand">
+    <button type="button" id="sidebarToggle" class="sidebar-toggle-btn d-none d-lg-flex" aria-label="Collapse sidebar" data-tip="Collapse sidebar">
       <i class="fa-solid fa-angles-left"></i>
     </button>
     <button type="button" class="btn-close d-lg-none" data-bs-dismiss="offcanvas" data-bs-target="#sidebarOffcanvas" aria-label="Close"></button>
@@ -246,7 +299,7 @@ function badgeCount(int $count): string
     </div>
     <ul class="dashboard-sidebar-menu nav flex-column mb-4">
       <li class="nav-item mb-1">
-        <a href="dashboard.php" title="Dashboard" class="nav-link <?= navActive('dashboard.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
+        <a href="dashboard.php" data-tip="Dashboard" aria-label="Dashboard" class="nav-link <?= navActive('dashboard.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
           <i class="fa-solid fa-table-columns" style="width:18px;"></i> <span class="sidebar-text">Dashboard</span>
         </a>
       </li>
@@ -257,32 +310,32 @@ function badgeCount(int $count): string
     </div>
     <ul class="dashboard-sidebar-menu nav flex-column mb-4">
       <li class="nav-item mb-1">
-        <a href="client_management.php" title="Client Management" class="nav-link <?= navActive('client_management.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
+        <a href="client_management.php" data-tip="Client Management" aria-label="Client Management" class="nav-link <?= navActive('client_management.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
           <i class="fa-solid fa-users" style="width:18px;"></i> <span class="sidebar-text">Client Management</span>
         </a>
       </li>
       <li class="nav-item mb-1">
-        <a href="resource_matching.php" title="Resource Matching" class="nav-link <?= navActive('resource_matching.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
+        <a href="resource_matching.php" data-tip="Resource Matching" aria-label="Resource Matching" class="nav-link <?= navActive('resource_matching.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
           <i class="fa-solid fa-diagram-project" style="width:18px;"></i> <span class="sidebar-text">Resource Matching</span>
         </a>
       </li>
       <li class="nav-item mb-1">
-        <a href="sow_contracts.php" title="SOW &amp; Contracts" class="nav-link <?= navActive('sow_contracts.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
+        <a href="sow_contracts.php" data-tip="SOW &amp; Contracts" aria-label="SOW &amp; Contracts" class="nav-link <?= navActive('sow_contracts.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
           <i class="fa-solid fa-file-signature" style="width:18px;"></i> <span class="sidebar-text">SOW &amp; Contracts</span>
         </a>
       </li>
       <li class="nav-item mb-1">
-        <a href="cpq_quotations.php" title="CPQ &amp; Scope" class="nav-link <?= navActive('cpq_quotations.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
+        <a href="cpq_quotations.php" data-tip="CPQ &amp; Scope" aria-label="CPQ &amp; Scope" class="nav-link <?= navActive('cpq_quotations.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
           <i class="fa-solid fa-file-invoice-dollar" style="width:18px;"></i> <span class="sidebar-text">CPQ &amp; Scope</span>
         </a>
       </li>
       <li class="nav-item mb-1">
-        <a href="services.php" title="Services &amp; Fees" class="nav-link <?= navActive('services.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
+        <a href="services.php" data-tip="Services &amp; Fees" aria-label="Services &amp; Fees" class="nav-link <?= navActive('services.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
           <i class="fa-solid fa-tags" style="width:18px;"></i> <span class="sidebar-text">Services &amp; Fees</span>
         </a>
       </li>
       <li class="nav-item mb-1">
-        <a href="calendar_deadlines.php" title="Calendar Deadlines" class="nav-link <?= navActive('calendar_deadlines.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
+        <a href="calendar_deadlines.php" data-tip="Calendar Deadlines" aria-label="Calendar Deadlines" class="nav-link <?= navActive('calendar_deadlines.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
           <i class="fa-solid fa-calendar-days" style="width:18px;"></i> <span class="sidebar-text">Calendar Deadlines</span>
         </a>
       </li>
@@ -293,7 +346,7 @@ function badgeCount(int $count): string
     </div>
     <ul class="dashboard-sidebar-menu nav flex-column mb-4">
       <li class="nav-item mb-1">
-        <a href="my_assignments.php" title="My Assignments" class="nav-link <?= navActive('my_assignments.php', $currentPage) ?> d-flex align-items-center flex-nowrap gap-3 rounded-3 px-3 py-2">
+        <a href="my_assignments.php" data-tip="<?= htmlspecialchars($assignmentTip) ?>" aria-label="My Assignments" class="nav-link <?= navActive('my_assignments.php', $currentPage) ?> d-flex align-items-center flex-nowrap gap-3 rounded-3 px-3 py-2">
           <i class="fa-solid fa-list-check flex-shrink-0" style="width:18px;"></i>
           <span class="sidebar-text flex-grow-1 text-truncate" style="min-width:0;">My Assignments</span>
 
@@ -316,9 +369,9 @@ function badgeCount(int $count): string
     <div class="dashboard-nav-label text-uppercase text-secondary small fw-semibold px-3 mb-2" style="letter-spacing:.06em; font-size:.72rem;">
       Documents
     </div>
-    <ul class="dashboard-sidebar-menu nav flex-column mb-4">
+    <ul class="dashboard-sidebar-menu nav flex-column">
       <li class="nav-item mb-1">
-        <a href="knowledge_repository.php" title="Repository" class="nav-link <?= navActive('knowledge_repository.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
+        <a href="knowledge_repository.php" data-tip="Repository" aria-label="Repository" class="nav-link <?= navActive('knowledge_repository.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
           <i class="fa-solid fa-book" style="width:18px;"></i> <span class="sidebar-text">Repository</span>
         </a>
       </li>
@@ -328,7 +381,7 @@ function badgeCount(int $count): string
 
   <div class="dashboard-sidebar-footer border-top p-3">
     <div class="dropdown dropup">
-      <button type="button" class="btn btn-link p-0 w-100 text-start text-decoration-none dropdown-toggle d-flex align-items-center gap-3 text-dark" data-bs-toggle="dropdown" aria-expanded="false" title="<?= htmlspecialchars($staffFullname) ?>">
+      <button type="button" class="btn btn-link p-0 w-100 text-start text-decoration-none dropdown-toggle d-flex align-items-center gap-3 text-dark" data-bs-toggle="dropdown" aria-expanded="false" data-tip="<?= htmlspecialchars($staffFullname) ?>" aria-label="<?= htmlspecialchars($staffFullname) ?>">
         <span class="dashboard-user-icon d-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-10 flex-shrink-0" style="width:38px; height:38px;">
           <i class="fa-solid fa-user text-primary"></i>
         </span>
@@ -349,11 +402,65 @@ function badgeCount(int $count): string
 
 </aside>
 
+<div class="sidebar-tip" id="sidebarTip" role="tooltip"></div>
+
 <script>
-  document.getElementById('sidebarToggle').addEventListener('click', function () {
-    var collapsed = document.documentElement.classList.toggle('sidebar-collapsed');
-    try {
-      localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0');
-    } catch (e) {}
-  });
+  (function () {
+    var root = document.documentElement;
+    var tip = document.getElementById('sidebarTip');
+    var toggle = document.getElementById('sidebarToggle');
+    var desktop = window.matchMedia('(min-width: 992px)');
+
+    function isCollapsed() {
+      return root.classList.contains('sidebar-collapsed') && desktop.matches;
+    }
+
+    function hideTip() {
+      tip.classList.remove('is-visible');
+    }
+
+    function showTip(el) {
+      var text = el.getAttribute('data-tip');
+      if (!text) return;
+      var isToggle = el === toggle;
+      if (!isToggle && !isCollapsed()) return;
+      if (!desktop.matches) return;
+      tip.textContent = text;
+      var rect = el.getBoundingClientRect();
+      tip.style.left = (rect.right + 12) + 'px';
+      tip.style.top = (rect.top + rect.height / 2) + 'px';
+      tip.classList.add('is-visible');
+    }
+
+    function syncToggleLabel() {
+      var label = root.classList.contains('sidebar-collapsed') ? 'Expand sidebar' : 'Collapse sidebar';
+      toggle.setAttribute('data-tip', label);
+      toggle.setAttribute('aria-label', label);
+    }
+
+    document.querySelectorAll('#sidebarOffcanvas [data-tip]').forEach(function (el) {
+      el.addEventListener('mouseenter', function () { showTip(el); });
+      el.addEventListener('focus', function () { showTip(el); });
+      el.addEventListener('mouseleave', hideTip);
+      el.addEventListener('blur', hideTip);
+      el.addEventListener('click', hideTip);
+    });
+
+    document.querySelector('.dashboard-sidebar-scroll').addEventListener('scroll', hideTip);
+    window.addEventListener('resize', hideTip);
+
+    syncToggleLabel();
+
+    toggle.addEventListener('click', function () {
+      var collapsed = root.classList.toggle('sidebar-collapsed');
+      try {
+        localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0');
+      } catch (e) {}
+      syncToggleLabel();
+      hideTip();
+      setTimeout(function () {
+        if (toggle.matches(':hover')) showTip(toggle);
+      }, 280);
+    });
+  })();
 </script>
