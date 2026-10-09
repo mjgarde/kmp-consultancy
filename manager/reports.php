@@ -334,11 +334,12 @@ body {
   letter-spacing: .01em;
   border: 1px solid transparent;
   display: inline-block;
+  color: #000 !important;
 }
-.status-draft { background-color: var(--navy-soft); color: var(--slate); border-color: var(--line); }
-.status-approved { background-color: var(--success-soft); color: var(--success-text); border-color: var(--success-border); }
-.status-rejected { background-color: var(--danger-soft); color: var(--danger-text); border-color: var(--danger-border); }
-.status-progress { background-color: var(--warn-soft); color: var(--warn-text); border-color: var(--warn-border); }
+.status-draft { background-color: var(--navy-soft); border-color: var(--line); }
+.status-approved { background-color: var(--success-soft); border-color: var(--success-border); }
+.status-rejected { background-color: var(--danger-soft); border-color: var(--danger-border); }
+.status-progress { background-color: var(--warn-soft); border-color: var(--warn-border); }
 
 .bar-track { background-color: var(--navy-soft); border-radius: 999px; height: 8px; overflow: hidden; width: 100%; }
 .bar-fill { height: 100%; border-radius: 999px; background-color: var(--indigo); }
@@ -364,13 +365,31 @@ body {
 .btn-ghost:hover { background-color: #E4E8F0; color: var(--navy); }
 
 .btn-outline-print {
-  background-color: #fff;
-  color: var(--indigo-text);
-  border: 1px solid var(--indigo);
-  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  background-color: transparent;
+  color: #000;
+  border: none;
+  border-radius: 6px;
   font-weight: 600;
+  font-size: .85rem;
+  padding: .4rem .55rem;
+  outline: none !important;
+  box-shadow: none !important;
 }
-.btn-outline-print:hover { background-color: var(--indigo-soft); color: var(--indigo-text); }
+.btn-outline-print:hover,
+.btn-outline-print:focus,
+.btn-outline-print:active,
+.btn-outline-print:focus-visible,
+.btn-outline-print:active:focus {
+  background-color: transparent;
+  color: #000;
+  border: none;
+  outline: none !important;
+  box-shadow: none !important;
+}
+.btn-outline-print i { font-size: .85rem; color: #000; }
 
 .empty-state { color: var(--ink-soft); }
 .empty-state i { color: #C7D0D6; }
@@ -447,161 +466,69 @@ body {
 .filter-hint {
   font-size: .74rem;
   color: var(--ink-soft);
-  margin: .5rem 0 .75rem 0;
+  margin: -.4rem 0 .75rem 0;
 }
-.note-small { font-size: .72rem; color: var(--ink-soft); }
 
-.print-only { display: none; }
-
-@page {
-  size: A4 portrait;
-  margin: 14mm 12mm 16mm 12mm;
-  @bottom-right {
-    content: "Page " counter(page) " of " counter(pages);
-    font-family: 'Inter', sans-serif;
-    font-size: 9px;
-    color: #667085;
-  }
-}
+.print-header { display: none; }
+.print-footer { display: none; }
 
 @media print {
-  * {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-
-  html, body { background: #fff !important; font-size: 11px; }
   .no-print { display: none !important; }
-  .print-only { display: block; }
-
-  .dashboard-layout { display: block !important; }
-  .dashboard-layout > *:not(.dashboard-main) { display: none !important; }
-  .offcanvas, .offcanvas-backdrop, .modal-backdrop { display: none !important; }
-  .dashboard-main { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
-  main.dashboard-content { padding: 0 !important; }
-
   .print-header {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 14px;
-    padding-bottom: 12px;
-    margin-bottom: 6px;
-    border-bottom: 3px solid var(--navy);
+    text-align: center;
+    margin-bottom: 24px;
+    padding-bottom: 14px;
+    border-bottom: 2px solid var(--navy);
   }
-  .print-header img { height: 54px; width: 54px; object-fit: contain; }
-  .print-header .ph-text { flex: 1; }
+  .print-header img {
+    height: 48px;
+    width: 48px;
+    object-fit: contain;
+  }
   .print-header h1 {
     font-family: 'Lexend', sans-serif;
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 700;
     color: var(--navy);
-    margin: 0 0 2px 0;
+    margin-bottom: 2px;
   }
-  .print-header p { font-size: 10px; color: var(--ink-soft); margin: 0; }
-  .print-header .ph-badge {
-    text-align: right;
-    font-size: 9.5px;
+  .print-header p {
+    font-size: 11px;
     color: var(--ink-soft);
-    line-height: 1.5;
+    margin: 0;
   }
-  .print-header .ph-badge strong { color: var(--navy); font-size: 12px; font-family: 'Lexend', sans-serif; display: block; }
-
-  .print-meta {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    font-size: 10px;
-    padding: 7px 10px;
-    margin-bottom: 14px;
-    background-color: var(--navy-soft);
-    border: 1px solid var(--line);
-    border-radius: 6px;
-  }
-  .print-meta span b { color: var(--navy); }
-
-  .summary-grid, .summary-grid.cols-5, .summary-grid.cols-6 {
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    gap: 8px;
-    margin-bottom: 14px;
-  }
-  .stat-card { padding: 7px 9px; gap: 8px; border-radius: 6px; break-inside: avoid; }
-  .stat-card .stat-icon { width: 26px; height: 26px; font-size: .7rem; border-radius: 6px; }
-  .stat-card .stat-label { font-size: 7.5px; }
-  .stat-card .stat-value { font-size: 13px; }
-
-  .tab-content > .tab-pane {
-    display: block !important;
-    opacity: 1 !important;
-    margin-bottom: 18px;
-  }
-
-  .print-section-title {
-    display: flex !important;
-    align-items: center;
-    gap: 8px;
-    font-family: 'Lexend', sans-serif;
-    font-size: 12.5px;
-    font-weight: 700;
-    color: var(--navy);
-    text-transform: uppercase;
-    letter-spacing: .04em;
-    padding: 6px 10px;
-    margin: 0 0 10px 0;
-    background-color: var(--indigo-soft);
-    border-left: 4px solid var(--indigo);
-    break-after: avoid;
-  }
-
-  .row { display: block !important; margin: 0 !important; }
-  .row > [class*="col-"] { width: 100% !important; max-width: 100% !important; padding: 0 !important; margin-bottom: 10px; }
-
-  .card { border: 1px solid #CBD2DC !important; border-radius: 6px; box-shadow: none !important; break-inside: avoid; height: auto !important; }
-  .card-header { padding: 7px 10px !important; background-color: #fff !important; border-radius: 6px 6px 0 0 !important; }
-  .card-header h2 { font-size: 11px !important; }
-  .card-header p { font-size: 9px; }
-  .card-body { padding: 10px !important; }
-
-  .table-responsive { overflow: visible !important; }
-  .table { font-size: 10px; width: 100%; }
-  .table thead { display: table-header-group; }
-  .table thead th { font-size: 8.5px; padding: 5px 8px; background-color: var(--navy-soft) !important; }
-  .table td { font-size: 10px; padding: 5px 8px; }
-  .table tr { break-inside: avoid; }
-  .table tfoot td { font-size: 10px; padding: 5px 8px; }
-  .d-none.d-md-table-cell { display: table-cell !important; }
-
-  .status-pill { font-size: 8.5px; padding: 2px 8px; }
-  .bar-track { height: 6px; }
-
-  .signature-block {
-    display: flex !important;
-    justify-content: space-between;
-    gap: 40px;
-    margin-top: 34px;
-    break-inside: avoid;
-  }
-  .signature-block .sig {
-    flex: 1;
-    text-align: center;
-    font-size: 10px;
-    color: var(--ink-soft);
-  }
-  .signature-block .sig .line {
-    border-top: 1px solid var(--navy);
-    margin-top: 34px;
-    padding-top: 4px;
-    color: var(--navy);
-    font-weight: 600;
-  }
-
   .print-footer {
-    display: flex !important;
-    justify-content: space-between;
-    margin-top: 16px;
-    padding-top: 6px;
+    display: flex;
+    justify-content: center;
+    margin-top: 24px;
+    padding-top: 10px;
     border-top: 1px solid var(--line);
-    font-size: 9px;
+  }
+  .print-footer span {
+    font-size: 11px;
+    font-weight: 600;
     color: var(--ink-soft);
+  }
+  body { background-color: #fff !important; }
+  .dashboard-layout { display: block !important; }
+  .dashboard-layout > *:not(.dashboard-main) { display: none !important; }
+  .dashboard-main { width: 100% !important; margin: 0 !important; }
+  main.dashboard-content { padding: 0 24px 24px !important; }
+  .card, .stat-card { border: 1px solid #D8DEE3 !important; box-shadow: none !important; break-inside: avoid; }
+  .tab-pane { display: block !important; opacity: 1 !important; }
+
+  .status-pill {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    color: #000 !important;
+    font-weight: 700 !important;
+    font-size: .82rem !important;
   }
 }
 </style>
@@ -622,37 +549,27 @@ body {
         </button>
         <div>
           <h1 class="dashboard-title h6 h5-md fw-bold mb-0">Reports</h1>
-          <p class="dashboard-subtitle small mb-0 d-none d-sm-block">Client service, staff performance, and contract insights.</p>
+          <p class="dashboard-subtitle small mb-0 d-none d-sm-block">Client service and staff performance insights.</p>
         </div>
       </div>
       <div class="dashboard-topbar-actions d-flex align-items-center gap-3 gap-md-4">
-        <button type="button" class="btn btn-outline-print btn-sm px-3" onclick="window.print()">
-          <i class="fa-solid fa-print me-1"></i> Print
+        <button type="button" class="btn-outline-print" onclick="window.print()">
+          <i class="fa-solid fa-print"></i> Print
         </button>
       </div>
     </header>
 
     <main class="dashboard-content p-3 p-md-4">
 
-      <div class="print-header print-only">
+      <div class="print-header">
         <img src="../assets/img/system_img/logo.png" alt="Company Logo">
-        <div class="ph-text">
+        <div>
           <h1>KMP Business Consultancy Services</h1>
-          <p>Management Reports Summary</p>
-        </div>
-        <div class="ph-badge">
-          <strong>REPORTS</strong>
-          <?= date('F d, Y') ?><br><?= date('g:i A') ?>
+          <p>Reports generated <?= date('M d, Y g:i A') ?></p>
         </div>
       </div>
 
-      <div class="print-meta print-only">
-        <span><b>Coverage:</b> <?= $hasFilter ? htmlspecialchars($filterLabel) : 'All records' ?></span>
-        <span><b>Total Requests:</b> <?= $totRequests ?></span>
-        <span><b>Total Contracts:</b> <?= $contractTotal ?></span>
-      </div>
-
-      <form method="GET" class="filter-bar no-print" id="filterForm">
+      <form method="GET" class="filter-bar mb-2 no-print" id="filterForm">
         <div class="filter-mode-toggle">
           <input type="radio" name="filter_mode" id="mode-range" value="range" <?= $filterMode !== 'single' ? 'checked' : '' ?>>
           <label for="mode-range"><i class="fa-regular fa-calendar-days me-1"></i>Date Range</label>
@@ -673,7 +590,7 @@ body {
         </div>
 
         <?php if ($hasFilter): ?>
-          <span class="filter-active-badge"><i class="fa-solid fa-filter"></i>Filtered: <?= htmlspecialchars($filterLabel) ?></span>
+          <span class="filter-active-badge"><i class="fa-solid fa-filter"></i><?= htmlspecialchars($filterLabel) ?></span>
         <?php endif; ?>
 
         <div class="filter-actions">
@@ -768,7 +685,6 @@ body {
       <div class="tab-content">
 
         <div class="tab-pane fade show active" id="tab-client">
-          <h2 class="print-section-title print-only">1. Client Service</h2>
           <section class="card">
             <div class="card-header">
               <h2 class="h6 fw-bold mb-0">Service Requests by Client</h2>
@@ -796,9 +712,9 @@ body {
                         <td class="fw-semibold"><?= htmlspecialchars($c['company_name']) ?></td>
                         <td class="num"><?= (int) $c['total_requests'] ?></td>
                         <td class="num"><?= (int) $c['new_requests'] ?></td>
-                        <td class="num" style="color:var(--warn-text);"><?= (int) $c['in_progress'] ?></td>
-                        <td class="num" style="color:var(--success-text);"><?= (int) $c['completed'] ?></td>
-                        <td class="num" style="color:var(--danger-text);"><?= (int) $c['cancelled'] ?></td>
+                        <td class="num"><?= (int) $c['in_progress'] ?></td>
+                        <td class="num"><?= (int) $c['completed'] ?></td>
+                        <td class="num"><?= (int) $c['cancelled'] ?></td>
                         <td class="num d-none d-md-table-cell" style="color:var(--ink-soft);">
                           <?= $c['avg_response_hours'] !== null ? round((float) $c['avg_response_hours'], 1) . ' hrs' : '&mdash;' ?>
                         </td>
@@ -825,7 +741,6 @@ body {
         </div>
 
         <div class="tab-pane fade" id="tab-staff">
-          <h2 class="print-section-title print-only">2. Staff Performance</h2>
           <div class="row g-3">
             <div class="col-lg-8">
               <section class="card h-100">
@@ -858,8 +773,8 @@ body {
                             <td class="fw-semibold"><?= htmlspecialchars($s['firstname'] . ' ' . $s['lastname']) ?></td>
                             <td><span class="status-pill <?= $s['status'] === 'Active' ? 'status-approved' : 'status-rejected' ?>"><?= htmlspecialchars($s['status']) ?></span></td>
                             <td class="num"><?= $assigned ?></td>
-                            <td class="num" style="color:var(--warn-text);"><?= (int) $s['active_tasks'] ?></td>
-                            <td class="num" style="color:var(--success-text);"><?= (int) $s['completed_tasks'] ?></td>
+                            <td class="num"><?= (int) $s['active_tasks'] ?></td>
+                            <td class="num"><?= (int) $s['completed_tasks'] ?></td>
                             <td>
                               <div class="rate-cell">
                                 <div class="bar-track"><div class="bar-fill" style="width:<?= $rate ?>%;"></div></div>
@@ -902,8 +817,6 @@ body {
         </div>
 
         <div class="tab-pane fade" id="tab-contracts">
-          <h2 class="print-section-title print-only">3. Contracts and Quotations</h2>
-
           <div class="summary-grid cols-5 mb-3">
             <div class="stat-card">
               <span class="stat-icon"><i class="fa-solid fa-file-pen"></i></span>
@@ -973,7 +886,7 @@ body {
               <section class="card h-100">
                 <div class="card-header">
                   <h2 class="h6 fw-bold mb-0">Upcoming Contract Expirations</h2>
-                  <p class="small mb-0">Approved contracts nearing their end date. Not affected by the date filter.</p>
+                  <p class="small mb-0">Approved contracts nearing their end date.</p>
                 </div>
                 <div class="table-responsive">
                   <table class="table table-hover align-middle mb-0">
@@ -1047,15 +960,8 @@ body {
 
       </div>
 
-      <div class="signature-block print-only" style="display:none;">
-        <div class="sig"><div class="line">Prepared by</div></div>
-        <div class="sig"><div class="line">Reviewed by</div></div>
-        <div class="sig"><div class="line">Approved by</div></div>
-      </div>
-
-      <div class="print-footer print-only" style="display:none;">
-        <span>KMP Business Consultancy Services &bull; Reports</span>
-        <span>Coverage: <?= $hasFilter ? htmlspecialchars($filterLabel) : 'All records' ?></span>
+      <div class="print-footer">
+        <span><?= $hasFilter ? htmlspecialchars($filterLabel) : 'Filtered: All records' ?></span>
       </div>
 
     </main>

@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost
--- Generation Time: Oct 07, 2026 at 12:55 AM
+-- Generation Time: Oct 09, 2026 at 09:05 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.1.25
 
@@ -105,7 +105,7 @@ CREATE TABLE `contracts` (
 
 INSERT INTO `contracts` (`contract_id`, `contract_number`, `quotation_id`, `request_id`, `client_id`, `scope_summary`, `total_amount`, `start_date`, `end_date`, `status`, `prepared_by`, `approved_by`, `approved_at`, `created_at`, `updated_at`, `contract_file_name`, `contract_file_path`, `contract_file_size`) VALUES
 (7, 'SOW-2026-0001', 15, 42, 36, 'Conduct a comprehensive fleet risk assessment covering vehicle operations, safety practices, operational risks, and existing risk controls. The project will include risk identification, assessment of current controls, and preparation of a report with recommended improvements.', 11200.00, '2026-09-23', '2026-09-24', 'Approved', 1, 1, '2026-09-22 06:50:14', '2026-09-22 06:50:14', '2026-09-22 06:50:14', NULL, NULL, NULL),
-(11, 'SOW-2026-0002', 18, 46, 37, 'Hello sample revert', 100.80, '2026-10-08', '2026-10-09', 'Draft', 2, NULL, NULL, '2026-10-06 21:50:00', '2026-10-06 21:50:00', NULL, NULL, NULL);
+(11, 'SOW-2026-0002', 18, 46, 37, 'Hello sample revert', 100.80, '2026-10-08', '2026-10-09', 'Approved', 2, 2, '2026-10-09 03:02:55', '2026-10-06 21:50:00', '2026-10-09 03:02:55', NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -244,7 +244,7 @@ INSERT INTO `service_requests` (`request_id`, `client_id`, `request_title`, `req
 (42, 36, 'Fleet Risk Assessment', 'Risk Assessment', 'Completed', 1, 2, '2026-09-22 05:51:22', '2026-09-27 07:28:40'),
 (44, 37, 'Business Registration', 'Business Registration', 'New', NULL, NULL, '2026-09-29 01:19:48', '2026-09-29 01:19:48'),
 (45, 36, 's', 'Quality Assurance', 'New', NULL, NULL, '2026-10-04 01:48:05', '2026-10-04 01:48:05'),
-(46, 37, 'test', 'Risk Assessment', 'New', NULL, NULL, '2026-10-04 03:33:09', '2026-10-04 03:33:09');
+(46, 37, 'test', 'Risk Assessment', 'In Progress', 1, 2, '2026-10-04 03:33:09', '2026-10-09 03:55:17');
 
 -- --------------------------------------------------------
 
@@ -269,18 +269,18 @@ INSERT INTO `staff_skills` (`skill_id`, `user_id`, `skill_name`, `created_at`) V
 (3, 1, 'Business Registration', '2026-08-20 02:21:06'),
 (4, 1, 'Bookkeeping', '2026-08-20 02:21:06'),
 (5, 1, 'Audit Assistance', '2026-08-20 02:21:06'),
-(11, 5, 'Marketing Strategy', '2026-08-20 02:21:06'),
-(12, 5, 'Market Research', '2026-08-20 02:21:06'),
-(13, 5, 'Client Relations Management', '2026-08-20 02:21:06'),
-(14, 5, 'Contract Drafting', '2026-08-20 02:21:06'),
-(15, 5, 'Legal Compliance Review', '2026-08-20 02:21:06'),
-(16, 5, 'Quality Assurance', '2026-08-20 02:21:06'),
-(17, 5, 'Risk Assessment', '2026-08-20 02:21:06'),
 (18, 3, 'IT Infrastructure Assessment', '2026-09-22 02:11:29'),
 (19, 3, 'Business Process Improvement', '2026-09-22 02:11:29'),
 (20, 3, 'Data Privacy Compliance', '2026-09-22 02:11:29'),
 (21, 3, 'Systems Analysis', '2026-09-22 02:11:29'),
-(22, 3, 'Project Documentation', '2026-09-22 02:11:29');
+(22, 3, 'Project Documentation', '2026-09-22 02:11:29'),
+(23, 5, 'Marketing Strategy', '2026-10-08 12:02:19'),
+(24, 5, 'Market Research', '2026-10-08 12:02:19'),
+(25, 5, 'Client Relations Management', '2026-10-08 12:02:19'),
+(26, 5, 'Contract Drafting', '2026-10-08 12:02:19'),
+(27, 5, 'Legal Compliance Review', '2026-10-08 12:02:19'),
+(28, 5, 'Quality Assurance', '2026-10-08 12:02:19'),
+(29, 5, 'Risk Assessment', '2026-10-08 12:02:19');
 
 -- --------------------------------------------------------
 
@@ -457,7 +457,7 @@ ALTER TABLE `service_requests`
 -- AUTO_INCREMENT for table `staff_skills`
 --
 ALTER TABLE `staff_skills`
-  MODIFY `skill_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
+  MODIFY `skill_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=30;
 
 --
 -- AUTO_INCREMENT for table `users`
