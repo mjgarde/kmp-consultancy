@@ -61,6 +61,9 @@ function badgeCount(int $count): string
     }
   } catch (e) {}
 </script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
   .dashboard-sidebar {
     width: 264px;
@@ -154,15 +157,16 @@ function badgeCount(int $count): string
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 22px;
-    height: 22px;
-    padding: 0 5px;
+    min-width: 26px;
+    height: 26px;
+    padding: 0 6px;
+    box-sizing: border-box;
+    flex-shrink: 0;
     border-radius: 50%;
     border: 1px solid currentColor;
-    font-family: inherit;
-    font-size: .72rem;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
+    font-family: 'Fredoka', 'Chalkboard SE', 'Marker Felt', 'Comic Sans MS', 'Comic Neue', cursive;
+    font-size: .9rem;
+    font-weight: 700;
     letter-spacing: 0;
     line-height: 1;
     user-select: none;

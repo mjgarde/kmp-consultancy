@@ -23,23 +23,58 @@ foreach ($statusCountsStmt->fetchAll() as $row) {
 }
 $totalAssigned = array_sum($statusCounts);
 
-$completedThisMonthStmt = $pdo->prepare(
-    "SELECT COUNT(*) FROM service_requests
-     WHERE assigned_to = :staff_id AND status = 'Completed' AND updated_at BETWEEN :start AND :end"
-);
-$completedThisMonthStmt->execute([
-    'staff_id' => $staffId,
-    'start' => (new DateTime('first day of this month'))->format('Y-m-d 00:00:00'),
-    'end' => (new DateTime('last day of this month'))->format('Y-m-d 23:59:59'),
-]);
-$completedThisMonth = (int) $completedThisMonthStmt->fetchColumn();
-
 $staleStmt = $pdo->prepare(
     "SELECT COUNT(*) FROM service_requests
      WHERE assigned_to = :staff_id AND status IN ('New','In Progress') AND updated_at < DATE_SUB(NOW(), INTERVAL 5 DAY)"
 );
 $staleStmt->execute(['staff_id' => $staffId]);
 $staleCount = (int) $staleStmt->fetchColumn();
+
+$awaitingStmt = $pdo->prepare(
+    "SELECT
+        (SELECT COUNT(*) FROM quotations WHERE prepared_by = :q_staff AND status = 'Draft')
+      + (SELECT COUNT(*) FROM contracts WHERE prepared_by = :c_staff AND status = 'Draft')"
+);
+$awaitingStmt->execute(['q_staff' => $staffId, 'c_staff' => $staffId]);
+$awaitingCount = (int) $awaitingStmt->fetchColumn();
+
+$revertStmt = $pdo->prepare(
+    "SELECT 'Quotation' AS doc_type, q.quotation_number AS doc_number, c.company_name, q.updated_at, NULL AS note
+     FROM quotations q
+     INNER JOIN clients c ON c.client_id = q.client_id
+     WHERE q.prepared_by = :q_staff AND q.status = 'Revert'
+     UNION ALL
+     SELECT 'Contract' AS doc_type, ct.contract_number AS doc_number, c.company_name, ct.updated_at,
+            (SELECT cr.revision_note FROM contract_revisions cr
+             WHERE cr.contract_id = ct.contract_id
+             ORDER BY cr.created_at DESC, cr.revision_id DESC LIMIT 1) AS note
+     FROM contracts ct
+     INNER JOIN clients c ON c.client_id = ct.client_id
+     WHERE ct.prepared_by = :c_staff AND ct.status = 'Revert'
+     ORDER BY updated_at DESC"
+);
+$revertStmt->execute(['q_staff' => $staffId, 'c_staff' => $staffId]);
+$revertItems = $revertStmt->fetchAll();
+$revertCount = count($revertItems);
+$revertShown = array_slice($revertItems, 0, 5);
+
+$deadlineStmt = $pdo->prepare(
+    "SELECT 'Contract' AS doc_type, ct.contract_number AS doc_number, c.company_name, ct.end_date AS due_date, 'Ends' AS due_label
+     FROM contracts ct
+     INNER JOIN clients c ON c.client_id = ct.client_id
+     WHERE ct.prepared_by = :c_staff AND ct.status = 'Approved'
+       AND ct.end_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+     UNION ALL
+     SELECT 'Quotation' AS doc_type, q.quotation_number AS doc_number, c.company_name, q.valid_until AS due_date, 'Expires' AS due_label
+     FROM quotations q
+     INNER JOIN clients c ON c.client_id = q.client_id
+     WHERE q.prepared_by = :q_staff AND q.status = 'Draft'
+       AND q.valid_until BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+     ORDER BY due_date ASC
+     LIMIT 5"
+);
+$deadlineStmt->execute(['c_staff' => $staffId, 'q_staff' => $staffId]);
+$deadlines = $deadlineStmt->fetchAll();
 
 $trendMonths = [];
 for ($i = 5; $i >= 0; $i--) {
@@ -76,22 +111,6 @@ $recentStmt = $pdo->prepare(
 $recentStmt->execute(['staff_id' => $staffId]);
 $recentActivity = $recentStmt->fetchAll();
 
-$topClientsStmt = $pdo->prepare(
-    "SELECT c.company_name, COUNT(*) AS cnt
-     FROM service_requests sr
-     INNER JOIN clients c ON c.client_id = sr.client_id
-     WHERE sr.assigned_to = :staff_id
-     GROUP BY c.client_id
-     ORDER BY cnt DESC
-     LIMIT 5"
-);
-$topClientsStmt->execute(['staff_id' => $staffId]);
-$topClients = $topClientsStmt->fetchAll();
-$topClientsMax = 1;
-foreach ($topClients as $tc) {
-    $topClientsMax = max($topClientsMax, (int) $tc['cnt']);
-}
-
 function dotColor(string $status): string
 {
     return match ($status) {
@@ -113,6 +132,29 @@ function activityVerb(string $status): string
         default => 'Updated',
     };
 }
+
+function dueText(string $date): string
+{
+    $days = (int) (new DateTime('today'))->diff(new DateTime($date))->format('%r%a');
+    if ($days <= 0) {
+        return 'Today';
+    }
+    if ($days === 1) {
+        return 'Tomorrow';
+    }
+    return 'In ' . $days . ' days';
+}
+
+function shortNote(?string $note): string
+{
+    $note = trim((string) $note);
+    if ($note === '') {
+        return '';
+    }
+    return mb_strimwidth($note, 0, 90, '...');
+}
+
+$displayName = $_SESSION['fullname'] ?? $_SESSION['staff_fullname'] ?? 'Staff';
 
 ?>
 <!DOCTYPE html>
@@ -144,27 +186,25 @@ function activityVerb(string $status): string
         </button>
         <div>
           <h1 class="dashboard-title h6 h5-md mb-0">Dashboard</h1>
-          <p class="dashboard-subtitle small mb-0 d-none d-sm-block">Welcome back, <?= htmlspecialchars($_SESSION['staff_fullname'] ?? 'Staff') ?></p>
+          <p class="dashboard-subtitle small mb-0 d-none d-sm-block">Welcome back, <?= htmlspecialchars($displayName) ?></p>
         </div>
-      </div>
-      <div class="d-flex align-items-center gap-3 gap-md-4">
       </div>
     </header>
 
     <main class="dashboard-content p-3 p-md-4">
 
       <div class="summary-strip">
-        <div class="summary-cell">
-          <div class="n"><?= $totalAssigned ?></div>
-          <div class="l">Total assigned</div>
-        </div>
         <div class="summary-cell is-progress">
           <div class="n"><?= $statusCounts['In Progress'] ?></div>
           <div class="l">In progress</div>
         </div>
-        <div class="summary-cell is-done">
-          <div class="n"><?= $completedThisMonth ?></div>
-          <div class="l">Completed this month</div>
+        <div class="summary-cell">
+          <div class="n"><?= $awaitingCount ?></div>
+          <div class="l">Awaiting approval</div>
+        </div>
+        <div class="summary-cell is-urgent">
+          <div class="n"><?= $revertCount ?></div>
+          <div class="l">Needs revision</div>
         </div>
         <div class="summary-cell is-urgent">
           <div class="n"><?= $staleCount ?></div>
@@ -201,27 +241,41 @@ function activityVerb(string $status): string
                   <span class="legend-label"><span class="legend-dot" style="background-color:var(--signal-urgent);"></span>Cancelled</span>
                   <span class="legend-value"><?= $statusCounts['Cancelled'] ?></span>
                 </div>
+                <div class="legend-row">
+                  <span class="legend-label">Total</span>
+                  <span class="legend-value"><?= $totalAssigned ?></span>
+                </div>
               </div>
             </div>
           </section>
 
           <section class="panel">
             <div class="panel-head">
-              <h2>Top clients</h2>
-              <p>By number of requests handled.</p>
+              <h2>Needs revision</h2>
+              <p>Quotations and contracts sent back to you.</p>
             </div>
             <div class="panel-body">
-              <?php if (empty($topClients)): ?>
-                <div class="empty-state"><i class="fa-regular fa-building"></i>No client data yet.</div>
+              <?php if (empty($revertShown)): ?>
+                <div class="empty-state"><i class="fa-regular fa-circle-check"></i>Nothing to revise.</div>
               <?php else: ?>
-                <?php foreach ($topClients as $tc): ?>
-                  <?php $pct = round(((int) $tc['cnt'] / $topClientsMax) * 100); ?>
-                  <div class="client-row">
-                    <span class="client-name text-truncate"><?= htmlspecialchars($tc['company_name']) ?></span>
-                    <span class="client-track"><span class="client-fill" style="width:<?= $pct ?>%;"></span></span>
-                    <span class="client-count"><?= $tc['cnt'] ?></span>
+                <?php foreach ($revertShown as $r): ?>
+                  <div class="activity-item">
+                    <div>
+                      <div class="activity-flag">
+                        <span class="activity-dot" style="background-color:var(--signal-urgent);"></span>
+                        <?= htmlspecialchars($r['doc_type']) ?> <?= htmlspecialchars($r['doc_number']) ?>
+                      </div>
+                      <div class="activity-sub"><?= htmlspecialchars($r['company_name']) ?></div>
+                      <?php if (shortNote($r['note']) !== ''): ?>
+                        <div class="activity-sub"><?= htmlspecialchars(shortNote($r['note'])) ?></div>
+                      <?php endif; ?>
+                    </div>
+                    <span class="activity-time"><?= (new DateTime($r['updated_at']))->format('M d, g:i A') ?></span>
                   </div>
                 <?php endforeach; ?>
+                <?php if ($revertCount > count($revertShown)): ?>
+                  <div class="activity-sub pt-2">+<?= $revertCount - count($revertShown) ?> more</div>
+                <?php endif; ?>
               <?php endif; ?>
             </div>
           </section>
@@ -237,6 +291,31 @@ function activityVerb(string $status): string
               <div style="height:200px;">
                 <canvas id="completedTrend"></canvas>
               </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Due this week</h2>
+              <p>Contracts ending and quotations expiring in 7 days.</p>
+            </div>
+            <div class="panel-body">
+              <?php if (empty($deadlines)): ?>
+                <div class="empty-state"><i class="fa-regular fa-calendar"></i>No deadlines this week.</div>
+              <?php else: ?>
+                <?php foreach ($deadlines as $d): ?>
+                  <div class="activity-item">
+                    <div>
+                      <div class="activity-flag">
+                        <span class="activity-dot" style="background-color:var(--signal-progress);"></span>
+                        <?= htmlspecialchars($d['doc_type']) ?> <?= htmlspecialchars($d['doc_number']) ?>
+                      </div>
+                      <div class="activity-sub"><?= htmlspecialchars($d['company_name']) ?></div>
+                    </div>
+                    <span class="activity-time"><?= htmlspecialchars($d['due_label']) ?> <?= htmlspecialchars(dueText($d['due_date'])) ?></span>
+                  </div>
+                <?php endforeach; ?>
+              <?php endif; ?>
             </div>
           </section>
 
@@ -276,7 +355,7 @@ function activityVerb(string $status): string
 
 <script src="../assets/vendor/bootstrap-5.3.8/js/bootstrap.bundle.min.js"></script>
 <script>
-Chart.defaults.font = { family: 'IBM Plex Sans', size: 11 };
+Chart.defaults.font = { family: 'Inter', size: 11 };
 Chart.defaults.color = '#5C6773';
 
 new Chart(document.getElementById('statusDonut'), {
@@ -286,7 +365,7 @@ new Chart(document.getElementById('statusDonut'), {
     datasets: [{
       data: [<?= $statusCounts['New'] ?>, <?= $statusCounts['In Progress'] ?>, <?= $statusCounts['Completed'] ?>, <?= $statusCounts['Cancelled'] ?>],
       backgroundColor: ['#1F3D37', '#B8873A', '#3E7D63', '#B14A3A'],
-      borderWidth: 0,
+      borderWidth: 0
     }]
   },
   options: {
@@ -305,7 +384,7 @@ new Chart(document.getElementById('completedTrend'), {
       data: <?= json_encode($trendData) ?>,
       backgroundColor: '#3E7D63',
       borderRadius: 5,
-      maxBarThickness: 42,
+      maxBarThickness: 42
     }]
   },
   options: {
