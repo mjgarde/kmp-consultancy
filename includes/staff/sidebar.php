@@ -2,8 +2,8 @@
 require_once __DIR__ . '/../../config/database.php';
 
 $staffFullname = $_SESSION['fullname'] ?? 'Staff';
-$staffEmail    = $_SESSION['email'] ?? '';
-$currentPage   = basename($_SERVER['PHP_SELF']);
+$staffEmail = $_SESSION['email'] ?? '';
+$currentPage = basename($_SERVER['PHP_SELF']);
 
 $pdo = getConnection();
 $staffId = $_SESSION['user_id'] ?? 0;
@@ -37,7 +37,7 @@ function maskEmail(string $email): string
     if ($localLength <= 2) {
         $maskedLocal = str_repeat('*', $localLength);
     } else {
-        $visible     = substr($local, 0, $localLength - 2);
+        $visible = substr($local, 0, $localLength - 2);
         $maskedLocal = $visible . str_repeat('*', 2);
     }
 
@@ -154,24 +154,29 @@ function badgeCount(int $count): string
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 20px;
-    height: 20px;
+    min-width: 22px;
+    height: 22px;
     padding: 0 5px;
     border-radius: 50%;
-    border: 1.4px solid currentColor;
-    background: transparent;
-    font-size: 0.7rem;
-    font-weight: 700;
+    border: 1px solid currentColor;
+    font-family: inherit;
+    font-size: .72rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
     line-height: 1;
     user-select: none;
+    -webkit-font-smoothing: antialiased;
   }
 
   .sidebar-badge-new {
-    color: #33495c;
+    color: #dc3545;
+    background: rgba(220, 53, 69, .10);
   }
 
   .sidebar-badge-progress {
-    color: #c6893a;
+    color: #b7791f;
+    background: rgba(183, 121, 31, .10);
   }
 
   @media (min-width: 992px) {
@@ -275,7 +280,9 @@ function badgeCount(int $count): string
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .sidebar-tip { transition: none; }
+    .sidebar-tip {
+      transition: none;
+    }
   }
 </style>
 
@@ -294,62 +301,68 @@ function badgeCount(int $count): string
 
   <nav class="dashboard-sidebar-scroll flex-grow-1 py-3 px-3">
 
-    <div class="dashboard-nav-label text-uppercase text-secondary small fw-semibold px-3 mb-2" style="letter-spacing:.06em; font-size:.72rem;">
+    <div class="dashboard-nav-label text-uppercase text-secondary small fw-semibold px-3 mb-2" style="letter-spacing: .06em; font-size: .72rem;">
       Main
     </div>
     <ul class="dashboard-sidebar-menu nav flex-column mb-4">
       <li class="nav-item mb-1">
         <a href="dashboard.php" data-tip="Dashboard" aria-label="Dashboard" class="nav-link <?= navActive('dashboard.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
-          <i class="fa-solid fa-table-columns" style="width:18px;"></i> <span class="sidebar-text">Dashboard</span>
+          <i class="fa-solid fa-table-columns" style="width: 18px;"></i>
+          <span class="sidebar-text">Dashboard</span>
         </a>
       </li>
     </ul>
 
-    <div class="dashboard-nav-label text-uppercase text-secondary small fw-semibold px-3 mb-2" style="letter-spacing:.06em; font-size:.72rem;">
+    <div class="dashboard-nav-label text-uppercase text-secondary small fw-semibold px-3 mb-2" style="letter-spacing: .06em; font-size: .72rem;">
       Operations
     </div>
     <ul class="dashboard-sidebar-menu nav flex-column mb-4">
       <li class="nav-item mb-1">
         <a href="client_management.php" data-tip="Client Management" aria-label="Client Management" class="nav-link <?= navActive('client_management.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
-          <i class="fa-solid fa-users" style="width:18px;"></i> <span class="sidebar-text">Client Management</span>
+          <i class="fa-solid fa-users" style="width: 18px;"></i>
+          <span class="sidebar-text">Client Management</span>
         </a>
       </li>
       <li class="nav-item mb-1">
         <a href="resource_matching.php" data-tip="Resource Matching" aria-label="Resource Matching" class="nav-link <?= navActive('resource_matching.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
-          <i class="fa-solid fa-diagram-project" style="width:18px;"></i> <span class="sidebar-text">Resource Matching</span>
+          <i class="fa-solid fa-diagram-project" style="width: 18px;"></i>
+          <span class="sidebar-text">Resource Matching</span>
         </a>
       </li>
       <li class="nav-item mb-1">
         <a href="sow_contracts.php" data-tip="SOW &amp; Contracts" aria-label="SOW &amp; Contracts" class="nav-link <?= navActive('sow_contracts.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
-          <i class="fa-solid fa-file-signature" style="width:18px;"></i> <span class="sidebar-text">SOW &amp; Contracts</span>
+          <i class="fa-solid fa-file-signature" style="width: 18px;"></i>
+          <span class="sidebar-text">SOW &amp; Contracts</span>
         </a>
       </li>
       <li class="nav-item mb-1">
         <a href="cpq_quotations.php" data-tip="CPQ &amp; Scope" aria-label="CPQ &amp; Scope" class="nav-link <?= navActive('cpq_quotations.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
-          <i class="fa-solid fa-file-invoice-dollar" style="width:18px;"></i> <span class="sidebar-text">CPQ &amp; Scope</span>
+          <i class="fa-solid fa-file-invoice-dollar" style="width: 18px;"></i>
+          <span class="sidebar-text">CPQ &amp; Scope</span>
         </a>
       </li>
       <li class="nav-item mb-1">
         <a href="services.php" data-tip="Services &amp; Fees" aria-label="Services &amp; Fees" class="nav-link <?= navActive('services.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
-          <i class="fa-solid fa-tags" style="width:18px;"></i> <span class="sidebar-text">Services &amp; Fees</span>
+          <i class="fa-solid fa-tags" style="width: 18px;"></i>
+          <span class="sidebar-text">Services &amp; Fees</span>
         </a>
       </li>
       <li class="nav-item mb-1">
         <a href="calendar_deadlines.php" data-tip="Calendar Deadlines" aria-label="Calendar Deadlines" class="nav-link <?= navActive('calendar_deadlines.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
-          <i class="fa-solid fa-calendar-days" style="width:18px;"></i> <span class="sidebar-text">Calendar Deadlines</span>
+          <i class="fa-solid fa-calendar-days" style="width: 18px;"></i>
+          <span class="sidebar-text">Calendar Deadlines</span>
         </a>
       </li>
     </ul>
 
-    <div class="dashboard-nav-label text-uppercase text-secondary small fw-semibold px-3 mb-2" style="letter-spacing:.06em; font-size:.72rem;">
+    <div class="dashboard-nav-label text-uppercase text-secondary small fw-semibold px-3 mb-2" style="letter-spacing: .06em; font-size: .72rem;">
       Workspace
     </div>
     <ul class="dashboard-sidebar-menu nav flex-column mb-4">
       <li class="nav-item mb-1">
         <a href="my_assignments.php" data-tip="<?= htmlspecialchars($assignmentTip) ?>" aria-label="My Assignments" class="nav-link <?= navActive('my_assignments.php', $currentPage) ?> d-flex align-items-center flex-nowrap gap-3 rounded-3 px-3 py-2">
-          <i class="fa-solid fa-list-check flex-shrink-0" style="width:18px;"></i>
-          <span class="sidebar-text flex-grow-1 text-truncate" style="min-width:0;">My Assignments</span>
-
+          <i class="fa-solid fa-list-check flex-shrink-0" style="width: 18px;"></i>
+          <span class="sidebar-text flex-grow-1 text-truncate" style="min-width: 0;">My Assignments</span>
           <span class="sidebar-text d-flex align-items-center gap-1 flex-shrink-0 sidebar-badge-group">
             <?php if ($newAssignmentCount > 0): ?>
               <span class="sidebar-badge sidebar-badge-new" title="<?= $newAssignmentCount ?> new assignment<?= $newAssignmentCount === 1 ? '' : 's' ?>">
@@ -366,13 +379,14 @@ function badgeCount(int $count): string
       </li>
     </ul>
 
-    <div class="dashboard-nav-label text-uppercase text-secondary small fw-semibold px-3 mb-2" style="letter-spacing:.06em; font-size:.72rem;">
+    <div class="dashboard-nav-label text-uppercase text-secondary small fw-semibold px-3 mb-2" style="letter-spacing: .06em; font-size: .72rem;">
       Documents
     </div>
     <ul class="dashboard-sidebar-menu nav flex-column">
       <li class="nav-item mb-1">
         <a href="knowledge_repository.php" data-tip="Repository" aria-label="Repository" class="nav-link <?= navActive('knowledge_repository.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
-          <i class="fa-solid fa-book" style="width:18px;"></i> <span class="sidebar-text">Repository</span>
+          <i class="fa-solid fa-book" style="width: 18px;"></i>
+          <span class="sidebar-text">Repository</span>
         </a>
       </li>
     </ul>
@@ -382,12 +396,12 @@ function badgeCount(int $count): string
   <div class="dashboard-sidebar-footer border-top p-3">
     <div class="dropdown dropup">
       <button type="button" class="btn btn-link p-0 w-100 text-start text-decoration-none dropdown-toggle d-flex align-items-center gap-3 text-dark" data-bs-toggle="dropdown" aria-expanded="false" data-tip="<?= htmlspecialchars($staffFullname) ?>" aria-label="<?= htmlspecialchars($staffFullname) ?>">
-        <span class="dashboard-user-icon d-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-10 flex-shrink-0" style="width:38px; height:38px;">
+        <span class="dashboard-user-icon d-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-10 flex-shrink-0" style="width: 38px; height: 38px;">
           <i class="fa-solid fa-user text-primary"></i>
         </span>
         <div class="sidebar-text overflow-hidden flex-grow-1">
           <div class="fw-semibold small text-truncate"><?= htmlspecialchars($staffFullname) ?></div>
-          <div class="text-secondary text-truncate" style="font-size:.75rem;"><?= htmlspecialchars(maskEmail($staffEmail)) ?></div>
+          <div class="text-secondary text-truncate" style="font-size: .75rem;"><?= htmlspecialchars(maskEmail($staffEmail)) ?></div>
         </div>
       </button>
       <ul class="dropdown-menu w-100 shadow-sm">

@@ -50,14 +50,6 @@ $services = [
         'note' => 'Taxes are paid by the client.',
     ],
     [
-        'category' => 'BIR and Taxes',
-        'name' => 'BIR Help (Notice, Update, Closure)',
-        'summary' => 'Assistance when the BIR sends a notice or when registration needs changes.',
-        'includes' => ['Response to BIR notice', 'Registration update', 'Business closure or transfer', 'Compliance check'],
-        'rates' => [['label' => 'Service fee', 'min' => 2000, 'max' => 15000, 'unit' => 'per case', 'fmt' => 'peso', 'est' => true]],
-        'note' => '',
-    ],
-    [
         'category' => 'Accounting',
         'name' => 'Bookkeeping',
         'summary' => 'Recording the income and expenses of the business.',
@@ -74,7 +66,7 @@ $services = [
         'note' => 'External audit is not included.',
     ],
     [
-        'category' => 'Legal and Documents',
+        'category' => 'Legal Documents',
         'name' => 'Paralegal (Legal Papers)',
         'summary' => 'Assistance in drafting and reviewing legal documents.',
         'includes' => ['Contract drafting', 'Contract review', 'Labor law assistance', 'Document filing'],
@@ -82,55 +74,7 @@ $services = [
         'note' => 'This is not a substitute for a lawyer.',
     ],
     [
-        'category' => 'Legal and Documents',
-        'name' => 'Corporate Documents',
-        'summary' => 'Preparation and updating of corporate papers.',
-        'includes' => ['Meeting minutes', 'Corporate records', 'GIS (General Information Sheet)', 'Amendment of Articles and By-Laws'],
-        'rates' => [['label' => 'Service fee', 'min' => 5000, 'max' => 30000, 'unit' => 'depends on the volume of work', 'fmt' => 'peso']],
-        'note' => '',
-    ],
-    [
-        'category' => 'Cooperatives and Agri',
-        'name' => 'CDA Cooperative Registration',
-        'summary' => 'Registration of a cooperative with the CDA.',
-        'includes' => ['Bylaws', 'Articles of Cooperation', 'Pre-registration seminar', 'CDA filing'],
-        'rates' => [['label' => 'Service fee', 'min' => 10000, 'max' => 40000, 'unit' => 'per registration', 'fmt' => 'peso', 'est' => true]],
-        'note' => 'CDA fees are separate.',
-    ],
-    [
-        'category' => 'Cooperatives and Agri',
-        'name' => 'Agri-Business Plan',
-        'summary' => 'Plan for farming, processing, or trading of products.',
-        'includes' => ['Market study', 'Cost and income (projection)', 'Operations plan', 'For loan or grant'],
-        'rates' => [['label' => 'Service fee', 'min' => 8000, 'max' => 35000, 'unit' => 'per plan', 'fmt' => 'peso', 'est' => true]],
-        'note' => '',
-    ],
-    [
-        'category' => 'Cooperatives and Agri',
-        'name' => 'Loan Application Papers',
-        'summary' => 'Preparation of papers for a loan with a bank or agency.',
-        'includes' => ['Business plan', 'Financial statements', 'Checklist of requirements', 'Application guidance'],
-        'rates' => [['label' => 'Service fee', 'min' => 3000, 'max' => 15000, 'unit' => 'per application', 'fmt' => 'peso', 'est' => true]],
-        'note' => 'Approval of the loan is not guaranteed.',
-    ],
-    [
-        'category' => 'HR and Training',
-        'name' => 'HR Setup',
-        'summary' => 'Setting up the system for employees.',
-        'includes' => ['Time and attendance', 'Payroll', 'Leave management', 'Recruitment', 'Performance review', 'Labor compliance'],
-        'rates' => [['label' => 'Service fee', 'min' => 5000, 'max' => 40000, 'unit' => 'depends on company size', 'fmt' => 'peso']],
-        'note' => '',
-    ],
-    [
-        'category' => 'HR and Training',
-        'name' => 'Training and Workshops',
-        'summary' => 'Training for employees and organizations.',
-        'includes' => ['Leadership and soft skills', 'HRIS and compliance', 'Onsite, Zoom, or hybrid'],
-        'rates' => [['label' => 'Training fee', 'min' => 3000, 'max' => 30000, 'unit' => 'per session, depends on the number of participants', 'fmt' => 'peso']],
-        'note' => '',
-    ],
-    [
-        'category' => 'Business Advisory',
+        'category' => 'Advisory and Training',
         'name' => 'Business Consultation',
         'summary' => 'Advice on how to grow and improve the business.',
         'includes' => ['Business planning', 'Startup advice', 'Process improvement', 'Project management'],
@@ -138,88 +82,30 @@ $services = [
         'note' => '',
     ],
     [
-        'category' => 'Business Advisory',
-        'name' => 'Feasibility Study and Research',
-        'summary' => 'Study on whether the business will be profitable before starting.',
-        'includes' => ['Business research', 'Feasibility study', 'Market trends', 'Organization check'],
-        'rates' => [['label' => 'Study fee', 'min' => 10000, 'max' => 60000, 'unit' => 'higher for more in-depth studies', 'fmt' => 'peso']],
+        'category' => 'Advisory and Training',
+        'name' => 'Training and Workshops',
+        'summary' => 'Training for employees and organizations.',
+        'includes' => ['Leadership and soft skills', 'HRIS and compliance', 'Onsite, Zoom, or hybrid'],
+        'rates' => [['label' => 'Training fee', 'min' => 3000, 'max' => 30000, 'unit' => 'per session, depends on the number of participants', 'fmt' => 'peso']],
         'note' => '',
     ],
     [
-        'category' => 'Business Advisory',
-        'name' => 'Business Buy and Sell',
-        'summary' => 'Assistance in buying, selling, or transferring a business.',
-        'includes' => ['Business valuation', 'Finding an investor', 'Handling the sale', 'Document check'],
-        'rates' => [['label' => 'Commission', 'min' => 2, 'max' => 5, 'unit' => 'of the sale value', 'fmt' => 'percent', 'est' => true]],
-        'note' => '',
-    ],
-    [
-        'category' => 'Marketing and IT',
+        'category' => 'Marketing',
         'name' => 'Marketing and Social Media',
         'summary' => 'Promoting and growing the business online and offline.',
         'includes' => ['Branding', 'Social media management', 'Customer retention', 'Competitor study'],
         'rates' => [['label' => 'Fee per campaign', 'min' => 5000, 'max' => 50000, 'unit' => 'per campaign', 'fmt' => 'peso']],
         'note' => '',
     ],
-    [
-        'category' => 'Marketing and IT',
-        'name' => 'IT Systems',
-        'summary' => 'Building and maintaining business systems.',
-        'includes' => ['System development', 'Digital processes', 'Maintenance and support'],
-        'rates' => [
-            ['label' => 'System development', 'min' => 15000, 'max' => null, 'unit' => 'starting', 'fmt' => 'peso'],
-            ['label' => 'Monthly maintenance', 'min' => 1500, 'max' => 6000, 'unit' => 'per month', 'fmt' => 'peso'],
-        ],
-        'note' => '',
-    ],
-    [
-        'category' => 'Marketing and IT',
-        'name' => 'Online Store',
-        'summary' => 'Building an online shop to sell on the internet.',
-        'includes' => ['Online shop setup', 'Product listing', 'Order processing', 'Secure online payment'],
-        'rates' => [['label' => 'Setup fee', 'min' => 10000, 'max' => 60000, 'unit' => 'per project', 'fmt' => 'peso', 'est' => true]],
-        'note' => '',
-    ],
-    [
-        'category' => 'Real Estate and Rentals',
-        'name' => 'Real Estate Broker',
-        'summary' => 'Assistance in buying, selling, and leasing land or houses.',
-        'includes' => ['Listing and promotion', 'Finding a buyer or tenant', 'Negotiation', 'Support until closing'],
-        'rates' => [['label' => 'Commission', 'min' => 3, 'max' => 5, 'unit' => 'of the sale price', 'fmt' => 'percent', 'est' => true]],
-        'note' => '',
-    ],
-    [
-        'category' => 'Real Estate and Rentals',
-        'name' => 'Property Management',
-        'summary' => 'Management of rental houses, apartments, or commercial spaces.',
-        'includes' => ['Tenant coordination', 'Rent collection', 'Maintenance', 'Occupancy check'],
-        'rates' => [['label' => 'Management fee', 'min' => 8, 'max' => 15, 'unit' => 'of the rent collected', 'fmt' => 'percent', 'est' => true]],
-        'note' => '',
-    ],
-    [
-        'category' => 'Real Estate and Rentals',
-        'name' => 'Transient and Vacation Rental',
-        'summary' => 'Management of transient, homestay, and vacation rentals.',
-        'includes' => ['Online booking', 'Guest coordination', 'Cleaning and maintenance', 'Promotion'],
-        'rates' => [['label' => 'Management fee', 'min' => 15, 'max' => 25, 'unit' => 'of booking revenue', 'fmt' => 'percent', 'est' => true]],
-        'note' => '',
-    ],
-    [
-        'category' => 'Real Estate and Rentals',
-        'name' => 'Recreation Venue Management',
-        'summary' => 'Management of sports and recreation venues, such as paddle parks.',
-        'includes' => ['Venue administration', 'Booking', 'Customer service', 'Event coordination'],
-        'rates' => [['label' => 'Management fee', 'min' => 5000, 'max' => 30000, 'unit' => 'per month', 'fmt' => 'peso', 'est' => true]],
-        'note' => '',
-    ],
-    [
-        'category' => 'Real Estate and Rentals',
-        'name' => 'Vehicle Rental',
-        'summary' => 'Vehicle rental for personal, business, or group use.',
-        'includes' => ['Short-term rental', 'Long-term rental', 'Special trips', 'Online reservation'],
-        'rates' => [['label' => 'Rental price', 'min' => 1000, 'max' => 3500, 'unit' => 'per day', 'fmt' => 'peso', 'est' => true]],
-        'note' => '',
-    ],
+];
+
+$categoryIcons = [
+    'Business Registration' => 'fa-building',
+    'BIR and Taxes' => 'fa-file-invoice',
+    'Accounting' => 'fa-calculator',
+    'Legal Documents' => 'fa-scale-balanced',
+    'Advisory and Training' => 'fa-chalkboard-user',
+    'Marketing' => 'fa-bullhorn',
 ];
 
 function peso(int $amount): string
@@ -279,122 +165,164 @@ $estCount = count(array_filter($services, fn($s) => !empty($s['rates'][0]['est']
 <style>
 :root {
   --navy: #0F172A;
+  --navy-2: #1B2540;
   --indigo: #3B4E8A;
-  --indigo-dark: #2E3E70;
-  --indigo-soft: #EEF0F8;
+  --indigo-text: #2E3E70;
+  --indigo-soft: #E4E9F7;
   --slate: #475569;
   --ink: #1A2233;
   --muted: #667085;
-  --line: #E5E7EB;
-  --line-soft: #F1F2F5;
-  --green: #1F7A4D;
-  --amber: #9A6A12;
-  --amber-soft: #FBF3E0;
+  --line: #E2E5EB;
+  --canvas: #F3F5F9;
+  --green: #157A5F;
+  --amber-soft: #FBF0DD;
+  --amber-text: #8A5A15;
+  --amber-line: #EFD8A8;
+  --red-soft: #FAECE8;
+  --red-text: #93382A;
 }
-body { background: #fff; color: var(--ink); font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; overflow-x: hidden; }
-.dashboard-layout, .dashboard-main, .dashboard-content { background: #fff !important; }
+
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+.dashboard-layout, .dashboard-main, .dashboard-content { background: var(--canvas) !important; }
 .dashboard-main { min-width: 0; max-width: 100%; }
 .dashboard-title, h1, h2, h3, h4 { font-family: 'Lexend', 'Inter', sans-serif; }
 .dashboard-title { color: var(--navy); letter-spacing: -0.01em; }
 .dashboard-subtitle { color: var(--muted) !important; }
 .dashboard-topbar { border-bottom: 1px solid var(--line) !important; background: #fff; }
 
-.sv-strip { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 1rem; overflow: hidden; }
-.sv-strip-item { padding: .8rem 1.1rem; border-right: 1px solid var(--line); display: flex; align-items: baseline; gap: .6rem; min-width: 0; }
-.sv-strip-item:last-child { border-right: none; }
-.sv-strip-n { font-family: 'Lexend', sans-serif; font-size: 1.35rem; font-weight: 700; color: var(--navy); }
-.sv-strip-l { font-size: .72rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.sv-banner {
+  background: #FFFFFF;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1.5rem 1.75rem;
+  margin-bottom: 1rem;
+  display: grid;
+  grid-template-columns: 1.3fr repeat(4, 1fr);
+  align-items: center;
+  gap: 1.25rem;
+}
+.sv-banner-intro h2 { font-size: 1.15rem; font-weight: 700; color: #000000; margin: 0 0 .3rem; letter-spacing: -0.01em; }
+.sv-banner-intro p { font-size: .8rem; color: #000000; margin: 0; line-height: 1.5; }
+.sv-stat { text-align: center; padding: .25rem 0; background: var(--canvas); border-radius: 10px; padding: .95rem .5rem; }
+.sv-stat-n { display: block; font-family: 'Lexend', sans-serif; font-size: 1.75rem; font-weight: 700; color: var(--navy); line-height: 1; }
+.sv-stat-l { display: block; margin-top: .45rem; font-size: .66rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.sv-stat.is-green .sv-stat-n { color: #0F5F49; }
+.sv-stat.is-amber .sv-stat-n { color: #8A5A15; }
 
-.sv-bar { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin-bottom: .75rem; }
+.sv-toolbar { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.15rem; margin-bottom: 1rem; }
+.sv-bar { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; }
 .sv-search { position: relative; flex: 1 1 320px; max-width: 520px; }
 .sv-search i { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: .85rem; }
-.sv-search input, .sv-select { height: 40px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-size: .85rem; color: var(--ink); outline: none; }
+.sv-search input, .sv-select {
+  height: 40px;
+  border: 1px solid #D5DAE3;
+  border-radius: 8px;
+  background: #fff;
+  font-size: .85rem;
+  color: var(--ink);
+  outline: none;
+}
 .sv-search input { width: 100%; padding: 0 .9rem 0 2.2rem; }
 .sv-select { padding: 0 2rem 0 .8rem; min-width: 190px; }
-.sv-search input:focus, .sv-select:focus { border-color: var(--indigo); box-shadow: 0 0 0 .2rem rgba(59,78,138,.12); }
+.sv-search input:focus, .sv-select:focus { border-color: var(--indigo); box-shadow: 0 0 0 .2rem #DDE2F1; }
 .sv-shown { margin-left: auto; font-size: .78rem; color: var(--muted); }
 
-.sv-chips { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: 1rem; }
-.sv-chip { border: 1px solid var(--line); background: #fff; color: var(--slate); border-radius: 8px; padding: .35rem .8rem; font-size: .76rem; font-weight: 600; cursor: pointer; transition: all .12s ease; }
-.sv-chip:hover { border-color: var(--indigo); color: var(--indigo-dark); }
-.sv-chip.is-active { background: var(--indigo); border-color: var(--indigo); color: #fff; }
-.sv-chip b { font-weight: 500; opacity: .65; margin-left: .3rem; }
+.sv-chips { display: flex; gap: .45rem; flex-wrap: wrap; margin-top: .9rem; padding-top: .9rem; border-top: 1px solid var(--line); }
+.sv-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  border: 1px solid #D5DAE3;
+  background: #fff;
+  color: var(--slate);
+  border-radius: 999px;
+  padding: .4rem .95rem;
+  font-size: .78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sv-chip b { font-weight: 600; color: var(--muted); }
+.sv-chip.is-active { background: var(--navy); border-color: var(--navy); color: #fff; }
+.sv-chip.is-active b { color: #C9D1E6; }
 
-.sv-legend { display: flex; align-items: center; gap: .5rem; font-size: .74rem; color: var(--muted); margin-bottom: .75rem; }
+.sv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+.sv-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  cursor: pointer;
+}
+.sv-card-top { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.sv-icon { width: 42px; height: 42px; border-radius: 10px; background: var(--indigo); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
+.sv-tag { display: inline-block; background: var(--amber-soft); color: var(--amber-text); border: 1px solid var(--amber-line); font-size: .62rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; border-radius: 6px; padding: .2rem .5rem; }
+.sv-tag.is-set { background: #E3F3EC; color: #0F5F49; border-color: #BFE3D3; }
+.sv-card-body { flex: 1 1 auto; }
+.sv-cat { display: inline-block; font-size: .68rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin-bottom: .35rem; }
+.sv-name { font-size: 1rem; font-weight: 600; color: var(--navy); line-height: 1.35; margin: 0 0 .35rem; font-family: 'Lexend', 'Inter', sans-serif; }
+.sv-sum { font-size: .8rem; color: var(--muted); line-height: 1.5; margin: 0; }
+.sv-price { background: var(--canvas); border-radius: 10px; padding: .8rem .95rem; }
+.sv-price-l { font-size: .64rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.sv-price-v { font-family: 'Lexend', sans-serif; font-size: 1.2rem; font-weight: 700; color: var(--indigo-text); margin-top: .2rem; font-variant-numeric: tabular-nums; }
+.sv-price-u { font-size: .75rem; color: var(--slate); margin-top: .15rem; }
+.sv-price-m { font-size: .7rem; color: var(--muted); margin-top: .25rem; }
+.sv-card-foot { display: flex; align-items: center; justify-content: space-between; font-size: .78rem; font-weight: 600; color: var(--indigo-text); }
+.sv-empty { display: none; text-align: center; color: var(--muted); padding: 3rem 1rem; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
 
-.sv-tablewrap { border: 1px solid var(--line); border-radius: 10px; background: #fff; overflow: hidden; }
-.sv-table { width: 100%; border-collapse: collapse; }
-.sv-table thead th { background: #FAFAFB; border-bottom: 1px solid var(--line); padding: .7rem 1rem; font-size: .68rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); white-space: nowrap; text-align: left; }
-.sv-table th.num, .sv-table td.num { text-align: right; }
-.sv-table tbody tr { border-bottom: 1px solid var(--line-soft); cursor: pointer; transition: background-color .1s ease; }
-.sv-table tbody tr:last-child { border-bottom: none; }
-.sv-table tbody tr:hover { background: #F8F9FC; }
-.sv-table tbody tr.is-selected { background: var(--indigo-soft); }
-.sv-table td { padding: .8rem 1rem; vertical-align: middle; font-size: .84rem; }
-.sv-name { font-weight: 600; color: var(--navy); }
-.sv-sum { font-size: .75rem; color: var(--muted); margin-top: .1rem; }
-.sv-cat { display: inline-block; background: var(--indigo-soft); color: var(--indigo-dark); border-radius: 6px; padding: .2rem .55rem; font-size: .72rem; font-weight: 600; }
-.sv-money { font-family: 'Lexend', sans-serif; font-weight: 600; color: var(--indigo-dark); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.sv-dash { color: #98A0AE; font-size: .8rem; }
-.sv-unit { font-size: .75rem; color: var(--muted); }
-.sv-est { display: inline-block; margin-left: .4rem; background: var(--amber-soft); color: var(--amber); font-size: .6rem; font-weight: 700; letter-spacing: .04em; border-radius: 4px; padding: .05rem .35rem; vertical-align: middle; }
-.sv-more { color: var(--muted); font-size: .68rem; display: block; }
-.sv-empty { display: none; text-align: center; color: var(--muted); padding: 3rem 1rem; }
+.sv-modal .modal-content { border: none; border-radius: 12px; background: #fff; overflow: hidden; }
+.sv-modal .modal-header { border-bottom: none; background: var(--navy); padding: 1.2rem 1.5rem; align-items: flex-start; gap: 1rem; }
+.sv-modal-cat { display: inline-block; background: var(--indigo-soft); color: var(--indigo-text); border-radius: 6px; padding: .22rem .6rem; font-size: .72rem; font-weight: 600; }
+.sv-modal-title { font-size: 1.2rem; font-weight: 700; color: #FFFFFF; margin: .55rem 0 0; letter-spacing: -0.01em; }
+.sv-modal .btn-close { margin: 0 0 0 auto; width: 34px; height: 34px; padding: 0; background-size: 14px; opacity: 1; border-radius: 8px; flex-shrink: 0; }
+.sv-modal .btn-close:focus { box-shadow: none; }
+.sv-modal .modal-body { padding: 1.4rem 1.5rem 1.6rem; background: var(--canvas); }
+.sv-modal-sum { font-size: .88rem; color: var(--slate); margin: 0 0 1.25rem; line-height: 1.55; }
+.sv-sec { font-family: 'Inter', sans-serif; font-size: .68rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 1.4rem 0 .6rem; }
+.sv-sec.first { margin-top: 0; }
+.sv-rate-card { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: .85rem 1.1rem; margin-bottom: .6rem; }
+.sv-rate-card .k { font-size: .74rem; font-weight: 600; color: var(--muted); display: flex; align-items: center; gap: .5rem; }
+.sv-rate-card .v { font-family: 'Lexend', sans-serif; font-size: 1.45rem; font-weight: 700; color: var(--indigo-text); margin-top: .2rem; }
+.sv-rate-card .u { font-size: .78rem; color: var(--slate); margin-top: .15rem; }
+.sv-inc { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+.sv-inc li { display: flex; gap: .6rem; font-size: .84rem; line-height: 1.4; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: .6rem .8rem; }
+.sv-inc i { color: var(--green); font-size: .75rem; margin-top: .28rem; }
+.sv-note { display: flex; gap: .65rem; background: var(--red-soft); color: var(--red-text); border-radius: 8px; padding: .7rem .9rem; font-size: .82rem; margin-top: 1.1rem; }
 
-.sv-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.35); opacity: 0; pointer-events: none; transition: opacity .2s ease; z-index: 1040; }
-.sv-overlay.is-open { opacity: 1; pointer-events: auto; }
-.sv-panel { position: fixed; top: 0; right: 0; bottom: 0; width: 460px; max-width: 100%; background: #fff; box-shadow: -8px 0 30px rgba(15,23,42,.12); transform: translateX(100%); transition: transform .25s ease; z-index: 1050; display: flex; flex-direction: column; }
-.sv-panel.is-open { transform: translateX(0); }
-.sv-panel-head { padding: 1.1rem 1.25rem; border-bottom: 1px solid var(--line); display: flex; gap: 1rem; align-items: flex-start; }
-.sv-panel-title { font-size: 1.05rem; font-weight: 700; color: var(--navy); margin: .35rem 0 0; }
-.sv-close { margin-left: auto; border: none; background: transparent; width: 32px; height: 32px; border-radius: 8px; color: var(--muted); flex-shrink: 0; }
-.sv-close:hover { background: var(--line-soft); color: var(--ink); }
-.sv-panel-body { padding: 1.25rem; overflow-y: auto; flex: 1 1 auto; }
-.sv-panel-sum { font-size: .85rem; color: var(--slate); margin-bottom: 1.25rem; line-height: 1.5; }
-.sv-sec { font-family: 'Inter', sans-serif; font-size: .68rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 1.25rem 0 .6rem; }
-.sv-rate-card { border: 1px solid var(--line); border-radius: 10px; padding: .8rem 1rem; margin-bottom: .6rem; }
-.sv-rate-card .k { font-size: .72rem; font-weight: 600; color: var(--muted); }
-.sv-rate-card .v { font-family: 'Lexend', sans-serif; font-size: 1.3rem; font-weight: 700; color: var(--indigo-dark); margin-top: .1rem; }
-.sv-rate-card .u { font-size: .75rem; color: var(--slate); margin-top: .1rem; }
-.sv-inc { list-style: none; padding: 0; margin: 0; display: grid; gap: .5rem; }
-.sv-inc li { display: flex; gap: .6rem; font-size: .84rem; line-height: 1.4; }
-.sv-inc i { color: var(--green); font-size: .72rem; margin-top: .3rem; }
-.sv-warn { display: flex; gap: .6rem; background: #FDF1EE; color: #8A3B2B; border-radius: 8px; padding: .65rem .8rem; font-size: .8rem; margin-top: 1rem; }
-.sv-estnote { display: flex; gap: .6rem; background: var(--amber-soft); color: var(--amber); border-radius: 8px; padding: .65rem .8rem; font-size: .78rem; margin-bottom: .8rem; }
-
-@media (max-width: 991.98px) {
-  .sv-strip { grid-template-columns: repeat(2, 1fr); }
-  .sv-strip-item:nth-child(2) { border-right: none; }
-  .sv-strip-item:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
-  .sv-table th:nth-child(2), .sv-table td:nth-child(2) { display: none; }
+@media (max-width: 1199.98px) {
+  .sv-banner { grid-template-columns: repeat(4, 1fr); }
+  .sv-banner-intro { grid-column: 1 / -1; }
 }
 
 @media (max-width: 767.98px) {
   .dashboard-content { padding: .75rem !important; }
   .dashboard-title { font-size: .92rem !important; }
+  .sv-banner { grid-template-columns: repeat(2, 1fr); padding: 1.1rem; gap: .7rem; }
+  .sv-stat-n { font-size: 1.4rem; }
+  .sv-toolbar { padding: .85rem; }
   .sv-search { max-width: none; flex: 1 1 100%; }
   .sv-select { flex: 1 1 100%; width: 100%; }
   .sv-shown { margin-left: 0; width: 100%; }
-  .sv-chips { flex-wrap: nowrap; overflow-x: auto; padding-bottom: .3rem; scrollbar-width: none; }
+  .sv-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .sv-chips::-webkit-scrollbar { display: none; }
   .sv-chip { flex: 0 0 auto; white-space: nowrap; }
-
-  .sv-tablewrap { border: none; border-radius: 0; overflow: visible; }
-  .sv-table, .sv-table tbody { display: block; }
-  .sv-table thead { display: none; }
-  .sv-table tbody tr { display: block; border: 1px solid var(--line); border-radius: 10px; padding: .85rem .95rem; margin-bottom: .6rem; }
-  .sv-table tbody tr:last-child { border-bottom: 1px solid var(--line); }
-  .sv-table td { display: block; padding: 0; }
-  .sv-table th:nth-child(2), .sv-table td:nth-child(2) { display: block; margin-top: .5rem; }
-  .sv-table td.num { text-align: left; display: inline-block; margin-top: .6rem; margin-right: 1rem; }
-  .sv-table td.num::before { content: attr(data-label); display: block; font-size: .62rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin-bottom: .1rem; }
-  .sv-table td.basis { margin-top: .5rem; padding-top: .5rem; border-top: 1px dashed var(--line); }
-
-  .sv-panel { width: 100%; }
+  .sv-grid { grid-template-columns: 1fr; }
+  .sv-modal .modal-header { padding: 1rem 1.1rem; }
+  .sv-modal .modal-body { padding: 1.1rem; }
+  .sv-modal-title { font-size: 1.05rem; }
+  .sv-inc { grid-template-columns: 1fr; }
 }
 
-@media (max-width: 400px) {
-  .sv-strip-item { padding: .65rem .8rem; flex-direction: column; gap: .1rem; align-items: flex-start; }
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
 }
 </style>
 </head>
@@ -420,107 +348,106 @@ body { background: #fff; color: var(--ink); font-family: 'Inter', -apple-system,
 
     <main class="dashboard-content p-3 p-md-4">
 
-      <div class="sv-strip">
-        <div class="sv-strip-item"><span class="sv-strip-n"><?= $totalServices ?></span><span class="sv-strip-l">Services</span></div>
-        <div class="sv-strip-item"><span class="sv-strip-n"><?= count($categories) ?></span><span class="sv-strip-l">Categories</span></div>
-        <div class="sv-strip-item"><span class="sv-strip-n"><?= $totalServices - $estCount ?></span><span class="sv-strip-l">Confirmed prices</span></div>
-        <div class="sv-strip-item"><span class="sv-strip-n"><?= $estCount ?></span><span class="sv-strip-l">Estimated prices</span></div>
-      </div>
-
-      <div class="sv-bar">
-        <div class="sv-search">
-          <i class="fa-solid fa-magnifying-glass"></i>
-          <input type="text" id="svSearch" placeholder="Search for a service, e.g. BIR, DTI, cooperative" autocomplete="off">
+      <section class="sv-banner">
+        <div class="sv-banner-intro">
+          <h2>Service Catalog</h2>
+          <p>Standard services and rate ranges offered to clients.</p>
         </div>
-        <select id="svSort" class="sv-select">
-          <option value="default">Sort: Default</option>
-          <option value="name">Name A-Z</option>
-          <option value="low">Cheapest first</option>
-          <option value="high">Most expensive first</option>
-        </select>
-        <div class="sv-shown"><span id="svCount"><?= $totalServices ?></span> of <?= $totalServices ?> services</div>
-      </div>
+        <div class="sv-stat"><span class="sv-stat-n"><?= $totalServices ?></span><span class="sv-stat-l">Services</span></div>
+        <div class="sv-stat"><span class="sv-stat-n"><?= count($categories) ?></span><span class="sv-stat-l">Categories</span></div>
+        <div class="sv-stat is-green"><span class="sv-stat-n"><?= $totalServices - $estCount ?></span><span class="sv-stat-l">Confirmed</span></div>
+        <div class="sv-stat is-amber"><span class="sv-stat-n"><?= $estCount ?></span><span class="sv-stat-l">Estimated</span></div>
+      </section>
 
-      <div class="sv-chips" id="svChips">
-        <button type="button" class="sv-chip is-active" data-cat="all">All<b><?= $totalServices ?></b></button>
-        <?php foreach ($categories as $cat => $n): ?>
-          <button type="button" class="sv-chip" data-cat="<?= htmlspecialchars($cat) ?>"><?= htmlspecialchars($cat) ?><b><?= $n ?></b></button>
+      <section class="sv-toolbar">
+        <div class="sv-bar">
+          <div class="sv-search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="svSearch" placeholder="Search for a service." autocomplete="off">
+          </div>
+          <select id="svSort" class="sv-select">
+            <option value="default">Sort: Default</option>
+            <option value="name">Name A-Z</option>
+            <option value="low">Cheapest first</option>
+            <option value="high">Most expensive first</option>
+          </select>
+          <div class="sv-shown"><span id="svCount"><?= $totalServices ?></span> of <?= $totalServices ?> services</div>
+        </div>
+        <div class="sv-chips" id="svChips">
+          <button type="button" class="sv-chip is-active" data-cat="all">All<b><?= $totalServices ?></b></button>
+          <?php foreach ($categories as $cat => $n): ?>
+            <button type="button" class="sv-chip" data-cat="<?= htmlspecialchars($cat) ?>"><?= htmlspecialchars($cat) ?><b><?= $n ?></b></button>
+          <?php endforeach; ?>
+        </div>
+      </section>
+
+      <section class="sv-grid" id="svGrid">
+        <?php foreach ($services as $s): ?>
+          <?php
+            $r = $s['rates'][0];
+            $isPeso = $r['fmt'] === 'peso';
+            $sortMin = $isPeso ? $r['min'] : -1;
+            $sortMax = $isPeso ? ($r['max'] ?? $r['min']) : -1;
+            $blob = strtolower($s['name'] . ' ' . $s['summary'] . ' ' . implode(' ', $s['includes']) . ' ' . $s['category']);
+            $extra = count($s['rates']) - 1;
+          ?>
+          <article class="sv-card" data-id="<?= $s['id'] ?>" data-cat="<?= htmlspecialchars($s['category']) ?>" data-search="<?= htmlspecialchars($blob) ?>" data-name="<?= htmlspecialchars(strtolower($s['name'])) ?>" data-min="<?= $sortMin ?>" data-max="<?= $sortMax ?>" data-order="<?= $s['id'] ?>">
+            <div class="sv-card-top">
+              <span class="sv-icon"><i class="fa-solid <?= $categoryIcons[$s['category']] ?? 'fa-briefcase' ?>"></i></span>
+              <?php if (!empty($r['est'])): ?>
+                <span class="sv-tag">Estimate</span>
+              <?php else: ?>
+                <span class="sv-tag is-set">Fixed range</span>
+              <?php endif; ?>
+            </div>
+            <div class="sv-card-body">
+              <span class="sv-cat"><?= htmlspecialchars($s['category']) ?></span>
+              <h3 class="sv-name"><?= htmlspecialchars($s['name']) ?></h3>
+              <p class="sv-sum"><?= htmlspecialchars($s['summary']) ?></p>
+            </div>
+            <div class="sv-price">
+              <div class="sv-price-l"><?= htmlspecialchars($r['label']) ?></div>
+              <div class="sv-price-v"><?= htmlspecialchars(rateText($r)) ?></div>
+              <div class="sv-price-u"><?= htmlspecialchars($r['unit']) ?></div>
+              <?php if ($extra > 0): ?><div class="sv-price-m">+<?= $extra ?> more price<?= $extra > 1 ? 's' : '' ?></div><?php endif; ?>
+            </div>
+            <div class="sv-card-foot">
+              <span>View details</span>
+              <i class="fa-solid fa-arrow-right"></i>
+            </div>
+          </article>
         <?php endforeach; ?>
-      </div>
+      </section>
 
-      <div class="sv-legend"><span class="sv-est">EST</span> This price is only an estimate. Always confirm on the quotation before telling the client.</div>
-
-      <div class="sv-tablewrap">
-        <table class="sv-table">
-          <thead>
-            <tr>
-              <th style="width:36%;">Service</th>
-              <th>Category</th>
-              <th class="num">Minimum</th>
-              <th class="num">Maximum</th>
-              <th>Pricing Basis</th>
-            </tr>
-          </thead>
-          <tbody id="svBody">
-            <?php foreach ($services as $s): ?>
-              <?php
-                $r = $s['rates'][0];
-                $isPeso = $r['fmt'] === 'peso';
-                $sortMin = $isPeso ? $r['min'] : -1;
-                $sortMax = $isPeso ? ($r['max'] ?? $r['min']) : -1;
-                $blob = strtolower($s['name'] . ' ' . $s['summary'] . ' ' . implode(' ', $s['includes']) . ' ' . $s['category']);
-              ?>
-              <tr data-id="<?= $s['id'] ?>" data-cat="<?= htmlspecialchars($s['category']) ?>" data-search="<?= htmlspecialchars($blob) ?>" data-name="<?= htmlspecialchars(strtolower($s['name'])) ?>" data-min="<?= $sortMin ?>" data-max="<?= $sortMax ?>" data-order="<?= $s['id'] ?>">
-                <td>
-                  <div class="sv-name"><?= htmlspecialchars($s['name']) ?></div>
-                  <div class="sv-sum"><?= htmlspecialchars($s['summary']) ?></div>
-                </td>
-                <td><span class="sv-cat"><?= htmlspecialchars($s['category']) ?></span></td>
-                <td class="num" data-label="Minimum">
-                  <span class="sv-money"><?= fmtVal($r['min'], $r['fmt']) ?></span>
-                  <?php if (!empty($r['est'])): ?><span class="sv-est">EST</span><?php endif; ?>
-                </td>
-                <td class="num" data-label="Maximum">
-                  <?php if ($r['max'] === null): ?>
-                    <span class="sv-dash">Varies</span>
-                  <?php else: ?>
-                    <span class="sv-money"><?= fmtVal($r['max'], $r['fmt']) ?></span>
-                  <?php endif; ?>
-                </td>
-                <td class="basis">
-                  <div class="sv-unit"><?= htmlspecialchars($r['unit']) ?></div>
-                  <?php if (count($s['rates']) > 1): ?><span class="sv-more">+<?= count($s['rates']) - 1 ?> more price<?= count($s['rates']) - 1 > 1 ? 's' : '' ?></span><?php endif; ?>
-                </td>
-              </tr>
-            <?php endforeach; ?>
-          </tbody>
-        </table>
-        <div class="sv-empty" id="svEmpty"><i class="fa-regular fa-folder-open fs-2 d-block mb-2"></i>No services found.</div>
-      </div>
+      <div class="sv-empty" id="svEmpty"><i class="fa-regular fa-folder-open fs-2 d-block mb-2"></i>No services found.</div>
 
     </main>
   </div>
 </div>
 
-<div class="sv-overlay" id="svOverlay"></div>
-<aside class="sv-panel" id="svPanel" aria-hidden="true">
-  <div class="sv-panel-head">
-    <div>
-      <span class="sv-cat" id="svPanelCat"></span>
-      <h2 class="sv-panel-title" id="svPanelTitle"></h2>
+<div class="modal fade sv-modal" id="svModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <span class="sv-modal-cat" id="svModalCat"></span>
+          <h2 class="sv-modal-title" id="svModalTitle"></h2>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="svModalBody"></div>
     </div>
-    <button type="button" class="sv-close" id="svClose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
   </div>
-  <div class="sv-panel-body" id="svPanelBody"></div>
-</aside>
+</div>
 
 <script src="../assets/vendor/bootstrap-5.3.8/js/bootstrap.bundle.min.js"></script>
 <script>
 var DATA = <?= json_encode($jsData, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>;
 var activeCat = 'all';
-var body = document.getElementById('svBody');
+var grid = document.getElementById('svGrid');
 var searchInput = document.getElementById('svSearch');
 var sortSelect = document.getElementById('svSort');
+var modal = new bootstrap.Modal(document.getElementById('svModal'));
 
 function esc(s) {
   var d = document.createElement('div');
@@ -531,25 +458,26 @@ function esc(s) {
 function applyFilters() {
   var q = searchInput.value.trim().toLowerCase();
   var shown = 0;
-  var rows = Array.prototype.slice.call(body.querySelectorAll('tr'));
+  var cards = Array.prototype.slice.call(grid.querySelectorAll('.sv-card'));
 
-  rows.forEach(function (row) {
-    var ok = (activeCat === 'all' || row.getAttribute('data-cat') === activeCat) && (row.getAttribute('data-search') || '').indexOf(q) !== -1;
-    row.style.display = ok ? '' : 'none';
+  cards.forEach(function (card) {
+    var ok = (activeCat === 'all' || card.getAttribute('data-cat') === activeCat) && (card.getAttribute('data-search') || '').indexOf(q) !== -1;
+    card.style.display = ok ? '' : 'none';
     if (ok) shown++;
   });
 
   var mode = sortSelect.value;
-  rows.sort(function (a, b) {
+  cards.sort(function (a, b) {
     if (mode === 'name') return a.getAttribute('data-name').localeCompare(b.getAttribute('data-name'));
     if (mode === 'low') return Number(a.getAttribute('data-min')) - Number(b.getAttribute('data-min'));
     if (mode === 'high') return Number(b.getAttribute('data-max')) - Number(a.getAttribute('data-max'));
     return Number(a.getAttribute('data-order')) - Number(b.getAttribute('data-order'));
   });
-  rows.forEach(function (row) { body.appendChild(row); });
+  cards.forEach(function (card) { grid.appendChild(card); });
 
   document.getElementById('svCount').textContent = shown;
   document.getElementById('svEmpty').style.display = shown === 0 ? 'block' : 'none';
+  grid.style.display = shown === 0 ? 'none' : '';
 }
 
 searchInput.addEventListener('input', applyFilters);
@@ -564,27 +492,19 @@ document.querySelectorAll('.sv-chip').forEach(function (chip) {
   });
 });
 
-function openPanel(id) {
+function openModal(id) {
   var d = DATA[id];
   if (!d) return;
 
-  document.querySelectorAll('#svBody tr').forEach(function (r) {
-    r.classList.toggle('is-selected', r.getAttribute('data-id') === String(id));
-  });
+  document.getElementById('svModalCat').textContent = d.category;
+  document.getElementById('svModalTitle').textContent = d.name;
 
-  document.getElementById('svPanelCat').textContent = d.category;
-  document.getElementById('svPanelTitle').textContent = d.name;
+  var html = '<p class="sv-modal-sum">' + esc(d.summary) + '</p>';
 
-  var hasEst = d.rates.some(function (r) { return r.est; });
-  var html = '<p class="sv-panel-sum">' + esc(d.summary) + '</p>';
-
-  if (hasEst) {
-    html += '<div class="sv-estnote"><i class="fa-solid fa-triangle-exclamation mt-1"></i><span>This price is only an estimate. Confirm it first before telling the client.</span></div>';
-  }
-
-  html += '<h3 class="sv-sec" style="margin-top:0;">Price</h3>';
+  html += '<h3 class="sv-sec first">Pricing</h3>';
   d.rates.forEach(function (r) {
-    html += '<div class="sv-rate-card"><div class="k">' + esc(r.label) + '</div><div class="v">' + esc(r.text) + '</div><div class="u">' + esc(r.unit) + '</div></div>';
+    var tag = r.est ? '<span class="sv-tag">Estimate</span>' : '';
+    html += '<div class="sv-rate-card"><div class="k">' + esc(r.label) + tag + '</div><div class="v">' + esc(r.text) + '</div><div class="u">' + esc(r.unit) + '</div></div>';
   });
 
   html += '<h3 class="sv-sec">What\'s included</h3><ul class="sv-inc">';
@@ -594,30 +514,17 @@ function openPanel(id) {
   html += '</ul>';
 
   if (d.note) {
-    html += '<div class="sv-warn"><i class="fa-solid fa-circle-exclamation mt-1"></i><span>' + esc(d.note) + '</span></div>';
+    html += '<div class="sv-note"><i class="fa-solid fa-circle-exclamation mt-1"></i><span>' + esc(d.note) + '</span></div>';
   }
 
-  document.getElementById('svPanelBody').innerHTML = html;
-  document.getElementById('svPanel').classList.add('is-open');
-  document.getElementById('svOverlay').classList.add('is-open');
-  document.getElementById('svPanel').setAttribute('aria-hidden', 'false');
+  document.getElementById('svModalBody').innerHTML = html;
+  modal.show();
 }
 
-function closePanel() {
-  document.getElementById('svPanel').classList.remove('is-open');
-  document.getElementById('svOverlay').classList.remove('is-open');
-  document.getElementById('svPanel').setAttribute('aria-hidden', 'true');
-  document.querySelectorAll('#svBody tr').forEach(function (r) { r.classList.remove('is-selected'); });
-}
-
-body.addEventListener('click', function (e) {
-  var row = e.target.closest('tr');
-  if (row) openPanel(row.getAttribute('data-id'));
+grid.addEventListener('click', function (e) {
+  var card = e.target.closest('.sv-card');
+  if (card) openModal(card.getAttribute('data-id'));
 });
-
-document.getElementById('svClose').addEventListener('click', closePanel);
-document.getElementById('svOverlay').addEventListener('click', closePanel);
-document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closePanel(); });
 </script>
 
 </body>
