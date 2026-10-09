@@ -11,10 +11,10 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'supervisor') 
 
 $pdo = getConnection();
 
-$filterMode  = $_GET['filter_mode'] ?? '';
-$dateStart   = $_GET['date_start'] ?? '';
-$dateEnd     = $_GET['date_end'] ?? '';
-$dateSingle  = $_GET['date_single'] ?? '';
+$filterMode = $_GET['filter_mode'] ?? '';
+$dateStart = $_GET['date_start'] ?? '';
+$dateEnd = $_GET['date_end'] ?? '';
+$dateSingle = $_GET['date_single'] ?? '';
 
 $validDate = function (string $d): bool {
     if ($d === '') return false;
@@ -26,23 +26,26 @@ $hasFilter = false;
 $filterWhereSr = '';
 $filterWhereQt = '';
 $filterWhereCt = '';
-$filterParams  = [];
-$filterLabel   = '';
+$filterWhereCtAlias = '';
+$filterParams = [];
+$filterLabel = '';
 
 if ($filterMode === 'range' && $validDate($dateStart) && $validDate($dateEnd)) {
-    $hasFilter     = true;
+    $hasFilter = true;
     $filterWhereSr = " AND DATE(sr.created_at) BETWEEN :fstart AND :fend ";
     $filterWhereQt = " AND DATE(q.created_at) BETWEEN :fstart AND :fend ";
     $filterWhereCt = " AND DATE(created_at) BETWEEN :fstart AND :fend ";
-    $filterParams  = [':fstart' => $dateStart, ':fend' => $dateEnd];
-    $filterLabel   = 'Filtered: ' . date('M d, Y', strtotime($dateStart)) . ' – ' . date('M d, Y', strtotime($dateEnd));
+    $filterWhereCtAlias = " AND DATE(ct.created_at) BETWEEN :fstart AND :fend ";
+    $filterParams = [':fstart' => $dateStart, ':fend' => $dateEnd];
+    $filterLabel = 'Filtered: ' . date('M d, Y', strtotime($dateStart)) . ' – ' . date('M d, Y', strtotime($dateEnd));
 } elseif ($filterMode === 'single' && $validDate($dateSingle)) {
-    $hasFilter     = true;
+    $hasFilter = true;
     $filterWhereSr = " AND DATE(sr.created_at) = :fsingle ";
     $filterWhereQt = " AND DATE(q.created_at) = :fsingle ";
     $filterWhereCt = " AND DATE(created_at) = :fsingle ";
-    $filterParams  = [':fsingle' => $dateSingle];
-    $filterLabel   = 'Filtered: ' . date('M d, Y', strtotime($dateSingle));
+    $filterWhereCtAlias = " AND DATE(ct.created_at) = :fsingle ";
+    $filterParams = [':fsingle' => $dateSingle];
+    $filterLabel = 'Filtered: ' . date('M d, Y', strtotime($dateSingle));
 }
 
 $totalClients = (int) $pdo->query('SELECT COUNT(*) FROM clients')->fetchColumn();
@@ -71,9 +74,9 @@ $approvedQuotationsStmt = $pdo->prepare("SELECT COUNT(*) FROM quotations q WHERE
 $approvedQuotationsStmt->execute($filterParams);
 $approvedQuotations = (int) $approvedQuotationsStmt->fetchColumn();
 
-$rejectedQuotationsStmt = $pdo->prepare("SELECT COUNT(*) FROM quotations q WHERE status = 'Rejected' $filterWhereQt");
-$rejectedQuotationsStmt->execute($filterParams);
-$rejectedQuotations = (int) $rejectedQuotationsStmt->fetchColumn();
+$revertQuotationsStmt = $pdo->prepare("SELECT COUNT(*) FROM quotations q WHERE status = 'Revert' $filterWhereQt");
+$revertQuotationsStmt->execute($filterParams);
+$revertQuotations = (int) $revertQuotationsStmt->fetchColumn();
 
 $draftContractsStmt = $pdo->prepare("SELECT COUNT(*) FROM contracts WHERE status = 'Draft' $filterWhereCt");
 $draftContractsStmt->execute($filterParams);
@@ -83,9 +86,12 @@ $approvedContractsStmt = $pdo->prepare("SELECT COUNT(*) FROM contracts WHERE sta
 $approvedContractsStmt->execute($filterParams);
 $approvedContracts = (int) $approvedContractsStmt->fetchColumn();
 
-$rejectedContractsStmt = $pdo->prepare("SELECT COUNT(*) FROM contracts WHERE status = 'Rejected' $filterWhereCt");
-$rejectedContractsStmt->execute($filterParams);
-$rejectedContracts = (int) $rejectedContractsStmt->fetchColumn();
+$revertContractsStmt = $pdo->prepare("SELECT COUNT(*) FROM contracts WHERE status = 'Revert' $filterWhereCt");
+$revertContractsStmt->execute($filterParams);
+$revertContracts = (int) $revertContractsStmt->fetchColumn();
+
+$pendingApproval = $draftQuotations + $draftContracts;
+$revertTotal = $revertQuotations + $revertContracts;
 
 $awaitingAssignment = (int) $pdo->query(
     "SELECT COUNT(*) FROM service_requests sr
@@ -93,7 +99,7 @@ $awaitingAssignment = (int) $pdo->query(
      WHERE sr.assigned_to IS NULL AND sr.status = 'New'"
 )->fetchColumn();
 
-$activeStaffCount = (int) $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'Staff' AND status = 'Active'")->fetchColumn();
+$activeStaffCount = (int) $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'staff' AND status = 'Active'")->fetchColumn();
 
 $recentRequestsStmt = $pdo->prepare(
     "SELECT sr.request_id, sr.request_title, sr.status, sr.created_at, c.company_name
@@ -117,11 +123,22 @@ $recentQuotationsStmt = $pdo->prepare(
 $recentQuotationsStmt->execute($filterParams);
 $recentQuotations = $recentQuotationsStmt->fetchAll();
 
+$pendingContractsStmt = $pdo->prepare(
+    "SELECT ct.contract_number, ct.status, ct.total_amount, ct.end_date, c.company_name
+     FROM contracts ct
+     INNER JOIN clients c ON c.client_id = ct.client_id
+     WHERE ct.status = 'Draft' $filterWhereCtAlias
+     ORDER BY ct.created_at DESC
+     LIMIT 5"
+);
+$pendingContractsStmt->execute($filterParams);
+$pendingContracts = $pendingContractsStmt->fetchAll();
+
 $staffWorkloadStmt = $pdo->query(
     "SELECT u.user_id, u.firstname, u.lastname, u.status,
             (SELECT COUNT(*) FROM service_requests sr WHERE sr.assigned_to = u.user_id AND sr.status = 'In Progress') AS workload
      FROM users u
-     WHERE u.role = 'Staff'
+     WHERE u.role = 'staff' AND u.status = 'Active'
      ORDER BY workload DESC
      LIMIT 5"
 );
@@ -144,6 +161,7 @@ function quotationStatusClass(string $status): string
         'Draft' => 'status-new',
         'Approved' => 'status-approved',
         'Rejected' => 'status-rejected',
+        'Revert' => 'status-progress',
         default => 'status-new',
     };
 }
@@ -197,6 +215,7 @@ body {
   background-color: var(--canvas);
   color: var(--ink);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  letter-spacing: -0.005em;
 }
 
 .dashboard-layout, .dashboard-main, .dashboard-content {
@@ -207,11 +226,26 @@ body {
   font-family: 'Lexend', 'Inter', sans-serif;
 }
 
-.dashboard-title { color: var(--navy-deep); letter-spacing: -0.01em; }
+.dashboard-title {
+  color: var(--navy-deep);
+  letter-spacing: -0.01em;
+  font-size: 1.15rem !important;
+}
 .dashboard-subtitle { color: var(--ink-soft) !important; }
-.dashboard-topbar { border-bottom: 1px solid var(--line) !important; background-color: #fff; }
+.dashboard-topbar {
+  border-bottom: 1px solid var(--line) !important;
+  background-color: #fff;
+  padding-top: .75rem;
+  padding-bottom: .75rem;
+}
 
-.card { border-radius: 12px; border: 1px solid var(--line) !important; box-shadow: none !important; }
+.card {
+  border-radius: 12px;
+  border: 1px solid var(--line) !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04) !important;
+  transition: box-shadow .15s ease;
+}
+.card:hover { box-shadow: 0 4px 14px rgba(15, 23, 42, .06) !important; }
 
 .card-header {
   border-bottom: 1px solid var(--line) !important;
@@ -227,6 +261,7 @@ body {
   border-radius: 12px;
   border: 1px solid var(--line);
   background-color: var(--card);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
   padding: 1.1rem 1.2rem;
   height: 100%;
   overflow: hidden;
@@ -265,28 +300,6 @@ body {
   justify-content: center;
 }
 
-.approved-stat {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 1.6rem 0;
-  gap: .4rem;
-}
-.approved-stat .approved-value {
-  font-family: 'Lexend', sans-serif;
-  font-size: 2.4rem;
-  font-weight: 700;
-  color: var(--success-text);
-  line-height: 1;
-}
-.approved-stat .approved-label {
-  font-size: .78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .05em;
-  color: var(--ink-soft);
-}
 .approved-icon {
   width: 46px;
   height: 46px;
@@ -333,23 +346,32 @@ body {
   align-self: stretch;
   background-color: var(--line);
 }
-
-body { letter-spacing: -0.005em; }
-
-.card {
-  box-shadow: 0 1px 2px rgba(15, 23, 42, .04) !important;
-  transition: box-shadow .15s ease;
+.approval-sub {
+  display: flex;
+  justify-content: space-around;
+  gap: 1rem;
+  margin-top: .8rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
 }
-.card:hover { box-shadow: 0 4px 14px rgba(15, 23, 42, .06) !important; }
-
-.metric-card {
-  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+.approval-sub-item {
+  flex: 1;
+  text-align: center;
 }
-
-.dashboard-title {
-  font-size: 1.15rem !important;
+.approval-sub-value {
+  font-family: 'Lexend', sans-serif;
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1;
 }
-.dashboard-topbar { padding-top: .75rem; padding-bottom: .75rem; }
+.approval-sub-label {
+  font-size: .66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  color: var(--ink-soft);
+  margin-top: .35rem;
+}
 
 .status-pill {
   font-size: .68rem;
@@ -375,26 +397,6 @@ body { letter-spacing: -0.005em; }
 }
 .table td { border-bottom: 1px solid var(--line); vertical-align: middle; font-size: .82rem; }
 .table-hover tbody tr:hover { background-color: var(--navy-soft); }
-
-.quick-link {
-  display: flex;
-  align-items: center;
-  gap: .75rem;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  padding: .85rem 1rem;
-  text-decoration: none;
-  color: var(--ink);
-  transition: border-color .15s ease, background-color .15s ease;
-}
-.quick-link:hover { border-color: var(--indigo); background-color: var(--indigo-soft); color: var(--ink); }
-.quick-link-icon {
-  width: 38px; height: 38px; border-radius: 9px;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; font-size: .95rem;
-}
-.quick-link-title { font-weight: 600; font-size: .85rem; }
-.quick-link-sub { font-size: .72rem; color: var(--ink-soft); }
 
 .workload-bar-track {
   background-color: var(--navy-soft);
@@ -592,7 +594,7 @@ button::-moz-focus-inner {
         </button>
         <div>
           <h1 class="dashboard-title h6 h5-md fw-bold mb-0">Dashboard</h1>
-          <p class="dashboard-subtitle small mb-0 d-none d-sm-block">Welcome back, <?= htmlspecialchars($_SESSION['manager_fullname'] ?? 'Supervisor') ?>.</p>
+          <p class="dashboard-subtitle small mb-0 d-none d-sm-block">Welcome back, <?= htmlspecialchars($_SESSION['fullname'] ?? $_SESSION['supervisor_fullname'] ?? 'Supervisor') ?>.</p>
         </div>
       </div>
       <div class="dashboard-topbar-actions d-flex align-items-center gap-3 gap-md-4">
@@ -645,7 +647,7 @@ button::-moz-focus-inner {
       </form>
 
       <div class="row g-3 mb-3">
-        <div class="col-6 col-lg-3">
+        <div class="col-6 col-lg-4">
           <div class="metric-card d-flex align-items-center gap-3">
             <span class="metric-icon" style="background-color:var(--indigo-soft);">
               <i class="fa-solid fa-building" style="color:var(--indigo-text);"></i>
@@ -656,7 +658,7 @@ button::-moz-focus-inner {
             </div>
           </div>
         </div>
-        <div class="col-6 col-lg-3">
+        <div class="col-6 col-lg-4">
           <div class="metric-card d-flex align-items-center gap-3">
             <span class="metric-icon" style="background-color:var(--warn-soft);">
               <i class="fa-solid fa-clipboard-list" style="color:var(--warn-text);"></i>
@@ -667,7 +669,7 @@ button::-moz-focus-inner {
             </div>
           </div>
         </div>
-        <div class="col-6 col-lg-3">
+        <div class="col-6 col-lg-4">
           <div class="metric-card d-flex align-items-center gap-3">
             <span class="metric-icon" style="background-color:var(--success-soft);">
               <i class="fa-solid fa-user-check" style="color:var(--success-text);"></i>
@@ -678,7 +680,7 @@ button::-moz-focus-inner {
             </div>
           </div>
         </div>
-        <div class="col-6 col-lg-3">
+        <div class="col-6 col-lg-4">
           <div class="metric-card d-flex align-items-center gap-3">
             <span class="metric-icon" style="background-color:var(--danger-soft);">
               <i class="fa-solid fa-user-clock" style="color:var(--danger-text);"></i>
@@ -686,6 +688,28 @@ button::-moz-focus-inner {
             <div>
               <div class="metric-label">Awaiting Assignment</div>
               <div class="metric-value"><?= $awaitingAssignment ?></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-4">
+          <div class="metric-card d-flex align-items-center gap-3">
+            <span class="metric-icon" style="background-color:var(--navy-soft);">
+              <i class="fa-solid fa-hourglass-half" style="color:var(--slate);"></i>
+            </span>
+            <div>
+              <div class="metric-label">Pending Approval</div>
+              <div class="metric-value"><?= $pendingApproval ?></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-4">
+          <div class="metric-card d-flex align-items-center gap-3">
+            <span class="metric-icon" style="background-color:var(--warn-soft);">
+              <i class="fa-solid fa-rotate-left" style="color:var(--warn-text);"></i>
+            </span>
+            <div>
+              <div class="metric-label">Needs Revision</div>
+              <div class="metric-value"><?= $revertTotal ?></div>
             </div>
           </div>
         </div>
@@ -721,7 +745,7 @@ button::-moz-focus-inner {
           <section class="card h-100">
             <div class="card-header">
               <h2 class="h6 fw-bold mb-0">Approvals Overview</h2>
-              <p class="small mb-0">Approved totals across records.</p>
+              <p class="small mb-0">Quotations and contracts at a glance.</p>
             </div>
             <div class="card-body">
               <div class="approval-split">
@@ -735,6 +759,16 @@ button::-moz-focus-inner {
                   <span class="approved-icon"><i class="fa-solid fa-file-signature"></i></span>
                   <div class="approved-value"><?= $approvedContracts ?></div>
                   <div class="approved-label">Contracts Approved</div>
+                </div>
+              </div>
+              <div class="approval-sub">
+                <div class="approval-sub-item">
+                  <div class="approval-sub-value" style="color:var(--slate);"><?= $pendingApproval ?></div>
+                  <div class="approval-sub-label">Pending</div>
+                </div>
+                <div class="approval-sub-item">
+                  <div class="approval-sub-value" style="color:var(--warn-text);"><?= $revertTotal ?></div>
+                  <div class="approval-sub-label">Revert</div>
                 </div>
               </div>
             </div>
@@ -780,7 +814,7 @@ button::-moz-focus-inner {
             </div>
           </section>
 
-          <section class="card">
+          <section class="card mb-3">
             <div class="card-header">
               <h2 class="h6 fw-bold mb-0">Recent Quotations</h2>
             </div>
@@ -804,6 +838,39 @@ button::-moz-focus-inner {
                         <td class="d-none d-md-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars($q['company_name']) ?></td>
                         <td style="color:var(--indigo-text);">&#8369;<?= number_format((float) $q['total_amount'], 2) ?></td>
                         <td><span class="status-pill <?= quotationStatusClass($q['status']) ?>"><?= htmlspecialchars($q['status']) ?></span></td>
+                      </tr>
+                    <?php endforeach; ?>
+                  <?php endif; ?>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-header">
+              <h2 class="h6 fw-bold mb-0">Contracts Awaiting Approval</h2>
+              <p class="small mb-0">Draft contracts that need a decision.</p>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-hover align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th scope="col">Contract #</th>
+                    <th scope="col" class="d-none d-md-table-cell">Client</th>
+                    <th scope="col">Total</th>
+                    <th scope="col">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php if (empty($pendingContracts)): ?>
+                    <tr><td colspan="4"><div class="empty-state text-center py-4"><i class="fa-regular fa-circle-check fs-4 d-block mb-2"></i><p class="small mb-0">No contracts awaiting approval.</p></div></td></tr>
+                  <?php else: ?>
+                    <?php foreach ($pendingContracts as $ct): ?>
+                      <tr>
+                        <td class="fw-semibold"><?= htmlspecialchars($ct['contract_number']) ?></td>
+                        <td class="d-none d-md-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars($ct['company_name']) ?></td>
+                        <td style="color:var(--indigo-text);">&#8369;<?= number_format((float) $ct['total_amount'], 2) ?></td>
+                        <td><span class="status-pill <?= quotationStatusClass($ct['status']) ?>"><?= htmlspecialchars($ct['status']) ?></span></td>
                       </tr>
                     <?php endforeach; ?>
                   <?php endif; ?>
@@ -871,14 +938,14 @@ function buildDoughnut(canvasId, values, colors) {
         data: values,
         backgroundColor: colors,
         borderWidth: 0,
-        hoverOffset: 6,
+        hoverOffset: 6
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       cutout: '68%',
-      plugins: { legend: { display: false } },
+      plugins: { legend: { display: false } }
     }
   });
 }
