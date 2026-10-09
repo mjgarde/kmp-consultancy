@@ -122,7 +122,7 @@ foreach ($monthRows as $r) {
         'type'    => $r['type'],
         'ref'     => $r['ref'],
         'company' => $r['company_name'],
-        'title'   => $r['title'],
+        'title'   => $r['request_title'],
         'status'  => $r['st'],
         'staff'   => trim((string) $r['staff']),
         'done'    => $done,
@@ -245,6 +245,8 @@ $assignments = rows(
 
 $defaultSel = $isCurrentMonth ? $todayStr : $monthStart->format('Y-m-d');
 $monthLabel = $monthStart->format('F Y');
+$monthName = $monthStart->format('F');
+$yearLabel = $monthStart->format('Y');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -256,17 +258,20 @@ $monthLabel = $monthStart->format('F Y');
 <link rel="stylesheet" href="../assets/vendor/fontawesome-free-7.3.1/css/all.min.css">
 <link rel="stylesheet" href="../assets/css/dashboard.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lexend:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lexend:wght@500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root {
-  --canvas: #FAF9F6;
-  --card: #FFFEFC;
-  --surface: #F6F4EF;
-  --line: #E6E2DA;
+  --canvas: #FFFFFF;
+  --paper: #FFFDF7;
+  --card: #FFFDF7;
+  --surface: #F6F2E8;
+  --line: #DDD7C8;
+  --grid: #E3DED0;
   --ink: #2A2D2F;
   --ink-soft: #6E7275;
   --charcoal: #2B3134;
   --teal: #2F6F6A;
+  --teal-dark: #1F4F4B;
   --teal-soft: #E3EFEC;
   --teal-text: #245853;
   --blue: #3F6C8F;
@@ -286,11 +291,10 @@ $monthLabel = $monthStart->format('F Y');
   --plum-text: #5E3A60;
   --slate-soft: #EFEDE8;
   --slate-text: #55595C;
+  --pen: #C23232;
 }
 
-* {
-  -webkit-tap-highlight-color: transparent;
-}
+* { -webkit-tap-highlight-color: transparent; }
 
 body {
   background: var(--canvas);
@@ -301,50 +305,31 @@ body {
 
 .dashboard-layout,
 .dashboard-main,
-.dashboard-content {
-  background: var(--canvas) !important;
-}
+.dashboard-content { background: var(--canvas) !important; }
 
-.dashboard-main {
-  min-width: 0;
-  max-width: 100%;
-}
+.dashboard-main { min-width: 0; max-width: 100%; }
 
 .dashboard-title,
-h1,
-h2,
-h3,
-.num {
-  font-family: 'Lexend', 'Inter', sans-serif;
-}
+h1, h2, h3,
+.num { font-family: 'Lexend', 'Inter', sans-serif; }
 
-.dashboard-title {
-  color: var(--charcoal);
-  letter-spacing: -.01em;
-}
-
-.dashboard-subtitle {
-  color: var(--ink-soft) !important;
-}
-
-.dashboard-topbar {
-  border-bottom: 1px solid var(--line) !important;
-  background: var(--card);
-}
+.dashboard-title { color: var(--charcoal); letter-spacing: -.01em; }
+.dashboard-subtitle { color: var(--ink-soft) !important; }
+.dashboard-topbar { border-bottom: 1px solid var(--line) !important; background: #FFFFFF !important; }
 
 .card {
-  background: var(--card);
+  background: var(--paper);
   border: 1px solid var(--line);
-  border-radius: 12px;
-  box-shadow: 0 1px 2px rgba(42, 45, 47, .04);
+  border-radius: 10px;
+  box-shadow: 0 2px 0 #D5CFBF, 0 8px 14px rgba(42, 45, 47, .07);
   height: 100%;
 }
 
 .card-header {
-  background: var(--card) !important;
+  background: var(--paper) !important;
   border-bottom: 1px solid var(--line) !important;
-  border-radius: 12px 12px 0 0 !important;
-  padding: 1rem 1.25rem;
+  border-radius: 10px 10px 0 0 !important;
+  padding: .9rem 1.15rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -352,505 +337,460 @@ h3,
   flex-wrap: wrap;
 }
 
-.card-header h2 {
-  color: var(--charcoal);
-  letter-spacing: -.01em;
-  font-size: .95rem;
+.card-header h2 { color: var(--charcoal); letter-spacing: -.01em; font-size: .95rem; font-weight: 700; margin: 0; }
+.card-header p { color: var(--ink-soft); font-size: .76rem; margin: .15rem 0 0; }
+.card-body { padding: 1rem 1.15rem; }
+
+.bottom-white .card,
+.bottom-white .card-header,
+.bottom-white .card-body { background: #FFFFFF !important; }
+
+.sep { font-weight: 900; color: var(--charcoal); padding: 0 .12rem; }
+
+.tn-ochre { background: var(--ochre-soft); color: var(--ochre-text); }
+.tn-blue  { background: var(--blue-soft);  color: var(--blue-text); }
+.tn-plum  { background: var(--plum-soft);  color: var(--plum-text); }
+.tn-terra { background: var(--terra-soft); color: var(--terra-text); }
+.tn-teal  { background: var(--teal-soft);  color: var(--teal-text); }
+
+.pill {
+  display: inline-block;
+  font-size: .66rem;
   font-weight: 700;
-  margin: 0;
+  padding: .22rem .6rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.pl-blue  { background: var(--blue-soft);  color: var(--blue-text); }
+.pl-ochre { background: var(--ochre-soft); color: var(--ochre-text); }
+.pl-sage  { background: var(--sage-soft);  color: var(--sage-text); }
+.pl-slate { background: var(--slate-soft); color: var(--slate-text); }
+.pl-terra { background: var(--terra-soft); color: var(--terra-text); }
+.pl-plum  { background: var(--plum-soft);  color: var(--plum-text); }
+
+.kpi {
+  position: relative;
+  height: 100%;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 0 #D5CFBF, 0 5px 0 -1px var(--paper), 0 5px 0 #D5CFBF;
+  margin-bottom: 6px;
+}
+.kpi-top {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: .5rem;
+  padding: .5rem .85rem;
+  color: #fff;
+  text-align: center;
+}
+.kpi-ochre .kpi-top { background: #BF5F12; }
+.kpi-blue  .kpi-top { background: #2F62B5; }
+.kpi-terra .kpi-top { background: #C23232; }
+.kpi-teal  .kpi-top { background: #2E7D4F; }
+
+.kpi-label { font-size: .66rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.kpi-icon { font-size: .85rem; opacity: .95; }
+.kpi-body { padding: .6rem .85rem .75rem; text-align: center; }
+.kpi-value { font-size: 2rem; font-weight: 800; line-height: 1; color: var(--charcoal); }
+.kpi-sub { font-size: .72rem; color: var(--ink-soft); margin-top: .35rem; }
+
+.cal-card {
+  position: relative;
+  overflow: visible;
+  margin-top: 20px;
+  margin-bottom: 14px;
+  height: calc(100% - 34px);
+  border-radius: 8px 8px 10px 10px;
+  box-shadow:
+    0 1px 0 #D5CFBF,
+    0 5px 0 -1px var(--paper),
+    0 5px 0 #D5CFBF,
+    0 10px 0 -2px var(--paper),
+    0 10px 0 -1px #D5CFBF,
+    0 18px 24px rgba(42, 45, 47, .14);
 }
 
-.card-header p {
-  color: var(--ink-soft);
-  font-size: .76rem;
-  margin: .15rem 0 0;
+.cal-rings {
+  position: absolute;
+  top: -14px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 6%;
+  z-index: 3;
+  pointer-events: none;
+}
+.cal-rings span { position: relative; width: 14px; height: 32px; }
+.cal-rings span::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 16px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--teal-dark);
+  box-shadow: inset 0 2px 0 rgba(0, 0, 0, .25);
+}
+.cal-rings span::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 0;
+  width: 7px;
+  height: 30px;
+  border-radius: 4px;
+  background: #AEB6BA;
+  border: 1px solid #5A6367;
+  box-shadow: inset 2px 0 0 #E4E8EA, inset -2px 0 0 #7C868B;
 }
 
-.card-body {
-  padding: 1rem 1.25rem;
+.cal-band {
+  background: var(--teal);
+  color: #fff;
+  border-radius: 8px 8px 0 0;
+  padding: 1.7rem 1.25rem 1.05rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .75rem;
+  flex-wrap: wrap;
+  border-bottom: 4px solid var(--teal-dark);
 }
 
-.btn-ghost {
+.month-nav { display: flex; align-items: center; gap: .5rem; }
+
+.cal-month {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: .55rem;
+  min-width: 200px;
+}
+.cal-month .m {
+  font-family: 'Lexend', sans-serif;
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+}
+.cal-month .y { font-family: 'Lexend', sans-serif; font-size: 1.1rem; font-weight: 500; opacity: .85; }
+
+.btn-band {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: .5rem;
-  background: transparent;
-  color: var(--charcoal);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  font-size: .82rem;
-  font-weight: 700;
-  padding: .42rem .85rem;
-  text-decoration: none;
-  transition: background .15s;
-}
-
-.btn-ghost:hover {
-  background: var(--surface);
-  color: var(--charcoal);
-}
-
-.btn-ghost.icon {
-  width: 34px;
-  padding: .42rem 0;
-}
-
-.kpi {
-  border-radius: 12px;
-  padding: 1.05rem 1.2rem;
+  background: var(--teal-dark);
   color: #fff;
-  height: 100%;
-}
-
-.kpi-ochre {
-  background: #A06B1F;
-}
-
-.kpi-blue {
-  background: #3F6C8F;
-}
-
-.kpi-terra {
-  background: #B5523F;
-}
-
-.kpi-teal {
-  background: #2F6F6A;
-}
-
-.kpi-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.kpi-label {
-  font-size: .68rem;
+  border: 1px solid #173C39;
+  border-radius: 8px;
+  font-size: .8rem;
   font-weight: 700;
-  letter-spacing: .05em;
-  text-transform: uppercase;
-  opacity: .92;
+  padding: .4rem .85rem;
+  text-decoration: none;
+  box-shadow: 0 2px 0 #173C39;
+  transition: transform .1s, box-shadow .1s;
 }
-
-.kpi-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  background: rgba(255, 255, 255, .2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: .85rem;
-}
-
-.kpi-value {
-  font-size: 1.7rem;
-  font-weight: 700;
-  line-height: 1.1;
-  margin-top: .8rem;
-}
-
-.kpi-sub {
-  font-size: .72rem;
-  opacity: .92;
-  margin-top: .3rem;
-}
-
-.tn-ochre {
-  background: var(--ochre-soft);
-  color: var(--ochre-text);
-}
-
-.tn-blue {
-  background: var(--blue-soft);
-  color: var(--blue-text);
-}
-
-.tn-plum {
-  background: var(--plum-soft);
-  color: var(--plum-text);
-}
-
-.tn-terra {
-  background: var(--terra-soft);
-  color: var(--terra-text);
-}
-
-.tn-teal {
-  background: var(--teal-soft);
-  color: var(--teal-text);
-}
-
-.pill {
-  display: inline-block;
-  font-size: .68rem;
-  font-weight: 700;
-  padding: .25rem .65rem;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-
-.pl-blue {
-  background: var(--blue-soft);
-  color: var(--blue-text);
-}
-
-.pl-ochre {
-  background: var(--ochre-soft);
-  color: var(--ochre-text);
-}
-
-.pl-sage {
-  background: var(--sage-soft);
-  color: var(--sage-text);
-}
-
-.pl-slate {
-  background: var(--slate-soft);
-  color: var(--slate-text);
-}
-
-.pl-terra {
-  background: var(--terra-soft);
-  color: var(--terra-text);
-}
-
-.pl-plum {
-  background: var(--plum-soft);
-  color: var(--plum-text);
-}
-
-.month-nav {
-  display: flex;
-  align-items: center;
-  gap: .4rem;
-}
-
-.month-title {
-  font-family: 'Lexend', sans-serif;
-  font-weight: 700;
-  font-size: 1rem;
-  color: var(--charcoal);
-  min-width: 140px;
-}
+.btn-band:hover { color: #fff; background: #19433F; }
+.btn-band:active { transform: translateY(2px); box-shadow: 0 0 0 #173C39; }
+.btn-band.icon { width: 34px; height: 34px; padding: 0; }
+.btn-band.solid { background: var(--paper); border-color: #CFC8B5; color: var(--teal-text); box-shadow: 0 2px 0 #B9B29E; }
+.btn-band.solid:hover { background: var(--teal-soft); color: var(--teal-text); }
+.btn-band.solid:active { box-shadow: 0 0 0 #B9B29E; }
 
 .legend {
   display: flex;
   flex-wrap: wrap;
   gap: .3rem 1rem;
-  padding: .7rem 1.25rem;
-  border-bottom: 1px solid var(--line);
+  padding: .6rem 1.15rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--grid);
 }
+.legend span { font-size: .7rem; color: var(--ink-soft); display: inline-flex; align-items: center; gap: .4rem; font-weight: 500; }
+.legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 
-.legend span {
-  font-size: .72rem;
-  color: var(--ink-soft);
-  display: inline-flex;
-  align-items: center;
-  gap: .4rem;
-}
+.cal-wrap { overflow: hidden; border-radius: 0 0 10px 10px; }
 
-.legend i {
-  width: 9px;
-  height: 9px;
-  border-radius: 3px;
-  display: inline-block;
-}
-
-.cal-wrap {
-  overflow: hidden;
-  border-radius: 0 0 12px 12px;
-}
-
-.cal-head,
-.cal-grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-}
+.cal-head, .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
 
 .cal-head div {
-  font-size: .68rem;
+  font-size: .66rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: .05em;
-  color: var(--ink-soft);
+  letter-spacing: .08em;
+  color: var(--charcoal);
   text-align: center;
-  padding: .55rem 0;
-  background: var(--surface);
+  padding: .5rem 0;
+  background: var(--paper);
+  border-bottom: 2px solid var(--charcoal);
 }
-
-.cal-head div:first-child {
-  color: var(--terra-text);
-}
-
-.cal-head div:last-child {
-  color: var(--blue-text);
-}
+.cal-head div:first-child { color: var(--terra); }
+.cal-head div:last-child  { color: var(--blue); }
 
 .cal-cell {
-  min-height: 106px;
-  background: var(--card);
+  position: relative;
+  min-height: 108px;
+  background: var(--paper);
   border: 0;
-  border-top: 1px solid var(--line);
-  border-right: 1px solid var(--line);
-  padding: .4rem;
+  border-bottom: 1px solid var(--grid);
+  border-right: 1px solid var(--grid);
+  padding: .35rem .4rem;
   text-align: left;
   display: flex;
   flex-direction: column;
   gap: 3px;
   cursor: pointer;
-  transition: background .15s;
+  transition: background .12s;
   min-width: 0;
   font-family: inherit;
 }
-
-.cal-cell:nth-child(7n) {
-  border-right: 0;
-}
-
-.cal-cell:hover {
-  background: var(--surface);
-}
-
-.cal-cell.out {
-  background: var(--surface);
-}
-
-.cal-cell.out .cal-num {
-  color: #A9ADB0;
-}
-
-.cal-cell.sel {
-  background: var(--teal-soft);
-}
+.cal-cell:nth-child(7n) { border-right: 0; }
+.cal-cell:nth-child(7n+1),
+.cal-cell:nth-child(7n) { background: #FBF8EE; }
+.cal-cell:hover { background: var(--surface); }
+.cal-cell.out { background: var(--surface); }
+.cal-cell.out .cal-num { color: #B3AE9F !important; font-weight: 500; }
+.cal-cell.sel { background: #FFF6C9; box-shadow: inset 0 0 0 2px var(--teal); z-index: 1; }
 
 .cal-num {
-  font-size: .78rem;
+  font-family: 'Lexend', sans-serif;
+  font-size: .85rem;
   font-weight: 600;
-  width: 24px;
-  height: 24px;
+  min-width: 26px;
+  height: 26px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
   color: var(--ink);
+  align-self: flex-start;
 }
-
-.cal-cell:nth-child(7n+1) .cal-num {
-  color: var(--terra);
-}
-
-.cal-cell:nth-child(7n) .cal-num {
-  color: var(--blue);
-}
-
-.cal-cell.out:nth-child(7n+1) .cal-num,
-.cal-cell.out:nth-child(7n) .cal-num {
-  opacity: .5;
-}
+.cal-cell:nth-child(7n+1) .cal-num { color: var(--terra); }
+.cal-cell:nth-child(7n) .cal-num { color: var(--blue); }
 
 .cal-cell.today .cal-num {
-  background: var(--teal);
-  color: #fff !important;
-  opacity: 1;
+  border: 2px solid var(--pen);
+  color: var(--pen) !important;
+  font-weight: 800;
+  transform: rotate(-4deg);
+  border-radius: 46% 54% 50% 50% / 52% 48% 52% 48%;
 }
 
+.chips { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .chip {
   display: block;
-  font-size: .66rem;
-  font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 5px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.chip.done {
-  opacity: .5;
-  text-decoration: line-through;
-}
-
-.more {
   font-size: .64rem;
-  color: var(--ink-soft);
   font-weight: 600;
+  padding: 2px 5px;
+  border-radius: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-
-.dots {
-  display: none;
-  gap: 3px;
-  flex-wrap: wrap;
+.chip::before {
+  content: '\2022';
+  font-family: 'Lexend', 'Inter', sans-serif;
+  font-weight: 800;
+  font-size: 1.35em;
+  line-height: 0;
+  vertical-align: middle;
+  margin-right: .3rem;
+  display: inline-block;
+  transform: translateY(-.06em);
 }
+.chip.done { opacity: .5; text-decoration: line-through; }
+.more { font-size: .62rem; color: var(--ink-soft); font-weight: 700; }
 
-.dot {
-  width: 7px;
-  height: 7px;
+.dots { display: none; gap: 3px; flex-wrap: wrap; justify-content: center; }
+.dot { width: 6px; height: 6px; border-radius: 50%; }
+
+.leaf { height: auto; position: relative; overflow: visible; margin-top: 4px; }
+.leaf-top {
+  position: relative;
+  background: var(--teal);
+  color: #fff;
+  border-radius: 9px 9px 0 0;
+  text-align: center;
+  padding: .9rem .5rem .4rem;
+}
+.leaf.db-terra .leaf-top { background: var(--terra); }
+.leaf.db-blue  .leaf-top { background: var(--blue); }
+.leaf.db-teal  .leaf-top { background: var(--teal); }
+.leaf-holes { position: absolute; top: 7px; left: 0; right: 0; display: flex; justify-content: center; gap: 36px; }
+.leaf-holes i { width: 9px; height: 9px; border-radius: 50%; background: var(--canvas); box-shadow: inset 0 1px 0 rgba(0, 0, 0, .25); }
+.leaf-mon { font-size: .78rem; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; }
+
+.leaf-face { text-align: center; padding: .4rem 1rem .7rem; }
+.leaf-num { font-family: 'Lexend', sans-serif; font-size: 4.2rem; font-weight: 800; line-height: 1; color: var(--charcoal); }
+.leaf.db-terra .leaf-num { color: var(--terra); }
+.leaf.db-blue  .leaf-num { color: var(--blue); }
+.leaf-face h2 { font-size: 1rem; font-weight: 700; margin: .3rem 0 0; color: var(--charcoal); text-transform: uppercase; letter-spacing: .1em; }
+.leaf-face p { font-size: .74rem; color: var(--ink-soft); margin: .2rem 0 0; }
+
+.leaf-perf { position: relative; border-top: 2px dashed var(--line); margin: 0 .8rem; }
+.leaf-perf::before, .leaf-perf::after {
+  content: '';
+  position: absolute;
+  top: -9px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
+  background: var(--canvas);
+  border: 1px solid var(--line);
 }
+.leaf-perf::before { left: -17px; }
+.leaf-perf::after { right: -17px; }
 
-.row-item {
-  display: flex;
-  align-items: center;
-  gap: .8rem;
-  padding: .65rem 0;
-}
-
-.row-item + .row-item {
-  border-top: 1px solid var(--line);
-}
-
-.row-item:first-child {
-  padding-top: 0;
-}
-
-.row-item:last-child {
-  padding-bottom: 0;
-}
-
-.row-item .ic {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  font-size: .85rem;
-}
-
-.row-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.row-title {
-  font-size: .82rem;
-  font-weight: 600;
-  color: var(--charcoal);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.row-sub {
-  font-size: .72rem;
-  color: var(--ink-soft);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+.row-item { display: flex; align-items: center; gap: .8rem; padding: .65rem 0; }
+.row-item + .row-item { border-top: 1px solid var(--grid); }
+.row-item:first-child { padding-top: 0; }
+.row-item:last-child { padding-bottom: 0; }
+.row-item .ic { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: .85rem; }
+.row-main { flex: 1; min-width: 0; }
+.row-title { font-size: .82rem; font-weight: 600; color: var(--charcoal); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-sub { font-size: .72rem; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .date-box {
-  width: 44px;
+  width: 46px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 6px;
   text-align: center;
   flex-shrink: 0;
   overflow: hidden;
-  background: var(--card);
+  background: var(--paper);
+  box-shadow: 0 2px 0 #D5CFBF;
 }
+.date-box .mon { font-size: .6rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #fff; display: block; line-height: 1.6; }
+.date-box .day { font-size: 1.05rem; font-weight: 700; font-family: 'Lexend', sans-serif; color: var(--charcoal); display: block; line-height: 1.5; }
+.db-terra .mon { background: var(--terra); }
+.db-ochre .mon { background: var(--ochre); }
+.db-blue  .mon { background: var(--blue); }
+.db-teal  .mon { background: var(--teal); }
+.db-slate .mon { background: #8A8F92; }
 
-.date-box .mon {
-  font-size: .62rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .04em;
-  color: #fff;
-  display: block;
-  line-height: 1.6;
-}
-
-.date-box .day {
-  font-size: 1rem;
-  font-weight: 700;
-  font-family: 'Lexend', sans-serif;
-  color: var(--charcoal);
-  display: block;
-  line-height: 1.5;
-}
-
-.db-terra .mon {
-  background: var(--terra);
-}
-
-.db-ochre .mon {
-  background: var(--ochre);
-}
-
-.db-blue .mon {
-  background: var(--blue);
-}
-
-.action-row {
+.notes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem .9rem; padding-top: .3rem; }
+.sticky {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  padding: 1rem .8rem .8rem;
+  border-radius: 2px 2px 2px 2px;
   text-decoration: none;
   color: var(--ink);
-  border-radius: 10px;
+  box-shadow: 0 2px 0 rgba(42, 45, 47, .1), 0 7px 10px rgba(42, 45, 47, .1);
+  transition: transform .15s;
+  min-width: 0;
 }
+.sticky:nth-child(odd)  { transform: rotate(-.7deg); }
+.sticky:nth-child(even) { transform: rotate(.8deg); }
+.sticky:hover { transform: rotate(0) translateY(-2px); color: var(--ink); }
+.sticky::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  width: 48px;
+  height: 15px;
+  margin-left: -24px;
+  background: #E6DEC4;
+  border: 1px solid #D4CBAE;
+}
+.sticky::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  background: rgba(42, 45, 47, .13);
+  border-top-left-radius: 5px;
+}
+.sticky .ic { width: 34px; height: 34px; border-radius: 50%; background: var(--paper); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: .82rem; }
+.sticky .row-title { white-space: normal; line-height: 1.25; color: inherit; }
+.sticky .row-sub { white-space: normal; color: inherit; opacity: .8; }
+.sticky .chev { font-size: .66rem; opacity: .6; }
 
-.action-row:hover {
-  color: var(--ink);
-}
+.ruled .row-item { padding: .7rem 0; }
 
-.empty {
-  text-align: center;
-  padding: 1.6rem 0;
-  color: var(--ink-soft);
-  font-size: .8rem;
-}
-
-.empty i {
-  font-size: 1.5rem;
-  display: block;
-  margin-bottom: .5rem;
-  color: #CFCAC0;
-}
+.empty { text-align: center; padding: 1.6rem 0; color: var(--ink-soft); font-size: .8rem; }
+.empty i { font-size: 1.5rem; display: block; margin-bottom: .5rem; color: #CFCAC0; }
 
 @media (max-width: 767.98px) {
-  .dashboard-content {
-    padding: .65rem !important;
-  }
+  .dashboard-content { padding: .6rem !important; }
+  .card-header { padding: .7rem .85rem; }
+  .card-body { padding: .8rem .85rem; }
 
-  .card-header {
-    padding: .8rem .9rem;
-  }
+  .kpi-top { padding: .38rem .65rem; }
+  .kpi-label { font-size: .58rem; }
+  .kpi-icon { font-size: .72rem; }
+  .kpi-body { padding: .5rem .65rem .6rem; }
+  .kpi-value { font-size: 1.5rem; }
+  .kpi-sub { font-size: .62rem; }
 
-  .card-body {
-    padding: .85rem .9rem;
-  }
+  .cal-card { margin-top: 16px; }
+  .cal-rings { top: -12px; padding: 0 5%; }
+  .cal-rings span:nth-child(even) { display: none; }
+  .cal-rings span { width: 12px; height: 28px; }
+  .cal-rings span::before { width: 12px; height: 12px; top: 14px; }
+  .cal-rings span::after { left: 3px; width: 6px; height: 26px; }
 
-  .cal-cell {
-    min-height: 58px;
-    align-items: center;
-    padding: .3rem .1rem;
-  }
+  .cal-band { padding: 1.4rem .8rem .8rem; border-bottom-width: 3px; }
+  .cal-month { min-width: 0; gap: .35rem; }
+  .cal-month .m { font-size: 1.15rem; }
+  .cal-month .y { font-size: .85rem; }
+  .btn-band { font-size: .72rem; padding: .32rem .65rem; }
+  .btn-band.icon { width: 30px; height: 30px; }
 
-  .chips {
-    display: none;
-  }
+  .legend { padding: .5rem .8rem; gap: .2rem .8rem; }
+  .legend span { font-size: .64rem; }
 
-  .dots {
-    display: flex;
-    justify-content: center;
-  }
+  .cal-head div { font-size: .58rem; padding: .4rem 0; letter-spacing: .04em; }
+  .cal-cell { min-height: 54px; align-items: center; padding: .25rem .1rem; gap: 2px; }
+  .cal-num { font-size: .74rem; min-width: 22px; height: 22px; align-self: center; }
+  .cal-cell.today .cal-num { border-width: 1.5px; }
+  .chips { display: none; }
+  .dots { display: flex; }
 
-  .legend {
-    padding: .6rem .9rem;
-  }
+  .leaf-num { font-size: 3.2rem; }
+  .leaf-face h2 { font-size: .88rem; }
+  .leaf-face p { font-size: .68rem; }
+  .leaf-top { padding-top: .8rem; }
 
-  .month-title {
-    min-width: 0;
-    font-size: .92rem;
-  }
+  .row-item { gap: .6rem; }
+  .row-item .ic { width: 30px; height: 30px; font-size: .74rem; }
+  .row-title { font-size: .76rem; }
+  .row-sub { font-size: .66rem; }
+  .date-box { width: 40px; }
+  .date-box .mon { font-size: .54rem; }
+  .date-box .day { font-size: .92rem; }
+  .pill { font-size: .6rem; padding: .18rem .5rem; }
 
-  .kpi {
-    padding: .85rem .95rem;
-  }
+  .notes { grid-template-columns: minmax(0, 1fr); gap: .9rem; }
+  .sticky { padding: .9rem .7rem .7rem; }
+  .sticky:nth-child(odd), .sticky:nth-child(even) { transform: none; }
+  .sticky .ic { width: 30px; height: 30px; font-size: .74rem; }
+}
 
-  .kpi-value {
-    font-size: 1.35rem;
-  }
+@media (max-width: 399.98px) {
+  .dashboard-content { padding: .45rem !important; }
+  .kpi-value { font-size: 1.3rem; }
+  .kpi-label { font-size: .54rem; letter-spacing: .03em; }
+  .cal-month .m { font-size: 1rem; }
+  .cal-month .y { font-size: .75rem; }
+  .btn-band.solid { padding: .3rem .5rem; }
+  .cal-cell { min-height: 46px; }
+  .cal-num { font-size: .68rem; min-width: 20px; height: 20px; }
+  .dot { width: 5px; height: 5px; }
+  .cal-head div { font-size: .52rem; }
+  .leaf-num { font-size: 2.7rem; }
+  .row-item .pill { display: none; }
 }
 </style>
 </head>
@@ -883,8 +823,10 @@ h3,
               <span class="kpi-label">Due Today</span>
               <span class="kpi-icon"><i class="fa-solid fa-clock"></i></span>
             </div>
-            <div class="kpi-value num"><?= $dueToday ?></div>
-            <div class="kpi-sub">Quotations &amp; contracts</div>
+            <div class="kpi-body">
+              <div class="kpi-value num"><?= $dueToday ?></div>
+              <div class="kpi-sub">Quotations &amp; contracts</div>
+            </div>
           </div>
         </div>
         <div class="col-6 col-xl-3">
@@ -893,8 +835,10 @@ h3,
               <span class="kpi-label">Next 7 Days</span>
               <span class="kpi-icon"><i class="fa-solid fa-calendar-week"></i></span>
             </div>
-            <div class="kpi-value num"><?= $next7 ?></div>
-            <div class="kpi-sub">Upcoming deadlines</div>
+            <div class="kpi-body">
+              <div class="kpi-value num"><?= $next7 ?></div>
+              <div class="kpi-sub">Upcoming deadlines</div>
+            </div>
           </div>
         </div>
         <div class="col-6 col-xl-3">
@@ -903,8 +847,10 @@ h3,
               <span class="kpi-label">Overdue</span>
               <span class="kpi-icon"><i class="fa-solid fa-triangle-exclamation"></i></span>
             </div>
-            <div class="kpi-value num"><?= $overdue ?></div>
-            <div class="kpi-sub">Needs attention</div>
+            <div class="kpi-body">
+              <div class="kpi-value num"><?= $overdue ?></div>
+              <div class="kpi-sub">Needs attention</div>
+            </div>
           </div>
         </div>
         <div class="col-6 col-xl-3">
@@ -913,8 +859,10 @@ h3,
               <span class="kpi-label">Completed</span>
               <span class="kpi-icon"><i class="fa-solid fa-circle-check"></i></span>
             </div>
-            <div class="kpi-value num"><?= $completedThisMonth ?></div>
-            <div class="kpi-sub">Service requests this month</div>
+            <div class="kpi-body">
+              <div class="kpi-value num"><?= $completedThisMonth ?></div>
+              <div class="kpi-sub">Requests this month</div>
+            </div>
           </div>
         </div>
       </div>
@@ -922,18 +870,24 @@ h3,
       <div class="row g-3 mb-3">
 
         <div class="col-xl-8">
-          <section class="card">
-            <div class="card-header">
+          <section class="card cal-card">
+            <div class="cal-rings">
+              <?php for ($ri = 0; $ri < 10; $ri++): ?><span></span><?php endfor; ?>
+            </div>
+            <div class="cal-band">
               <div class="month-nav">
-                <a href="?month=<?= h($prevMonth) ?>" class="btn-ghost icon" aria-label="Previous month">
+                <a href="?month=<?= h($prevMonth) ?>" class="btn-band icon" aria-label="Previous month">
                   <i class="fa-solid fa-chevron-left"></i>
                 </a>
-                <span class="month-title text-center"><?= h($monthLabel) ?></span>
-                <a href="?month=<?= h($nextMonth) ?>" class="btn-ghost icon" aria-label="Next month">
+                <div class="cal-month">
+                  <span class="m"><?= h($monthName) ?></span>
+                  <span class="y"><?= h($yearLabel) ?></span>
+                </div>
+                <a href="?month=<?= h($nextMonth) ?>" class="btn-band icon" aria-label="Next month">
                   <i class="fa-solid fa-chevron-right"></i>
                 </a>
               </div>
-              <a href="?" class="btn-ghost">Today</a>
+              <a href="?" class="btn-band solid">Today</a>
             </div>
             <div class="legend">
               <?php foreach ($typeMeta as $m): ?>
@@ -993,13 +947,17 @@ h3,
         <div class="col-xl-4">
           <div class="d-flex flex-column gap-3 h-100">
 
-            <section class="card" style="height:auto;">
-              <div class="card-header">
-                <div>
-                  <h2 id="dayTitle">Selected Day</h2>
-                  <p id="daySub" class="mb-0"></p>
-                </div>
+            <section class="card leaf db-teal" id="dayLeaf">
+              <div class="leaf-top">
+                <span class="leaf-holes"><i></i><i></i></span>
+                <span class="leaf-mon" id="dayMon"></span>
               </div>
+              <div class="leaf-face">
+                <div class="leaf-num" id="dayNum"></div>
+                <h2 id="dayTitle">Selected Day</h2>
+                <p id="daySub" class="mb-0"></p>
+              </div>
+              <div class="leaf-perf"></div>
               <div class="card-body" id="dayBody"></div>
             </section>
 
@@ -1025,7 +983,7 @@ h3,
                         <span class="day"><?= $dt->format('d') ?></span>
                       </div>
                       <div class="row-main">
-                        <div class="row-title"><?= h($u['ref']) ?> &middot; <?= h($meta[0]) ?></div>
+                        <div class="row-title"><?= h($u['ref']) ?> <span class="sep">&bull;</span> <?= h($meta[0]) ?></div>
                         <div class="row-sub"><?= h($u['company_name']) ?></div>
                       </div>
                       <span class="pill <?= $info[1] ?>"><?= h($info[0]) ?></span>
@@ -1040,7 +998,7 @@ h3,
 
       </div>
 
-      <div class="row g-3">
+      <div class="row g-3 bottom-white">
 
         <div class="col-lg-6">
           <section class="card">
@@ -1054,16 +1012,18 @@ h3,
               <?php if (!$actions): ?>
                 <div class="empty"><i class="fa-regular fa-circle-check"></i>Nothing needs action right now.</div>
               <?php else: ?>
-                <?php foreach ($actions as $a): ?>
-                  <a href="<?= h($a[4]) ?>" class="row-item action-row">
-                    <span class="ic <?= $a[0] ?>"><i class="fa-solid <?= $a[1] ?>"></i></span>
-                    <div class="row-main">
-                      <div class="row-title"><?= h($a[2]) ?></div>
-                      <div class="row-sub"><?= h($a[3]) ?></div>
-                    </div>
-                    <i class="fa-solid fa-chevron-right" style="color:#B9B3A8;font-size:.72rem;"></i>
-                  </a>
-                <?php endforeach; ?>
+                <div class="notes">
+                  <?php foreach ($actions as $a): ?>
+                    <a href="<?= h($a[4]) ?>" class="sticky <?= h($a[0]) ?>">
+                      <span class="ic"><i class="fa-solid <?= h($a[1]) ?>"></i></span>
+                      <div class="row-main">
+                        <div class="row-title"><?= h($a[2]) ?></div>
+                        <div class="row-sub"><?= h($a[3]) ?></div>
+                      </div>
+                      <i class="fa-solid fa-chevron-right chev"></i>
+                    </a>
+                  <?php endforeach; ?>
+                </div>
               <?php endif; ?>
             </div>
           </section>
@@ -1077,17 +1037,23 @@ h3,
                 <p>With the contract end date.</p>
               </div>
             </div>
-            <div class="card-body">
+            <div class="card-body ruled">
               <?php if (!$assignments): ?>
                 <div class="empty"><i class="fa-regular fa-user"></i>No active assignments.</div>
               <?php else: ?>
-                <?php foreach ($assignments as $s): ?>
+                <?php foreach ($assignments as $s):
+                    $hasEnd = !empty($s['end_date']);
+                    $endDt = $hasEnd ? new DateTime($s['end_date']) : null;
+                    $endCls = $hasEnd ? dueInfo((int) $today->diff($endDt)->format('%r%a'))[2] : 'db-slate';
+                ?>
                   <div class="row-item">
+                    <div class="date-box <?= $endCls ?>">
+                      <span class="mon"><?= $hasEnd ? h($endDt->format('M')) : 'N/A' ?></span>
+                      <span class="day"><?= $hasEnd ? h($endDt->format('d')) : '&ndash;' ?></span>
+                    </div>
                     <div class="row-main">
                       <div class="row-title"><?= h($s['request_title']) ?></div>
-                      <div class="row-sub">
-                        <?= h($s['firstname'] . ' ' . $s['lastname']) ?> &middot; <?= h($s['company_name']) ?><?= $s['end_date'] ? ' &middot; Ends ' . h(date('M d, Y', strtotime($s['end_date']))) : '' ?>
-                      </div>
+                      <div class="row-sub"><?= h($s['firstname'] . ' ' . $s['lastname']) ?> <span class="sep">&bull;</span> <?= h($s['company_name']) ?></div>
                     </div>
                     <?= statusPill($s['status']) ?>
                   </div>
@@ -1121,6 +1087,9 @@ h3,
   var titleEl = document.getElementById('dayTitle');
   var subEl = document.getElementById('daySub');
   var bodyEl = document.getElementById('dayBody');
+  var leafEl = document.getElementById('dayLeaf');
+  var monEl = document.getElementById('dayMon');
+  var numEl = document.getElementById('dayNum');
   var cells = document.querySelectorAll('.cal-cell');
 
   function esc(v) {
@@ -1135,15 +1104,14 @@ h3,
     });
 
     var d = new Date(date + 'T00:00:00');
-    titleEl.textContent = d.toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: '2-digit',
-      year: 'numeric'
-    });
+    var dow = d.getDay();
+    leafEl.className = 'card leaf ' + (dow === 0 ? 'db-terra' : (dow === 6 ? 'db-blue' : 'db-teal'));
+    monEl.textContent = d.toLocaleDateString('en-US', { month: 'long' }) + ' ' + d.getFullYear();
+    numEl.textContent = d.getDate();
+    titleEl.textContent = d.toLocaleDateString('en-US', { weekday: 'long' });
 
     var list = EVENTS[date] || [];
-    subEl.textContent = list.length + (list.length === 1 ? ' event' : ' events');
+    subEl.textContent = list.length + (list.length === 1 ? ' event' : ' events') + ' scheduled';
 
     if (list.length === 0) {
       bodyEl.innerHTML = '<div class="empty"><i class="fa-regular fa-calendar"></i>No events on this day.</div>';
@@ -1159,8 +1127,8 @@ h3,
       return '<div class="row-item">' +
         '<span class="ic ' + t.cls + '"><i class="fa-solid ' + t.icon + '"></i></span>' +
         '<div class="row-main">' +
-          '<div class="row-title">' + esc(e.ref) + ' &middot; ' + esc(e.company) + '</div>' +
-          '<div class="row-sub">' + esc(extra.join(' | ')) + '</div>' +
+          '<div class="row-title">' + esc(e.ref) + ' <span class="sep">&bull;</span> ' + esc(e.company) + '</div>' +
+          '<div class="row-sub">' + esc(extra.join(' \u2022 ')) + '</div>' +
         '</div>' +
         '<span class="pill ' + (PILLS[e.status] || 'pl-slate') + '">' + esc(e.done ? 'Done' : e.status) + '</span>' +
       '</div>';

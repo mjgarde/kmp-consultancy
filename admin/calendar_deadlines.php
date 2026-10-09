@@ -122,7 +122,7 @@ foreach ($monthRows as $r) {
         'type'    => $r['type'],
         'ref'     => $r['ref'],
         'company' => $r['company_name'],
-        'title'   => $r['title'],
+        'title'   => $r['request_title'],
         'status'  => $r['st'],
         'staff'   => trim((string) $r['staff']),
         'done'    => $done,
@@ -340,6 +340,12 @@ h1, h2, h3,
 .card-header h2 { color: var(--charcoal); letter-spacing: -.01em; font-size: .95rem; font-weight: 700; margin: 0; }
 .card-header p { color: var(--ink-soft); font-size: .76rem; margin: .15rem 0 0; }
 .card-body { padding: 1rem 1.15rem; }
+
+.bottom-white .card,
+.bottom-white .card-header,
+.bottom-white .card-body { background: #FFFFFF !important; }
+
+.sep { font-weight: 900; color: var(--charcoal); padding: 0 .12rem; }
 
 .tn-ochre { background: var(--ochre-soft); color: var(--ochre-text); }
 .tn-blue  { background: var(--blue-soft);  color: var(--blue-text); }
@@ -582,11 +588,15 @@ h1, h2, h3,
   font-size: .64rem;
   font-weight: 600;
   padding: 2px 5px;
-  border-radius: 2px 4px 4px 2px;
-  border-left: 3px solid currentColor;
+  border-radius: 4px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.chip::before {
+  content: '\2022';
+  font-weight: 900;
+  margin-right: .35rem;
 }
 .chip.done { opacity: .5; text-decoration: line-through; }
 .more { font-size: .62rem; color: var(--ink-soft); font-weight: 700; }
@@ -967,7 +977,7 @@ h1, h2, h3,
                         <span class="day"><?= $dt->format('d') ?></span>
                       </div>
                       <div class="row-main">
-                        <div class="row-title"><?= h($u['ref']) ?> &middot; <?= h($meta[0]) ?></div>
+                        <div class="row-title"><?= h($u['ref']) ?> <span class="sep">&bull;</span> <?= h($meta[0]) ?></div>
                         <div class="row-sub"><?= h($u['company_name']) ?></div>
                       </div>
                       <span class="pill <?= $info[1] ?>"><?= h($info[0]) ?></span>
@@ -982,7 +992,7 @@ h1, h2, h3,
 
       </div>
 
-      <div class="row g-3">
+      <div class="row g-3 bottom-white">
 
         <div class="col-lg-6">
           <section class="card">
@@ -1037,7 +1047,7 @@ h1, h2, h3,
                     </div>
                     <div class="row-main">
                       <div class="row-title"><?= h($s['request_title']) ?></div>
-                      <div class="row-sub"><?= h($s['firstname'] . ' ' . $s['lastname']) ?> &middot; <?= h($s['company_name']) ?></div>
+                      <div class="row-sub"><?= h($s['firstname'] . ' ' . $s['lastname']) ?> <span class="sep">&bull;</span> <?= h($s['company_name']) ?></div>
                     </div>
                     <?= statusPill($s['status']) ?>
                   </div>
@@ -1111,8 +1121,8 @@ h1, h2, h3,
       return '<div class="row-item">' +
         '<span class="ic ' + t.cls + '"><i class="fa-solid ' + t.icon + '"></i></span>' +
         '<div class="row-main">' +
-          '<div class="row-title">' + esc(e.ref) + ' &middot; ' + esc(e.company) + '</div>' +
-          '<div class="row-sub">' + esc(extra.join(' | ')) + '</div>' +
+          '<div class="row-title">' + esc(e.ref) + ' <span class="sep">&bull;</span> ' + esc(e.company) + '</div>' +
+          '<div class="row-sub">' + esc(extra.join(' \u2022 ')) + '</div>' +
         '</div>' +
         '<span class="pill ' + (PILLS[e.status] || 'pl-slate') + '">' + esc(e.done ? 'Done' : e.status) + '</span>' +
       '</div>';
