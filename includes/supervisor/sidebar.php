@@ -1,7 +1,7 @@
 <?php
 $supervisorFullname = $_SESSION['fullname'] ?? 'Supervisor';
 $supervisorEmail    = $_SESSION['email'] ?? '';
-$currentPage   = basename($_SERVER['PHP_SELF']);
+$currentPage     = basename($_SERVER['PHP_SELF']);
 
 function maskEmail(string $email): string
 {
@@ -24,7 +24,7 @@ function maskEmail(string $email): string
 
 function navActive(string $page, string $currentPage): string
 {
-    return $page === $currentPage ? 'active fw-semibold' : 'text-dark';
+    return $page === $currentPage ? 'active' : 'text-dark';
 }
 ?>
 <script>
@@ -40,20 +40,92 @@ function navActive(string $page, string $currentPage): string
     min-width: 264px;
     max-width: 264px;
     flex-shrink: 0;
+    overflow-x: hidden;
+  }
+
+  .dashboard-sidebar-brand {
+    min-height: 68px;
   }
 
   .dashboard-sidebar-brand img {
-    width: 52px;
-    height: 52px;
+    width: 44px;
+    height: 44px;
     flex-shrink: 0;
   }
 
   .dashboard-sidebar-brand .brand-link {
     min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
   }
 
   .dashboard-sidebar-brand .sidebar-text {
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: .95rem !important;
+  }
+
+  .dashboard-sidebar-scroll {
+    overflow-x: hidden;
+    overflow-y: auto;
+    min-height: 0;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  .dashboard-sidebar-scroll::-webkit-scrollbar {
+    width: 4px;
+    height: 0;
+  }
+
+  .dashboard-sidebar-scroll::-webkit-scrollbar-thumb {
+    background: #ced4da;
+    border-radius: 4px;
+  }
+
+  .dashboard-nav-label {
+    font-size: .68rem !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .dashboard-sidebar-menu .nav-link {
+    font-size: .88rem;
+    font-weight: 500;
+    line-height: 1.3;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .dashboard-sidebar-menu .nav-link .sidebar-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+
+  .dashboard-sidebar-menu .nav-link i {
+    flex-shrink: 0;
+    text-align: center;
+  }
+
+  .dashboard-sidebar-menu .nav-link:hover:not(.active) {
+    background: #f1f3f5;
+  }
+
+  .dashboard-sidebar-menu .nav-link.active {
+    background: rgba(13, 110, 253, .1);
+    color: #0d6efd;
+    font-weight: 500;
+  }
+
+  .dashboard-sidebar-footer .sidebar-text {
+    font-size: .85rem;
   }
 
   .sidebar-toggle-btn {
@@ -119,6 +191,69 @@ function navActive(string $page, string $currentPage): string
     transform: translate(0, -50%);
   }
 
+  @media (max-width: 991.98px) {
+    .dashboard-sidebar {
+      height: 100vh;
+      height: 100dvh;
+      width: 250px;
+      min-width: 0;
+      max-width: 85vw;
+    }
+
+    .dashboard-sidebar-brand {
+      min-height: 60px;
+      padding-top: .6rem !important;
+      padding-bottom: .6rem !important;
+    }
+
+    .dashboard-sidebar-brand img {
+      width: 38px;
+      height: 38px;
+    }
+
+    .dashboard-sidebar-brand .sidebar-text {
+      font-size: .88rem !important;
+    }
+
+    .dashboard-sidebar-scroll {
+      flex: 1 1 0;
+      padding-top: .5rem !important;
+      padding-bottom: .5rem !important;
+    }
+
+    .dashboard-nav-label {
+      font-size: .64rem !important;
+      margin-bottom: .25rem !important;
+    }
+
+    .dashboard-sidebar-menu {
+      margin-bottom: .75rem !important;
+    }
+
+    .dashboard-sidebar-menu .nav-item {
+      margin-bottom: 2px !important;
+    }
+
+    .dashboard-sidebar-menu .nav-link {
+      font-size: .82rem;
+      padding-top: .5rem !important;
+      padding-bottom: .5rem !important;
+      gap: .65rem !important;
+    }
+
+    .dashboard-sidebar-menu .nav-link i {
+      font-size: .9rem;
+    }
+
+    .dashboard-sidebar-footer {
+      padding: .6rem .75rem !important;
+    }
+
+    .dashboard-sidebar-footer .sidebar-text {
+      font-size: .8rem;
+    }
+  }
+
   @media (min-width: 992px) {
     .dashboard-sidebar {
       position: sticky;
@@ -129,12 +264,6 @@ function navActive(string $page, string $currentPage): string
       align-self: flex-start;
       overflow: visible;
       transition: width .25s ease, min-width .25s ease, max-width .25s ease;
-    }
-
-    .dashboard-sidebar .dashboard-sidebar-scroll {
-      overflow-y: auto;
-      overflow-x: hidden;
-      min-height: 0;
     }
 
     .dashboard-sidebar .dashboard-sidebar-brand,
@@ -157,6 +286,10 @@ function navActive(string $page, string $currentPage): string
       justify-content: center !important;
       padding: 1rem .5rem !important;
       gap: .75rem !important;
+    }
+
+    html.sidebar-collapsed .dashboard-sidebar-brand .brand-link {
+      flex: 0 0 auto;
     }
 
     html.sidebar-collapsed .dashboard-sidebar-brand img {
@@ -225,7 +358,7 @@ function navActive(string $page, string $currentPage): string
   <div class="dashboard-sidebar-brand d-flex align-items-center justify-content-between gap-2 border-bottom px-3 py-3">
     <a href="../index.php" class="brand-link d-flex align-items-center gap-2 text-decoration-none" data-tip="KMP ConsultHub" aria-label="KMP ConsultHub">
       <img src="../assets/img/system_img/logo.png" alt="KMP ConsultHub">
-      <span class="sidebar-text fw-bold fs-6" style="color: #000000;">KMP ConsultHub</span>
+      <span class="sidebar-text fw-bold" style="color: #000000;">KMP ConsultHub</span>
     </a>
     <button type="button" id="sidebarToggle" class="sidebar-toggle-btn d-none d-lg-flex" aria-label="Collapse sidebar" data-tip="Collapse sidebar">
       <i class="fa-solid fa-angles-left"></i>
@@ -235,7 +368,7 @@ function navActive(string $page, string $currentPage): string
 
   <nav class="dashboard-sidebar-scroll flex-grow-1 py-3 px-3">
 
-    <div class="dashboard-nav-label text-uppercase text-secondary small fw-semibold px-3 mb-2" style="letter-spacing:.06em; font-size:.72rem;">
+    <div class="dashboard-nav-label text-uppercase text-secondary small fw-semibold px-3 mb-2" style="letter-spacing:.06em;">
       Main
     </div>
     <ul class="dashboard-sidebar-menu nav flex-column mb-4">
@@ -246,7 +379,7 @@ function navActive(string $page, string $currentPage): string
       </li>
     </ul>
 
-    <div class="dashboard-nav-label text-uppercase text-secondary small fw-semibold px-3 mb-2" style="letter-spacing:.06em; font-size:.72rem;">
+    <div class="dashboard-nav-label text-uppercase text-secondary small fw-semibold px-3 mb-2" style="letter-spacing:.06em;">
       Operations
     </div>
     <ul class="dashboard-sidebar-menu nav flex-column mb-4">
@@ -277,7 +410,7 @@ function navActive(string $page, string $currentPage): string
       </li>
     </ul>
 
-    <div class="dashboard-nav-label text-uppercase text-secondary small fw-semibold px-3 mb-2" style="letter-spacing:.06em; font-size:.72rem;">
+    <div class="dashboard-nav-label text-uppercase text-secondary small fw-semibold px-3 mb-2" style="letter-spacing:.06em;">
       Documents
     </div>
     <ul class="dashboard-sidebar-menu nav flex-column mb-4">
@@ -288,7 +421,7 @@ function navActive(string $page, string $currentPage): string
       </li>
     </ul>
 
-    <div class="dashboard-nav-label text-uppercase text-secondary small fw-semibold px-3 mb-2" style="letter-spacing:.06em; font-size:.72rem;">
+    <div class="dashboard-nav-label text-uppercase text-secondary small fw-semibold px-3 mb-2" style="letter-spacing:.06em;">
       Insights
     </div>
     <ul class="dashboard-sidebar-menu nav flex-column">
@@ -304,12 +437,12 @@ function navActive(string $page, string $currentPage): string
   <div class="dashboard-sidebar-footer border-top p-3">
     <div class="dropdown dropup">
       <button type="button" class="btn btn-link p-0 w-100 text-start text-decoration-none dropdown-toggle d-flex align-items-center gap-3 text-dark" data-bs-toggle="dropdown" aria-expanded="false" data-tip="<?= htmlspecialchars($supervisorFullname) ?>" aria-label="<?= htmlspecialchars($supervisorFullname) ?>">
-        <span class="dashboard-user-icon d-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-10 flex-shrink-0" style="width:38px; height:38px;">
+        <span class="dashboard-user-icon d-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-10 flex-shrink-0" style="width:36px; height:36px;">
           <i class="fa-solid fa-user text-primary"></i>
         </span>
         <div class="sidebar-text overflow-hidden flex-grow-1">
           <div class="fw-semibold small text-truncate"><?= htmlspecialchars($supervisorFullname) ?></div>
-          <div class="text-secondary text-truncate" style="font-size:.75rem;"><?= htmlspecialchars(maskEmail($supervisorEmail)) ?></div>
+          <div class="text-secondary text-truncate" style="font-size:.72rem;"><?= htmlspecialchars(maskEmail($supervisorEmail)) ?></div>
         </div>
       </button>
       <ul class="dropdown-menu w-100 shadow-sm">
