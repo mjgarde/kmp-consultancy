@@ -1,7 +1,12 @@
 <?php
 $managerFullname = $_SESSION['fullname'] ?? 'Manager';
 $managerEmail    = $_SESSION['email'] ?? '';
-$currentPage     = basename($_SERVER['PHP_SELF']);
+$currentPage   = basename($_SERVER['PHP_SELF']);
+
+const SIDEBAR_STATUS_COLORS = [
+    'Draft'  => '#CA8A04',
+    'Revert' => '#3B4E8A',
+];
 
 function maskEmail(string $email): string
 {
@@ -26,6 +31,65 @@ function navActive(string $page, string $currentPage): string
 {
     return $page === $currentPage ? 'active' : 'text-dark';
 }
+
+function sidebarStatusCounts(string $table): array
+{
+    $counts = array_fill_keys(array_keys(SIDEBAR_STATUS_COLORS), 0);
+
+    if (!in_array($table, ['quotations', 'contracts'], true)) {
+        return $counts;
+    }
+
+    try {
+        $db = $GLOBALS['pdo'] ?? null;
+        if (!$db && function_exists('getConnection')) {
+            $db = getConnection();
+        }
+        if ($db) {
+            $rows = $db->query("SELECT status, COUNT(*) AS cnt FROM {$table} WHERE status IN ('Draft', 'Revert') GROUP BY status")->fetchAll();
+            foreach ($rows as $row) {
+                if (isset($counts[$row['status']])) {
+                    $counts[$row['status']] = (int) $row['cnt'];
+                }
+            }
+        }
+    } catch (Throwable $ex) {
+        error_log('sidebar counts: ' . $ex->getMessage());
+    }
+
+    return $counts;
+}
+
+function sidebarCountsHtml(array $counts): string
+{
+    $html = '';
+    foreach ($counts as $status => $count) {
+        if ($count <= 0) {
+            continue;
+        }
+        $color = SIDEBAR_STATUS_COLORS[$status];
+        $html .= '<span class="nav-count" style="--c:' . $color . ';" title="' . htmlspecialchars($status) . ': ' . $count . '">' . $count . '</span>';
+    }
+    return $html === '' ? '' : '<span class="nav-counts sidebar-text">' . $html . '</span>';
+}
+
+function sidebarCountsN(array $counts): int
+{
+    return count(array_filter($counts, fn($c) => $c > 0));
+}
+
+function sidebarNotifyDot(array $counts): string
+{
+    foreach ($counts as $status => $count) {
+        if ($count > 0) {
+            return '<span class="nav-notify" style="--c:' . SIDEBAR_STATUS_COLORS[$status] . ';"></span>';
+        }
+    }
+    return '';
+}
+
+$contractCounts  = sidebarStatusCounts('contracts');
+$quotationCounts = sidebarStatusCounts('quotations');
 ?>
 <script>
   try {
@@ -93,6 +157,7 @@ function navActive(string $page, string $currentPage): string
   }
 
   .dashboard-sidebar-menu .nav-link {
+    position: relative;
     font-size: .88rem;
     font-weight: 500;
     line-height: 1.3;
@@ -122,6 +187,52 @@ function navActive(string $page, string $currentPage): string
     background: rgba(13, 110, 253, .1);
     color: #0d6efd;
     font-weight: 500;
+  }
+
+  .nav-title {
+    max-width: calc(100% - (var(--n, 0) * 22px + 8px));
+  }
+
+  .nav-counts {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+    pointer-events: none;
+  }
+
+  .nav-count {
+    display: inline-flex;
+    align-items: center;
+    gap: .2rem;
+    font-size: .72rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--c);
+  }
+
+  .nav-count::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: var(--c);
+    flex-shrink: 0;
+  }
+
+  .nav-notify {
+    display: none;
+    position: absolute;
+    top: 7px;
+    right: 12px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background-color: var(--c);
+    box-shadow: 0 0 0 2px #fff;
   }
 
   .dashboard-sidebar-footer .sidebar-text {
@@ -245,6 +356,10 @@ function navActive(string $page, string $currentPage): string
       font-size: .9rem;
     }
 
+    .nav-count {
+      font-size: .7rem;
+    }
+
     .dashboard-sidebar-footer {
       padding: .6rem .75rem !important;
     }
@@ -279,6 +394,10 @@ function navActive(string $page, string $currentPage): string
 
     html.sidebar-collapsed .sidebar-text {
       display: none !important;
+    }
+
+    html.sidebar-collapsed .nav-notify {
+      display: block;
     }
 
     html.sidebar-collapsed .dashboard-sidebar-brand {
@@ -394,13 +513,19 @@ function navActive(string $page, string $currentPage): string
         </a>
       </li>
       <li class="nav-item mb-1">
-        <a href="sow_contracts.php" data-tip="SOW &amp; Contracts" aria-label="SOW &amp; Contracts" class="nav-link <?= navActive('sow_contracts.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
-          <i class="fa-solid fa-file-signature" style="width:18px;"></i> <span class="sidebar-text">SOW &amp; Contracts</span>
+        <a href="sow_contracts.php" data-tip="SOW &amp; Contracts" aria-label="SOW &amp; Contracts" class="nav-link <?= navActive('sow_contracts.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2" style="--n:<?= sidebarCountsN($contractCounts) ?>;">
+          <i class="fa-solid fa-file-signature" style="width:18px;"></i>
+          <span class="sidebar-text nav-title">SOW &amp; Contracts</span>
+          <?= sidebarCountsHtml($contractCounts) ?>
+          <?= sidebarNotifyDot($contractCounts) ?>
         </a>
       </li>
       <li class="nav-item mb-1">
-        <a href="cpq_quotations.php" data-tip="CPQ &amp; Scope" aria-label="CPQ &amp; Scope" class="nav-link <?= navActive('cpq_quotations.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2">
-          <i class="fa-solid fa-file-invoice-dollar" style="width:18px;"></i> <span class="sidebar-text">CPQ &amp; Scope</span>
+        <a href="cpq_quotations.php" data-tip="CPQ &amp; Scope" aria-label="CPQ &amp; Scope" class="nav-link <?= navActive('cpq_quotations.php', $currentPage) ?> d-flex align-items-center gap-3 rounded-3 px-3 py-2" style="--n:<?= sidebarCountsN($quotationCounts) ?>;">
+          <i class="fa-solid fa-file-invoice-dollar" style="width:18px;"></i>
+          <span class="sidebar-text nav-title">CPQ &amp; Scope</span>
+          <?= sidebarCountsHtml($quotationCounts) ?>
+          <?= sidebarNotifyDot($quotationCounts) ?>
         </a>
       </li>
       <li class="nav-item mb-1">

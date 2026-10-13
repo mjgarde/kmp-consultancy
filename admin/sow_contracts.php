@@ -134,13 +134,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
             $updateStmt->execute([$scopeSummary, $totalAmount, $startDate, $endDate, $targetStatus, $contractId]);
 
-            if ($revisionNote !== '') {
-                $revStmt = $pdo->prepare(
-                    "INSERT INTO contract_revisions (contract_id, revision_note, revised_by, created_at)
-                     VALUES (?, ?, ?, NOW())"
-                );
-                $revStmt->execute([$contractId, $revisionNote, $_SESSION['user_id']]);
-            }
+            $revStmt = $pdo->prepare(
+                "INSERT INTO contract_revisions (contract_id, revision_note, revised_by, created_at)
+                 VALUES (?, ?, ?, NOW())"
+            );
+            $revStmt->execute([
+                $contractId,
+                $revisionNote !== '' ? $revisionNote : 'Contract reverted.',
+                $_SESSION['user_id'],
+            ]);
 
             $pdo->commit();
 
@@ -298,7 +300,8 @@ $contractsStmt = $pdo->prepare(
             sr.request_title, sr.required_skill, sr.status AS request_status,
             q.quotation_number, q.subtotal, q.tax_rate, q.tax_amount, q.valid_until AS quotation_valid_until,
             pb.firstname AS prepared_firstname, pb.lastname AS prepared_lastname,
-            ab.firstname AS approved_firstname, ab.lastname AS approved_lastname
+            ab.firstname AS approved_firstname, ab.lastname AS approved_lastname,
+            (SELECT COUNT(*) FROM contract_revisions crc WHERE crc.contract_id = ct.contract_id) AS revision_count
      $listQuery
      ORDER BY ct.created_at DESC
      LIMIT $perPage OFFSET $offset"
@@ -568,6 +571,23 @@ body {
 .status-revert   { background-color: #3B4E8A; color: #FFFFFF; }
 .status-approved { background-color: var(--success); color: #FFFFFF; }
 .status-rejected { background-color: var(--danger); color: #FFFFFF; }
+
+.reverted-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  margin-left: .45rem;
+  font-size: .78rem;
+  font-weight: 700;
+  font-style: normal;
+  line-height: 1;
+  white-space: nowrap;
+  color: #3B4E8A;
+  background: none;
+  border: none;
+  padding: 0;
+}
+.reverted-tag i { font-size: .7rem; }
 
 .completed-mark {
   display: inline-flex;
@@ -1175,6 +1195,7 @@ body {
   .view-text-box { padding: .6rem .7rem; font-size: .8rem; }
   .form-label { font-size: .68rem; }
   .status-pill, .status-badge { font-size: .68rem; padding: .3rem .6rem; min-width: 80px; }
+  .reverted-tag { font-size: .72rem; }
   .btn-print { font-size: .82rem; padding: .35rem .6rem; }
   .btn-print i { font-size: .9rem; }
   .doc-action-label { min-width: 56px; font-size: .6rem; }
@@ -1411,10 +1432,12 @@ body {
               <?php else: ?>
                 <?php foreach ($contracts as $ct): ?>
                   <?php
+                    $wasReverted = $ct['status'] === 'Revert' || (int) $ct['revision_count'] > 0;
                     $viewPayload = [
                         'contract_id' => $ct['contract_id'],
                         'number' => $ct['contract_number'],
                         'status' => $ct['status'],
+                        'was_reverted' => $wasReverted,
                         'created_at' => $ct['created_at'] ? date('M d, Y', strtotime($ct['created_at'])) : null,
                         'company' => $ct['company_name'],
                         'contact_person' => $ct['contact_person'],
@@ -1475,7 +1498,12 @@ body {
                     </td>
                     <td class="small">
                       <span class="mobile-row-label">Status</span>
-                      <span class="cell-body"><span class="status-badge <?= statusClass($ct['status']) ?>"><?= e($ct['status']) ?></span></span>
+                      <span class="cell-body">
+                        <span class="status-badge <?= statusClass($ct['status']) ?>"><?= e($ct['status']) ?></span>
+                        <?php if ($wasReverted && $ct['status'] !== 'Revert'): ?>
+                          <span class="reverted-tag" title="Reverted <?= (int) $ct['revision_count'] ?>x"><i class="fa-solid fa-pen"></i> <?= (int) $ct['revision_count'] ?></span>
+                        <?php endif; ?>
+                      </span>
                     </td>
                     <td class="small d-none d-lg-table-cell" style="color:var(--ink-soft);">
                       <span class="mobile-row-label">Duration</span>
@@ -1510,7 +1538,7 @@ body {
                             <i class="fa-solid fa-rotate-left"></i><span>Reopen</span>
                           </button>
                         <?php endif; ?>
-                        <?php $editLabel = $ct['status'] === 'Revert' ? 'Edit' : 'Revert'; ?>
+                        <?php $editLabel = 'Revert'; ?>
                         <button type="button" class="btn-action btn-action-text btn-action-edit edit-contract-btn" title="<?= e($editLabel) ?> contract"
                           data-contract-id="<?= (int) $ct['contract_id'] ?>"
                           data-scope-summary="<?= e($ct['scope_summary'] ?? '') ?>"

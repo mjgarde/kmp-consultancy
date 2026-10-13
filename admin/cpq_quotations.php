@@ -1,4 +1,7 @@
 <?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 session_name('ADMIN_SESSION');
 session_start();
 require_once __DIR__ . '/../config/database.php';
@@ -155,6 +158,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $projectScope = trim($_POST['edit_project_scope'] ?? '');
             $taxRate      = max(0, (float) ($_POST['edit_tax_rate'] ?? 0));
             $validUntil   = ($_POST['edit_valid_until'] ?? '') ?: null;
+            $revisionNote = trim($_POST['revision_note'] ?? '');
 
             $checkStmt = $pdo->prepare('SELECT quotation_id, request_id, status FROM quotations WHERE quotation_id = ?');
             $checkStmt->execute([$quotationId]);
@@ -207,6 +211,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $insertItem->execute([$quotationId, $item[0], $item[1], $item[2], $item[3], $item[4]]);
             }
 
+            $revStmt = $pdo->prepare(
+                "INSERT INTO quotation_revisions (quotation_id, revision_note, revised_by, created_at)
+                 VALUES (?, ?, ?, NOW())"
+            );
+            $revStmt->execute([
+                $quotationId,
+                $revisionNote !== '' ? $revisionNote : 'Quotation reverted.',
+                $_SESSION['user_id'],
+            ]);
+
             $removedContracts = removeContractsForQuotation($pdo, $quotationId);
 
             $pdo->commit();
@@ -237,6 +251,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $pdo->beginTransaction();
             removeContractsForQuotation($pdo, $quotationId);
+            $pdo->prepare('DELETE FROM quotation_revisions WHERE quotation_id = ?')->execute([$quotationId]);
             $pdo->prepare('DELETE FROM quotation_items WHERE quotation_id = ?')->execute([$quotationId]);
             $pdo->prepare('DELETE FROM quotations WHERE quotation_id = ?')->execute([$quotationId]);
             $pdo->commit();
@@ -358,6 +373,7 @@ $quotationsStmt = $pdo->prepare(
             q.subtotal, q.tax_rate, q.tax_amount, q.total_amount, q.project_scope, q.valid_until, q.created_at,
             c.company_name, sr.request_title, sr.status AS request_status,
             (SELECT COUNT(*) FROM contracts ct WHERE ct.quotation_id = q.quotation_id) AS contract_count,
+            (SELECT COUNT(*) FROM quotation_revisions qr WHERE qr.quotation_id = q.quotation_id) AS revision_count,
             u.firstname AS prepared_by_firstname, u.lastname AS prepared_by_lastname
      $listQuery
      ORDER BY q.created_at DESC
@@ -374,6 +390,22 @@ if (!empty($quotationIds)) {
     $itemsStmt->execute($quotationIds);
     foreach ($itemsStmt->fetchAll() as $row) {
         $itemsByQuotation[$row['quotation_id']][] = $row;
+    }
+}
+
+$revisionsByQuotation = [];
+if (!empty($quotationIds)) {
+    $placeholders = implode(',', array_fill(0, count($quotationIds), '?'));
+    $revisionsStmt = $pdo->prepare(
+        "SELECT qr.quotation_id, qr.revision_note, qr.created_at, u.firstname, u.lastname
+         FROM quotation_revisions qr
+         LEFT JOIN users u ON qr.revised_by = u.user_id
+         WHERE qr.quotation_id IN ($placeholders)
+         ORDER BY qr.created_at DESC"
+    );
+    $revisionsStmt->execute($quotationIds);
+    foreach ($revisionsStmt->fetchAll() as $row) {
+        $revisionsByQuotation[$row['quotation_id']][] = $row;
     }
 }
 
@@ -550,8 +582,13 @@ body {
 .btn-action:active { transform: scale(.96); }
 .btn-action:focus-visible { outline: none; box-shadow: 0 0 0 .2rem rgba(30, 41, 59, .22); }
 
-.btn-action-view { background-color: #2F4A6D; }
-.btn-action-view:hover { background-color: #263C59; color: #fff; }
+.btn-action-text {
+  width: auto;
+  padding: 0 .8rem;
+  gap: .4rem;
+  font-weight: 600;
+  font-size: .78rem;
+}
 
 .btn-action-edit { background-color: #3B4E8A; }
 .btn-action-edit:hover { background-color: #2E3E70; color: #fff; }
@@ -561,6 +598,9 @@ body {
 
 .btn-action-reject { background-color: var(--danger); }
 .btn-action-reject:hover { background-color: #9C3A29; color: #fff; }
+
+.btn-action-delete { background-color: var(--danger); }
+.btn-action-delete:hover { background-color: #9C3A29; color: #fff; }
 
 .btn-action-reopen { background-color: var(--slate-soft); }
 .btn-action-reopen:hover { background-color: var(--slate); color: #fff; }
@@ -616,6 +656,23 @@ body {
 .status-revert   { background-color: #3B4E8A; color: #FFFFFF; }
 .status-approved { background-color: var(--success); color: #FFFFFF; }
 .status-rejected { background-color: var(--danger); color: #FFFFFF; }
+
+.reverted-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  margin-left: .45rem;
+  font-size: .78rem;
+  font-weight: 700;
+  font-style: normal;
+  line-height: 1;
+  white-space: nowrap;
+  color: #3B4E8A;
+  background: none;
+  border: none;
+  padding: 0;
+}
+.reverted-tag i { font-size: .7rem; }
 
 .completed-mark {
   display: inline-flex;
@@ -816,6 +873,23 @@ body {
 .request-preview-box.is-visible { display: block; }
 .request-preview-box .view-section-label { margin-bottom: .15rem; }
 
+.revision-item {
+  border-left: 2px solid var(--line);
+  padding: .1rem 0 .1rem .9rem;
+  margin-left: .3rem;
+  position: relative;
+}
+.revision-item::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: .35rem;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #3B4E8A;
+}
+
 #newQuotationModal .modal-content,
 #viewQuotationModal .modal-content,
 #editQuotationModal .modal-content { border-radius: 0; }
@@ -1003,6 +1077,10 @@ body {
   .totals-box { padding: .75rem .85rem; }
   .totals-box .row-line { font-size: .78rem; }
   .totals-box .row-line.grand { font-size: .95rem; }
+  .status-badge { font-size: .68rem; padding: .3rem .6rem; min-width: 80px; }
+  .reverted-tag { font-size: .72rem; }
+  .revision-item { padding-left: .7rem; }
+  #view_revisions_list { max-height: 180px !important; }
   #view_items_body td, #viewQuotationModal .table thead th { font-size: .72rem; }
 }
 
@@ -1141,17 +1219,6 @@ body {
   color: #2E3E70;
   font-size: .82rem;
 }
-
-.btn-action-text {
-  width: auto;
-  padding: 0 .8rem;
-  gap: .4rem;
-  font-weight: 600;
-  font-size: .78rem;
-}
-
-.btn-action-delete { background-color: var(--danger); }
-.btn-action-delete:hover { background-color: #9C3A29; color: #fff; }
 
 #receiptPrintArea { display: none; }
 
@@ -1300,11 +1367,14 @@ body {
                     $qItems = $itemsByQuotation[$q['quotation_id']] ?? [];
                     $preparedBy = trim(($q['prepared_by_firstname'] ?? '') . ' ' . ($q['prepared_by_lastname'] ?? ''));
                     $isLocked = ($q['request_status'] ?? '') === 'Completed';
+                    $revisionCount = (int) ($q['revision_count'] ?? 0);
+                    $wasReverted = $q['status'] === 'Revert' || $revisionCount > 0;
                     $viewPayload = [
                         'number' => $q['quotation_number'],
                         'company' => $q['company_name'],
                         'request' => $q['request_title'],
                         'status' => $q['status'],
+                        'was_reverted' => $wasReverted,
                         'project_scope' => $q['project_scope'] ?? '',
                         'subtotal' => number_format((float) $q['subtotal'], 2),
                         'tax_rate' => rtrim(rtrim(number_format((float) $q['tax_rate'], 2), '0'), '.'),
@@ -1321,6 +1391,13 @@ body {
                                 'line_total' => number_format((float) $it['line_total'], 2),
                             ];
                         }, $qItems),
+                        'revisions' => array_map(function ($r) {
+                            return [
+                                'note' => $r['revision_note'],
+                                'by' => trim(($r['firstname'] ?? '') . ' ' . ($r['lastname'] ?? '')),
+                                'date' => $r['created_at'] ? date('M d, Y g:i A', strtotime($r['created_at'])) : '',
+                            ];
+                        }, $revisionsByQuotation[$q['quotation_id']] ?? []),
                     ];
                     $editPayload = array_map(function ($it) {
                         return [
@@ -1352,7 +1429,12 @@ body {
                     </td>
                     <td class="small">
                       <span class="mobile-row-label">Status</span>
-                      <span class="cell-body"><span class="status-badge <?= statusClass($q['status']) ?>"><?= e($q['status']) ?></span></span>
+                      <span class="cell-body">
+                        <span class="status-badge <?= statusClass($q['status']) ?>"><?= e($q['status']) ?></span>
+                        <?php if ($wasReverted && $q['status'] !== 'Revert'): ?>
+                          <span class="reverted-tag" title="Reverted <?= $revisionCount ?>x"><i class="fa-solid fa-pen"></i> <?= $revisionCount ?></span>
+                        <?php endif; ?>
+                      </span>
                     </td>
                     <td class="small d-none d-lg-table-cell" style="color:var(--ink-soft);">
                       <span class="mobile-row-label">Valid Until</span>
@@ -1382,7 +1464,7 @@ body {
                               <i class="fa-solid fa-rotate-left"></i><span>Reopen</span>
                             </button>
                           <?php endif; ?>
-                          <?php $editLabel = $q['status'] === 'Revert' ? 'Edit' : 'Revert'; ?>
+                          <?php $editLabel = 'Revert'; ?>
                           <button type="button" class="btn-action btn-action-text btn-action-edit edit-quotation-btn" title="<?= e($editLabel) ?> quotation"
                             data-quotation-id="<?= (int) $q['quotation_id'] ?>"
                             data-number="<?= e($q['quotation_number']) ?>"
@@ -1614,6 +1696,15 @@ body {
                     <div id="editItemsContainer" class="d-flex flex-column gap-2"></div>
                   </div>
 
+                  <div class="quote-panel">
+                    <div class="quote-panel-title">
+                      <span class="step-icon"><i class="fa-solid fa-clock-rotate-left"></i></span>
+                      Revision Note
+                    </div>
+                    <label class="form-label">Revision Note (optional)</label>
+                    <textarea class="form-control" name="revision_note" id="edit_revision_note" rows="2" placeholder="Describe what changed and why"></textarea>
+                  </div>
+
                 </div>
               </div>
 
@@ -1667,12 +1758,9 @@ body {
 <div class="modal fade" id="viewQuotationModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-fullscreen">
     <div class="modal-content">
-      <div class="modal-header">
-        <h2 class="modal-title h5 fw-bold mb-0 d-flex align-items-center gap-2">
-          <span id="view_quotation_number">Quotation</span>
-          <span class="status-badge" id="view_status_badge"></span>
-        </h2>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      <div class="modal-header d-flex align-items-center justify-content-between">
+        <h2 class="modal-title h5 fw-bold mb-0" id="view_quotation_number">Quotation</h2>
+        <button type="button" class="btn-close m-0 ms-auto" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
 
       <div class="modal-body">
@@ -1692,6 +1780,10 @@ body {
                       <div class="view-section-label">Client</div>
                       <div class="fw-semibold" id="view_client_name"></div>
                       <div class="small" id="view_request_title" style="color:var(--ink-soft);"></div>
+                    </div>
+                    <div class="col-12 col-sm-6">
+                      <div class="view-section-label">Status</div>
+                      <span class="status-badge" id="view_status_badge"></span>
                     </div>
                     <div class="col-6 col-sm-6">
                       <div class="view-section-label">Valid Until</div>
@@ -1734,6 +1826,14 @@ body {
                       <tbody id="view_items_body"></tbody>
                     </table>
                   </div>
+                </div>
+
+                <div class="quote-panel">
+                  <div class="quote-panel-title">
+                    <span class="step-icon"><i class="fa-solid fa-clock-rotate-left"></i></span>
+                    Revision History
+                  </div>
+                  <div id="view_revisions_list" class="d-flex flex-column gap-2" style="max-height:220px; overflow-y:auto;"></div>
                 </div>
 
               </div>
@@ -1991,6 +2091,7 @@ document.querySelectorAll('.edit-quotation-btn').forEach(function (btn) {
     document.getElementById('edit_project_scope').value = this.dataset.projectScope || '';
     document.getElementById('edit_tax_rate').value = this.dataset.taxRate || '12';
     document.getElementById('edit_valid_until').value = this.dataset.validUntil || '';
+    document.getElementById('edit_revision_note').value = '';
     document.getElementById('editContractNotice').classList.toggle('d-none', this.dataset.hasContract !== '1');
 
     editItemsContainer.innerHTML = '';
@@ -2056,6 +2157,21 @@ document.querySelectorAll('.quotation-row').forEach(function (row) {
       });
     }
 
+    const revisionsList = document.getElementById('view_revisions_list');
+    revisionsList.innerHTML = '';
+    if (data.revisions.length === 0) {
+      revisionsList.innerHTML = '<p class="small mb-0" style="color:var(--ink-soft);">No revisions recorded.</p>';
+    } else {
+      data.revisions.forEach(function (rev) {
+        const div = document.createElement('div');
+        div.className = 'revision-item';
+        div.innerHTML =
+          '<div class="small" style="white-space:pre-line;">' + escapeHtml(rev.note) + '</div>' +
+          '<div class="small" style="color:var(--ink-soft); font-size:.7rem;">' + escapeHtml(rev.by || 'Unknown') + ' &middot; ' + escapeHtml(rev.date) + '</div>';
+        revisionsList.appendChild(div);
+      });
+    }
+
     new bootstrap.Modal(document.getElementById('viewQuotationModal')).show();
   });
 });
@@ -2075,7 +2191,7 @@ const statusConfig = {
   },
   delete_quotation: {
     title: 'Delete quotation',
-    text: 'This will permanently delete the quotation and its scope items. If a contract was generated from it, that contract will also be deleted. This cannot be undone.',
+    text: 'This will permanently delete the quotation, its scope items, and its revision history. If a contract was generated from it, that contract will also be deleted. This cannot be undone.',
     button: 'Delete',
     buttonClass: 'btn btn-reset'
   },
