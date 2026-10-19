@@ -68,20 +68,6 @@ function requestIsCompleted(PDO $pdo, int $requestId): bool
     return (int) $stmt->fetchColumn() > 0;
 }
 
-function removeContractsForQuotation(PDO $pdo, int $quotationId): int
-{
-    $pdo->prepare(
-        'DELETE cr FROM contract_revisions cr
-         INNER JOIN contracts ct ON cr.contract_id = ct.contract_id
-         WHERE ct.quotation_id = ?'
-    )->execute([$quotationId]);
-
-    $stmt = $pdo->prepare('DELETE FROM contracts WHERE quotation_id = ?');
-    $stmt->execute([$quotationId]);
-
-    return $stmt->rowCount();
-}
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
@@ -148,74 +134,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->commit();
 
             flash('success', "Quotation {$quotationNumber} saved as draft.");
-        }
-
-        if ($action === 'edit_quotation') {
-            $quotationId  = (int) ($_POST['quotation_id'] ?? 0);
-            $projectScope = trim($_POST['edit_project_scope'] ?? '');
-            $taxRate      = max(0, (float) ($_POST['edit_tax_rate'] ?? 0));
-            $validUntil   = ($_POST['edit_valid_until'] ?? '') ?: null;
-
-            $checkStmt = $pdo->prepare('SELECT quotation_id, request_id, status FROM quotations WHERE quotation_id = ?');
-            $checkStmt->execute([$quotationId]);
-            $existing = $checkStmt->fetch();
-
-            if (!$existing) {
-                flash('error', 'Quotation not found.');
-            }
-
-            if (requestIsCompleted($pdo, (int) $existing['request_id'])) {
-                flash('error', LOCKED_MESSAGE);
-            }
-
-            $targetStatus = 'Revert';
-
-            [$items, $subtotal] = collectItems(
-                $_POST['edit_item_description'] ?? [],
-                $_POST['edit_item_quantity'] ?? [],
-                $_POST['edit_item_unit_price'] ?? []
-            );
-
-            if (empty($items)) {
-                flash('error', 'Please keep at least one valid scope item.');
-            }
-
-            $taxAmount = round($subtotal * ($taxRate / 100), 2);
-            $totalAmount = round($subtotal + $taxAmount, 2);
-
-            $pdo->beginTransaction();
-
-            $updateQuotation = $pdo->prepare(
-                "UPDATE quotations
-                 SET project_scope = ?, status = ?,
-                     subtotal = ?, tax_rate = ?, tax_amount = ?, total_amount = ?, valid_until = ?
-                 WHERE quotation_id = ?"
-            );
-            $updateQuotation->execute([
-                $projectScope, $targetStatus,
-                $subtotal, $taxRate, $taxAmount, $totalAmount, $validUntil, $quotationId,
-            ]);
-
-            $deleteItems = $pdo->prepare('DELETE FROM quotation_items WHERE quotation_id = ?');
-            $deleteItems->execute([$quotationId]);
-
-            $insertItem = $pdo->prepare(
-                "INSERT INTO quotation_items (quotation_id, description, quantity, unit_price, line_total, sort_order)
-                 VALUES (?, ?, ?, ?, ?, ?)"
-            );
-            foreach ($items as $item) {
-                $insertItem->execute([$quotationId, $item[0], $item[1], $item[2], $item[3], $item[4]]);
-            }
-
-            $removedContracts = removeContractsForQuotation($pdo, $quotationId);
-
-            $pdo->commit();
-
-            if ($removedContracts > 0) {
-                flash('success', 'Quotation reverted. The linked contract was removed; approve the quotation again to generate a new contract.');
-            }
-
-            flash('success', 'Quotation updated successfully.');
         }
 
         if (in_array($action, ['approve_quotation', 'reject_quotation', 'reopen_quotation'], true)) {
@@ -331,7 +249,6 @@ $quotationsStmt = $pdo->prepare(
     "SELECT q.quotation_id, q.quotation_number, q.status,
             q.subtotal, q.tax_rate, q.tax_amount, q.total_amount, q.project_scope, q.valid_until, q.created_at,
             c.company_name, sr.request_title, sr.status AS request_status,
-            (SELECT COUNT(*) FROM contracts ct WHERE ct.quotation_id = q.quotation_id) AS contract_count,
             u.firstname AS prepared_by_firstname, u.lastname AS prepared_by_lastname
      $listQuery
      ORDER BY q.created_at DESC
@@ -524,12 +441,6 @@ body {
 .btn-action:active { transform: scale(.96); }
 .btn-action:focus-visible { outline: none; box-shadow: 0 0 0 .2rem rgba(30, 41, 59, .22); }
 
-.btn-action-view { background-color: #2F4A6D; }
-.btn-action-view:hover { background-color: #263C59; color: #fff; }
-
-.btn-action-edit { background-color: #3B4E8A; }
-.btn-action-edit:hover { background-color: #2E3E70; color: #fff; }
-
 .btn-action-approve { background-color: var(--success); }
 .btn-action-approve:hover { background-color: var(--success-text); color: #fff; }
 
@@ -611,6 +522,28 @@ body {
   letter-spacing: .04em;
   text-transform: uppercase;
   color: var(--success);
+}
+
+.progress-mark {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .15rem;
+  line-height: 1.1;
+  color: var(--warn);
+  min-width: 72px;
+}
+.progress-mark i {
+  font-size: 1.05rem;
+  color: var(--warn);
+}
+.progress-mark span {
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--warn);
 }
 
 .status-tabs { display: flex; gap: .5rem; flex-wrap: wrap; padding: 4px; }
@@ -791,10 +724,9 @@ body {
 .request-preview-box .view-section-label { margin-bottom: .15rem; }
 
 #newQuotationModal .modal-content,
-#viewQuotationModal .modal-content,
-#editQuotationModal .modal-content { border-radius: 0; }
+#viewQuotationModal .modal-content { border-radius: 0; }
 
-#quotationForm, #editQuotationForm {
+#quotationForm {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -802,16 +734,14 @@ body {
 }
 
 #newQuotationModal .modal-header,
-#viewQuotationModal .modal-header,
-#editQuotationModal .modal-header {
+#viewQuotationModal .modal-header {
   padding: .9rem 1.25rem;
   background-color: #fff;
   border-bottom: 1px solid var(--line);
 }
 
 #newQuotationModal .modal-body,
-#viewQuotationModal .modal-body,
-#editQuotationModal .modal-body {
+#viewQuotationModal .modal-body {
   flex: 1 1 auto;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -820,8 +750,7 @@ body {
 }
 
 #newQuotationModal .modal-footer,
-#viewQuotationModal .modal-footer,
-#editQuotationModal .modal-footer {
+#viewQuotationModal .modal-footer {
   background-color: #fff;
   padding: .75rem 1.25rem;
   border-top: 1px solid var(--line);
@@ -882,8 +811,7 @@ body {
   .quote-panel-title { font-size: .88rem; margin-bottom: .8rem; }
   .quote-panel-title .step-icon { width: 24px; height: 24px; font-size: .68rem; }
   #newQuotationModal .modal-body,
-  #viewQuotationModal .modal-body,
-  #editQuotationModal .modal-body { padding: .9rem; }
+  #viewQuotationModal .modal-body { padding: .9rem; }
 }
 
 @media (max-width: 767.98px) {
@@ -958,13 +886,10 @@ body {
   .modal-header { padding: .7rem .8rem !important; }
   .modal-title { font-size: .95rem !important; }
   #newQuotationModal .modal-body,
-  #viewQuotationModal .modal-body,
-  #editQuotationModal .modal-body { padding: .65rem; }
+  #viewQuotationModal .modal-body { padding: .65rem; }
   #newQuotationModal .modal-footer,
-  #viewQuotationModal .modal-footer,
-  #editQuotationModal .modal-footer { padding: .6rem .8rem; }
-  #newQuotationModal .modal-footer .btn,
-  #editQuotationModal .modal-footer .btn { flex: 1 1 0; }
+  #viewQuotationModal .modal-footer { padding: .6rem .8rem; }
+  #newQuotationModal .modal-footer .btn { flex: 1 1 0; }
   .quote-panel { padding: .8rem .85rem; border-radius: 10px; }
   .quote-panel-title { font-size: .84rem; margin-bottom: .7rem; }
   .quote-panel-title .step-icon { width: 22px; height: 22px; font-size: .62rem; }
@@ -987,48 +912,41 @@ body {
 }
 
 #newQuotationModal .modal-content,
-#viewQuotationModal .modal-content,
-#editQuotationModal .modal-content {
+#viewQuotationModal .modal-content {
   background-color: #FFFEFC;
 }
 
 #newQuotationModal .modal-header,
-#viewQuotationModal .modal-header,
-#editQuotationModal .modal-header {
+#viewQuotationModal .modal-header {
   background-color: #FFFEFC;
   border-bottom-color: #E6E2DA;
 }
 
 #newQuotationModal .modal-body,
-#viewQuotationModal .modal-body,
-#editQuotationModal .modal-body {
+#viewQuotationModal .modal-body {
   background-color: #F6F4EF;
 }
 
 #newQuotationModal .modal-footer,
-#viewQuotationModal .modal-footer,
-#editQuotationModal .modal-footer {
+#viewQuotationModal .modal-footer {
   background-color: #FFFEFC;
   border-top-color: #E6E2DA;
 }
 
 #newQuotationModal .quote-panel,
-#viewQuotationModal .quote-panel,
-#editQuotationModal .quote-panel {
+#viewQuotationModal .quote-panel {
   background-color: #FFFEFC;
   border-color: #E6E2DA;
   box-shadow: 0 1px 2px rgba(42, 45, 47, .04);
 }
 
 #newQuotationModal .quote-panel-title,
-#viewQuotationModal .quote-panel-title,
-#editQuotationModal .quote-panel-title {
+#viewQuotationModal .quote-panel-title {
   color: #2B3134;
 }
 
 #newQuotationModal .item-row,
-#viewQuotationModal .item-row,
-#editQuotationModal .item-row {
+#viewQuotationModal .item-row {
   background-color: #FAF8F4;
   border-color: #E6E2DA;
 }
@@ -1046,75 +964,52 @@ body {
 }
 
 #newQuotationModal .table thead th,
-#viewQuotationModal .table thead th,
-#editQuotationModal .table thead th {
+#viewQuotationModal .table thead th {
   background-color: #F6F4EF !important;
   color: #6E7275;
 }
 
 #newQuotationModal .form-label,
-#viewQuotationModal .form-label,
-#editQuotationModal .form-label {
+#viewQuotationModal .form-label {
   color: #55595C;
 }
 
 #newQuotationModal .form-control:hover,
 #newQuotationModal .form-select:hover,
 #viewQuotationModal .form-control:hover,
-#viewQuotationModal .form-select:hover,
-#editQuotationModal .form-control:hover,
-#editQuotationModal .form-select:hover {
+#viewQuotationModal .form-select:hover {
   border-color: #CFCAC0;
 }
 
 #newQuotationModal .form-control:focus,
 #newQuotationModal .form-select:focus,
 #viewQuotationModal .form-control:focus,
-#viewQuotationModal .form-select:focus,
-#editQuotationModal .form-control:focus,
-#editQuotationModal .form-select:focus {
+#viewQuotationModal .form-select:focus {
   border-color: #2F6F6A;
   box-shadow: 0 0 0 .2rem rgba(47, 111, 106, .14);
 }
 
 #newQuotationModal .totals-box,
-#viewQuotationModal .totals-box,
-#editQuotationModal .totals-box {
+#viewQuotationModal .totals-box {
   border-color: #CFE2DE;
 }
 
 #newQuotationModal .totals-box .row-line.grand,
-#viewQuotationModal .totals-box .row-line.grand,
-#editQuotationModal .totals-box .row-line.grand {
+#viewQuotationModal .totals-box .row-line.grand {
   border-top-color: #BBD5D0;
 }
 
 #newQuotationModal .view-section-label,
-#viewQuotationModal .view-section-label,
-#editQuotationModal .view-section-label {
+#viewQuotationModal .view-section-label {
   color: #6E7275;
 }
 
 #newQuotationModal .modal-title,
-#viewQuotationModal .modal-title,
-#editQuotationModal .modal-title {
+#viewQuotationModal .modal-title {
   color: #2B3134;
 }
 
 .quotation-row { cursor: pointer; }
-
-.revert-notice {
-  display: flex;
-  align-items: center;
-  gap: .6rem;
-  background-color: #E9ECF6;
-  border: 1px solid #C9D0E8;
-  border-left: 4px solid #3B4E8A;
-  border-radius: 8px;
-  padding: .65rem .9rem;
-  color: #2E3E70;
-  font-size: .82rem;
-}
 
 .btn-action-text {
   width: auto;
@@ -1293,13 +1188,6 @@ body {
                             ];
                         }, $qItems),
                     ];
-                    $editPayload = array_map(function ($it) {
-                        return [
-                            'description' => $it['description'],
-                            'quantity' => (float) $it['quantity'],
-                            'unit_price' => (float) $it['unit_price'],
-                        ];
-                    }, $qItems);
                   ?>
                   <tr class="quotation-row" data-quotation="<?= e(json_encode($viewPayload)) ?>">
                     <td class="small fw-semibold">
@@ -1352,18 +1240,12 @@ body {
                               data-action="reopen_quotation" data-quotation-id="<?= (int) $q['quotation_id'] ?>" data-number="<?= e($q['quotation_number']) ?>">
                               <i class="fa-solid fa-rotate-left"></i><span>Reopen</span>
                             </button>
+                          <?php elseif ($q['status'] === 'Approved'): ?>
+                            <span class="progress-mark">
+                              <i class="fa-solid fa-hourglass-half"></i>
+                              <span>In Progress</span>
+                            </span>
                           <?php endif; ?>
-                          <?php $editLabel = $q['status'] === 'Revert' ? 'Edit' : 'Revert'; ?>
-                          <button type="button" class="btn-action btn-action-text btn-action-edit edit-quotation-btn" title="<?= e($editLabel) ?> quotation"
-                            data-quotation-id="<?= (int) $q['quotation_id'] ?>"
-                            data-number="<?= e($q['quotation_number']) ?>"
-                            data-project-scope="<?= e($q['project_scope'] ?? '') ?>"
-                            data-tax-rate="<?= e(rtrim(rtrim(number_format((float) $q['tax_rate'], 2), '0'), '.')) ?>"
-                            data-valid-until="<?= e($q['valid_until'] ?? '') ?>"
-                            data-has-contract="<?= (int) $q['contract_count'] > 0 ? '1' : '0' ?>"
-                            data-items="<?= e(json_encode($editPayload)) ?>">
-                            <i class="fa-solid fa-pen"></i><span><?= e($editLabel) ?></span>
-                          </button>
                         <?php endif; ?>
                       </span>
                     </td>
@@ -1534,110 +1416,12 @@ body {
   </div>
 </div>
 
-<div class="modal fade" id="editQuotationModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-fullscreen">
-    <div class="modal-content">
-      <form method="POST" id="editQuotationForm">
-        <input type="hidden" name="action" value="edit_quotation">
-        <input type="hidden" name="quotation_id" id="edit_quotation_id">
-
-        <div class="modal-header">
-          <h2 class="modal-title h5 fw-bold mb-0">Revert Quotation <span id="edit_quotation_number_label" style="color:var(--ink-soft); font-weight:600;"></span></h2>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-
-        <div class="modal-body">
-          <div class="quote-shell">
-            <div class="row g-2 g-md-3">
-
-              <div class="col-12 d-none" id="editContractNotice">
-                <div class="revert-notice">
-                  <i class="fa-solid fa-triangle-exclamation"></i>
-                  <span>This quotation already has a contract. Saving will remove that contract, and the quotation must be approved again before a new contract can be generated.</span>
-                </div>
-              </div>
-
-              <div class="col-lg-8">
-                <div class="d-flex flex-column gap-2 gap-md-3">
-
-                  <div class="quote-panel">
-                    <div class="quote-panel-title">
-                      <span class="step-icon"><i class="fa-solid fa-bullseye"></i></span>
-                      Project Scope
-                    </div>
-                    <textarea class="form-control" name="edit_project_scope" id="edit_project_scope" rows="3" placeholder="Describe the overall project scope and deliverables"></textarea>
-                  </div>
-
-                  <div class="quote-panel">
-                    <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
-                      <div class="quote-panel-title mb-0">
-                      <span class="step-icon"><i class="fa-solid fa-list-check"></i></span>
-                      Scope Items
-                    </div>
-                      <button type="button" class="btn btn-ghost btn-sm text-nowrap" id="editAddItemBtn">
-                        <i class="fa-solid fa-plus me-1"></i> Add Item
-                      </button>
-                    </div>
-                    <div id="editItemsContainer" class="d-flex flex-column gap-2"></div>
-                  </div>
-
-                </div>
-              </div>
-
-              <div class="col-lg-4">
-                <div class="quote-sticky d-flex flex-column gap-2 gap-md-3">
-
-                  <div class="quote-panel">
-                    <div class="quote-panel-title">
-                      <span class="step-icon"><i class="fa-solid fa-sliders"></i></span>
-                      Quotation Details
-                    </div>
-                    <div class="row g-2 g-md-3">
-                      <div class="col-6 col-lg-12 col-xl-6">
-                        <label class="form-label">Tax Rate (%)</label>
-                        <input type="number" class="form-control" name="edit_tax_rate" id="edit_tax_rate" step="0.01" min="0" value="12">
-                      </div>
-                      <div class="col-6 col-lg-12 col-xl-6">
-                        <label class="form-label">Valid Until</label>
-                        <input type="date" class="form-control" name="edit_valid_until" id="edit_valid_until">
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="quote-panel">
-                    <div class="quote-panel-title">
-                      <span class="step-icon"><i class="fa-solid fa-calculator"></i></span>
-                      Summary
-                    </div>
-                    <div class="totals-box">
-                      <div class="row-line"><span>Subtotal</span><span id="editSubtotalDisplay">&#8369;0.00</span></div>
-                      <div class="row-line"><span>Tax</span><span id="editTaxDisplay">&#8369;0.00</span></div>
-                      <div class="row-line grand"><span>Total</span><span id="editTotalDisplay">&#8369;0.00</span></div>
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-
-            </div>
-          </div>
-        </div>
-
-        <div class="modal-footer">
-          <button type="submit" class="btn btn-teal-solid px-4 w-100 w-sm-auto">Save &amp; Revert</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
 <div class="modal fade" id="viewQuotationModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-fullscreen">
     <div class="modal-content">
       <div class="modal-header">
         <h2 class="modal-title h5 fw-bold mb-0 d-flex align-items-center gap-2">
           <span id="view_quotation_number">Quotation</span>
-          <span class="status-badge" id="view_status_badge"></span>
         </h2>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
@@ -1660,9 +1444,13 @@ body {
                       <div class="fw-semibold" id="view_client_name"></div>
                       <div class="small" id="view_request_title" style="color:var(--ink-soft);"></div>
                     </div>
-                    <div class="col-6 col-sm-6">
+                    <div class="col-6 col-sm-3">
                       <div class="view-section-label">Valid Until</div>
                       <div class="small fw-semibold" id="view_valid_until"></div>
+                    </div>
+                    <div class="col-6 col-sm-3">
+                      <div class="view-section-label">Status</div>
+                      <span class="status-badge" id="view_status_badge"></span>
                     </div>
                     <div class="col-6 col-sm-6">
                       <div class="view-section-label">Prepared By</div>
@@ -1924,64 +1712,6 @@ document.getElementById('newQuotationModal').addEventListener('show.bs.modal', f
   recalculateTotals();
 });
 
-const editItemsContainer = document.getElementById('editItemsContainer');
-const editAddItemBtn = document.getElementById('editAddItemBtn');
-const editTaxRateInput = document.getElementById('edit_tax_rate');
-
-function recalculateEditTotals() {
-  calculate(editItemsContainer, editTaxRateInput, 'editSubtotalDisplay', 'editTaxDisplay', 'editTotalDisplay');
-}
-
-function addEditItemRow(description, quantity, unitPrice) {
-  const qty = (quantity !== undefined && quantity !== null) ? quantity : 1;
-  const price = (unitPrice !== undefined && unitPrice !== null) ? unitPrice : 0;
-  const row = buildItemRow('edit_', description || '', qty, price);
-  editItemsContainer.appendChild(row);
-  row.querySelector('.item-qty').addEventListener('input', recalculateEditTotals);
-  row.querySelector('.item-price').addEventListener('input', recalculateEditTotals);
-  row.querySelector('.remove-item-btn').addEventListener('click', function () {
-    row.remove();
-    recalculateEditTotals();
-  });
-  recalculateEditTotals();
-}
-
-editAddItemBtn.addEventListener('click', function () {
-  addEditItemRow('', 1, 0);
-});
-editTaxRateInput.addEventListener('input', recalculateEditTotals);
-
-document.querySelectorAll('.edit-quotation-btn').forEach(function (btn) {
-  btn.addEventListener('click', function () {
-    document.getElementById('edit_quotation_id').value = this.dataset.quotationId;
-    document.getElementById('edit_quotation_number_label').textContent = this.dataset.number ? ('\u2014 ' + this.dataset.number) : '';
-    document.getElementById('edit_project_scope').value = this.dataset.projectScope || '';
-    document.getElementById('edit_tax_rate').value = this.dataset.taxRate || '12';
-    document.getElementById('edit_valid_until').value = this.dataset.validUntil || '';
-    document.getElementById('editContractNotice').classList.toggle('d-none', this.dataset.hasContract !== '1');
-
-    editItemsContainer.innerHTML = '';
-
-    let items = [];
-    try {
-      items = JSON.parse(this.dataset.items || '[]');
-    } catch (err) {
-      items = [];
-    }
-
-    if (items.length === 0) {
-      addEditItemRow('', 1, 0);
-    } else {
-      items.forEach(function (item) {
-        addEditItemRow(item.description, item.quantity, item.unit_price);
-      });
-    }
-
-    recalculateEditTotals();
-    new bootstrap.Modal(document.getElementById('editQuotationModal')).show();
-  });
-});
-
 let currentQuotationData = null;
 
 document.querySelectorAll('.quotation-row').forEach(function (row) {
@@ -2036,13 +1766,13 @@ const statusConfig = {
   },
   reject_quotation: {
     title: 'Reject quotation',
-    text: 'This quotation will be marked as rejected. You can still edit it or move it back to draft later.',
+    text: 'This quotation will be marked as rejected. You can still move it back to draft later.',
     button: 'Reject',
     buttonClass: 'btn btn-reset'
   },
   reopen_quotation: {
     title: 'Move back to draft',
-    text: 'This quotation will return to draft so it can be revised and approved again.',
+    text: 'This quotation will return to draft so it can be approved again.',
     button: 'Move to Draft',
     buttonClass: 'btn btn-primary-solid'
   }

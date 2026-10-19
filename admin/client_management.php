@@ -1474,12 +1474,10 @@ body {
                   <option value="<?= htmlspecialchars($existingSkill) ?>"><?= htmlspecialchars($existingSkill) ?></option>
                 <?php endforeach; ?>
               </select>
-              <div class="form-text">This determines which staff will be recommended in Resource Matching.</div>
             </div>
             <div class="col-12">
               <div class="small mb-1" style="color:var(--ink-soft);">Status</div>
               <span class="status-pill" id="manage_status_pill"></span>
-              <div class="form-text mt-2">Status is updated once the request has an approved contract, in Resource Matching.</div>
             </div>
           </div>
         </div>

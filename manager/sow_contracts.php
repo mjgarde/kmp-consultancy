@@ -98,55 +98,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash('success', "Contract {$contractNumber} saved as draft.");
         }
 
-        if ($action === 'edit_contract') {
-            $contractId   = (int) ($_POST['contract_id'] ?? 0);
-            $scopeSummary = trim($_POST['scope_summary'] ?? '');
-            $totalAmount  = max(0, (float) ($_POST['total_amount'] ?? 0));
-            $startDate    = ($_POST['edit_start_date'] ?? '') ?: null;
-            $endDate      = ($_POST['edit_end_date'] ?? '') ?: null;
-            $revisionNote = trim($_POST['revision_note'] ?? '');
-
-            if ($startDate && $endDate && $endDate < $startDate) {
-                flash('error', 'End date cannot be earlier than the start date.');
-            }
-
-            $checkStmt = $pdo->prepare('SELECT contract_id, status FROM contracts WHERE contract_id = ?');
-            $checkStmt->execute([$contractId]);
-            $existing = $checkStmt->fetch();
-
-            if (!$existing) {
-                flash('error', 'Contract not found.');
-            }
-
-            if (contractIsLocked($pdo, $contractId)) {
-                flash('error', 'This service request is already completed by staff, so this contract is locked.');
-            }
-
-            $targetStatus = 'Revert';
-
-            $pdo->beginTransaction();
-
-            $updateStmt = $pdo->prepare(
-                "UPDATE contracts
-                 SET scope_summary = ?, total_amount = ?, start_date = ?, end_date = ?, status = ?,
-                     approved_by = NULL, approved_at = NULL
-                 WHERE contract_id = ?"
-            );
-            $updateStmt->execute([$scopeSummary, $totalAmount, $startDate, $endDate, $targetStatus, $contractId]);
-
-            if ($revisionNote !== '') {
-                $revStmt = $pdo->prepare(
-                    "INSERT INTO contract_revisions (contract_id, revision_note, revised_by, created_at)
-                     VALUES (?, ?, ?, NOW())"
-                );
-                $revStmt->execute([$contractId, $revisionNote, $_SESSION['user_id']]);
-            }
-
-            $pdo->commit();
-
-            flash('success', 'Contract updated successfully.');
-        }
-
         if (in_array($action, ['approve_contract', 'reject_contract', 'reopen_contract'], true)) {
             $contractId = (int) ($_POST['contract_id'] ?? 0);
 
@@ -476,9 +427,6 @@ body {
   font-size: .78rem;
 }
 
-.btn-action-edit { background-color: #3B4E8A; }
-.btn-action-edit:hover { background-color: #2E3E70; color: #fff; }
-
 .btn-action-approve { background-color: var(--success); }
 .btn-action-approve:hover { background-color: var(--success-text); color: #fff; }
 
@@ -563,6 +511,28 @@ body {
   letter-spacing: .04em;
   text-transform: uppercase;
   color: var(--success);
+}
+
+.progress-mark {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .15rem;
+  line-height: 1.1;
+  color: var(--warn);
+  min-width: 72px;
+}
+.progress-mark i {
+  font-size: 1.05rem;
+  color: var(--warn);
+}
+.progress-mark span {
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--warn);
 }
 
 .status-tabs { display: flex; gap: .5rem; flex-wrap: wrap; padding: 4px; }
@@ -691,19 +661,6 @@ body {
   background-color: #3B4E8A;
 }
 
-.revert-notice {
-  display: flex;
-  align-items: center;
-  gap: .6rem;
-  background-color: #E9ECF6;
-  border: 1px solid #C9D0E8;
-  border-left: 4px solid #3B4E8A;
-  border-radius: 8px;
-  padding: .65rem .9rem;
-  color: #2E3E70;
-  font-size: .82rem;
-}
-
 .empty-state { color: var(--ink-soft); }
 .empty-state i { color: #C7D0D6; }
 
@@ -743,25 +700,20 @@ body {
 @keyframes searchspin { to { transform: rotate(360deg); } }
 
 #generateContractModal .modal-content,
-#viewContractModal .modal-content,
-#editContractModal .modal-content {
+#viewContractModal .modal-content {
   border-radius: 0;
   background-color: #FFFEFC;
 }
 
-#editContractModal .modal-content { border-radius: 14px; }
-
 #generateContractModal .modal-header,
-#viewContractModal .modal-header,
-#editContractModal .modal-header {
+#viewContractModal .modal-header {
   padding: .9rem 1.25rem;
   background-color: #FFFEFC;
   border-bottom: 1px solid #E6E2DA;
 }
 
 #generateContractModal .modal-body,
-#viewContractModal .modal-body,
-#editContractModal .modal-body {
+#viewContractModal .modal-body {
   flex: 1 1 auto;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -769,14 +721,13 @@ body {
   padding: 1.25rem;
 }
 
-#generateContractModal .modal-footer,
-#editContractModal .modal-footer {
+#generateContractModal .modal-footer {
   background-color: #FFFEFC;
   padding: .75rem 1.25rem;
   border-top: 1px solid #E6E2DA;
 }
 
-#generateContractForm, #editContractForm {
+#generateContractForm {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -842,59 +793,48 @@ body {
   background-color: #F6F4EF;
   border-color: #E6E2DA;
 }
-#viewContractModal .view-text-box,
-#editContractModal .view-text-box {
+#viewContractModal .view-text-box {
   background-color: #F6F4EF;
   border-color: #E6E2DA;
 }
 #generateContractModal .view-section-label,
-#viewContractModal .view-section-label,
-#editContractModal .view-section-label {
+#viewContractModal .view-section-label {
   color: #6E7275;
 }
 #generateContractModal .form-label,
-#viewContractModal .form-label,
-#editContractModal .form-label {
+#viewContractModal .form-label {
   color: #55595C;
 }
 #generateContractModal .form-control:hover,
 #generateContractModal .form-select:hover,
 #viewContractModal .form-control:hover,
-#viewContractModal .form-select:hover,
-#editContractModal .form-control:hover,
-#editContractModal .form-select:hover {
+#viewContractModal .form-select:hover {
   border-color: #CFCAC0;
 }
 #generateContractModal .form-control:focus,
 #generateContractModal .form-select:focus,
 #viewContractModal .form-control:focus,
-#viewContractModal .form-select:focus,
-#editContractModal .form-control:focus,
-#editContractModal .form-select:focus {
+#viewContractModal .form-select:focus {
   border-color: #2F6F6A;
   box-shadow: 0 0 0 .2rem rgba(47, 111, 106, .14);
 }
 #generateContractModal .modal-title,
-#viewContractModal .modal-title,
-#editContractModal .modal-title {
+#viewContractModal .modal-title {
   color: #2B3134;
 }
 #generateContractModal .table thead th,
-#viewContractModal .table thead th,
-#editContractModal .table thead th {
+#viewContractModal .table thead th {
   background-color: #F6F4EF !important;
   color: #6E7275;
   border-bottom-color: #E6E2DA !important;
 }
 #generateContractModal .table td,
-#viewContractModal .table td,
-#editContractModal .table td {
+#viewContractModal .table td {
   border-bottom-color: #E6E2DA;
 }
 
 #generateContractModal,
-#viewContractModal,
-#editContractModal {
+#viewContractModal {
   --indigo: #2F6F6A;
   --indigo-soft: #E3EFEC;
   --indigo-text: #245853;
@@ -1059,8 +999,7 @@ body {
   .quote-panel-title { font-size: .88rem; margin-bottom: .8rem; }
   .quote-panel-title .step-icon { width: 24px; height: 24px; font-size: .68rem; }
   #generateContractModal .modal-body,
-  #viewContractModal .modal-body,
-  #editContractModal .modal-body { padding: .9rem; }
+  #viewContractModal .modal-body { padding: .9rem; }
   .view-kv-value { font-size: .84rem; }
   .agreement-doc { padding: 1.5rem 1.5rem; font-size: .85rem; }
 }
@@ -1137,10 +1076,8 @@ body {
   .modal-header { padding: .7rem .8rem !important; }
   .modal-title { font-size: .95rem !important; }
   #generateContractModal .modal-body,
-  #viewContractModal .modal-body,
-  #editContractModal .modal-body { padding: .65rem; }
-  #generateContractModal .modal-footer,
-  #editContractModal .modal-footer { padding: .6rem .8rem; }
+  #viewContractModal .modal-body { padding: .65rem; }
+  #generateContractModal .modal-footer { padding: .6rem .8rem; }
   .quote-panel { padding: .8rem .85rem; border-radius: 10px; }
   .quote-panel-title { font-size: .84rem; margin-bottom: .7rem; }
   .quote-panel-title .step-icon { width: 22px; height: 22px; font-size: .62rem; }
@@ -1469,31 +1406,26 @@ body {
                             <span>Completed</span>
                           </span>
                         <?php else: ?>
-                        <?php if (in_array($ct['status'], ['Draft', 'Revert'], true)): ?>
-                          <button type="button" class="btn-action btn-action-text btn-action-approve status-action-btn" title="Approve"
-                            data-action="approve_contract" data-contract-id="<?= (int) $ct['contract_id'] ?>" data-number="<?= e($ct['contract_number']) ?>">
-                            <i class="fa-solid fa-check"></i><span>Approve</span>
-                          </button>
-                          <button type="button" class="btn-action btn-action-text btn-action-reject status-action-btn" title="Reject"
-                            data-action="reject_contract" data-contract-id="<?= (int) $ct['contract_id'] ?>" data-number="<?= e($ct['contract_number']) ?>">
-                            <i class="fa-solid fa-xmark"></i><span>Reject</span>
-                          </button>
-                        <?php elseif ($ct['status'] === 'Rejected'): ?>
-                          <button type="button" class="btn-action btn-action-text btn-action-reopen status-action-btn" title="Move back to draft"
-                            data-action="reopen_contract" data-contract-id="<?= (int) $ct['contract_id'] ?>" data-number="<?= e($ct['contract_number']) ?>">
-                            <i class="fa-solid fa-rotate-left"></i><span>Reopen</span>
-                          </button>
-                        <?php endif; ?>
-                        <?php $editLabel = $ct['status'] === 'Revert' ? 'Edit' : 'Revert'; ?>
-                        <button type="button" class="btn-action btn-action-text btn-action-edit edit-contract-btn" title="<?= e($editLabel) ?> contract"
-                          data-contract-id="<?= (int) $ct['contract_id'] ?>"
-                          data-scope-summary="<?= e($ct['scope_summary'] ?? '') ?>"
-                          data-total-amount="<?= e((string) $ct['total_amount']) ?>"
-                          data-start-date="<?= e($ct['start_date'] ?? '') ?>"
-                          data-end-date="<?= e($ct['end_date'] ?? '') ?>"
-                          data-number="<?= e($ct['contract_number']) ?>">
-                          <i class="fa-solid fa-pen"></i><span><?= e($editLabel) ?></span>
-                        </button>
+                          <?php if (in_array($ct['status'], ['Draft', 'Revert'], true)): ?>
+                            <button type="button" class="btn-action btn-action-text btn-action-approve status-action-btn" title="Approve"
+                              data-action="approve_contract" data-contract-id="<?= (int) $ct['contract_id'] ?>" data-number="<?= e($ct['contract_number']) ?>">
+                              <i class="fa-solid fa-check"></i><span>Approve</span>
+                            </button>
+                            <button type="button" class="btn-action btn-action-text btn-action-reject status-action-btn" title="Reject"
+                              data-action="reject_contract" data-contract-id="<?= (int) $ct['contract_id'] ?>" data-number="<?= e($ct['contract_number']) ?>">
+                              <i class="fa-solid fa-xmark"></i><span>Reject</span>
+                            </button>
+                          <?php elseif ($ct['status'] === 'Rejected'): ?>
+                            <button type="button" class="btn-action btn-action-text btn-action-reopen status-action-btn" title="Move back to draft"
+                              data-action="reopen_contract" data-contract-id="<?= (int) $ct['contract_id'] ?>" data-number="<?= e($ct['contract_number']) ?>">
+                              <i class="fa-solid fa-rotate-left"></i><span>Reopen</span>
+                            </button>
+                          <?php elseif ($ct['status'] === 'Approved'): ?>
+                            <span class="progress-mark">
+                              <i class="fa-solid fa-hourglass-half"></i>
+                              <span>In Progress</span>
+                            </span>
+                          <?php endif; ?>
                         <?php endif; ?>
                       </span>
                     </td>
@@ -1685,58 +1617,6 @@ body {
 
         <div class="modal-footer">
           <button type="submit" class="btn btn-teal-solid px-4 w-100 w-sm-auto" id="generateContractSubmitBtn" disabled>Generate Contract</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
-<div class="modal fade" id="editContractModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
-    <div class="modal-content">
-      <form method="POST" id="editContractForm">
-        <input type="hidden" name="action" value="edit_contract">
-        <input type="hidden" name="contract_id" id="edit_contract_id">
-
-        <div class="modal-header d-flex align-items-center justify-content-between">
-          <h2 class="modal-title h5 fw-bold mb-0">Revert Contract <span id="edit_contract_number_label" style="color:var(--ink-soft); font-weight:600;"></span></h2>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-
-        <div class="modal-body">
-          <div class="quote-panel mb-2 mb-md-3">
-            <div class="quote-panel-title">
-              <span class="step-icon"><i class="fa-solid fa-file-contract"></i></span>
-              Contract Details
-            </div>
-            <div class="row g-2 g-md-3">
-              <div class="col-12">
-                <label class="form-label">Scope Summary</label>
-                <textarea class="form-control" name="scope_summary" id="edit_scope_summary" rows="4"></textarea>
-              </div>
-              <div class="col-12 col-md-4">
-                <label class="form-label">Total Amount</label>
-                <input type="number" step="0.01" min="0" class="form-control" name="total_amount" id="edit_total_amount">
-              </div>
-              <div class="col-6 col-md-4">
-                <label class="form-label">Start Date</label>
-                <input type="date" class="form-control" name="edit_start_date" id="edit_start_date">
-              </div>
-              <div class="col-6 col-md-4">
-                <label class="form-label">End Date</label>
-                <input type="date" class="form-control" name="edit_end_date" id="edit_end_date">
-              </div>
-              <div class="col-12">
-                <label class="form-label">Revision Note (optional)</label>
-                <textarea class="form-control" name="revision_note" id="edit_revision_note" rows="2" placeholder="Describe what changed and why"></textarea>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="modal-footer">
-          <button type="button" class="btn btn-ghost px-4" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-teal-solid px-4">Save &amp; Revert</button>
         </div>
       </form>
     </div>
@@ -2052,20 +1932,6 @@ document.getElementById('generateContractModal').addEventListener('hidden.bs.mod
   quotationPreviewContent.classList.remove('is-visible');
 });
 
-document.querySelectorAll('.edit-contract-btn').forEach(function (btn) {
-  btn.addEventListener('click', function () {
-    document.getElementById('edit_contract_id').value = this.dataset.contractId;
-    document.getElementById('edit_contract_number_label').textContent = this.dataset.number ? ('\u2014 ' + this.dataset.number) : '';
-    document.getElementById('edit_scope_summary').value = this.dataset.scopeSummary || '';
-    document.getElementById('edit_total_amount').value = this.dataset.totalAmount || '';
-    document.getElementById('edit_start_date').value = this.dataset.startDate || '';
-    document.getElementById('edit_end_date').value = this.dataset.endDate || '';
-    document.getElementById('edit_revision_note').value = '';
-
-    new bootstrap.Modal(document.getElementById('editContractModal')).show();
-  });
-});
-
 const statusConfig = {
   approve_contract: {
     title: 'Approve contract',
@@ -2081,7 +1947,7 @@ const statusConfig = {
   },
   reopen_contract: {
     title: 'Move back to draft',
-    text: 'This contract will return to draft so it can be revised and approved again.',
+    text: 'This contract will return to draft so it can be approved again.',
     button: 'Move to Draft',
     buttonClass: 'btn btn-primary-solid'
   }
