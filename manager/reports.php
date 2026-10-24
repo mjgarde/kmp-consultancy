@@ -11,10 +11,8 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'manager') {
 
 $pdo = getConnection();
 
-$filterMode = $_GET['filter_mode'] ?? '';
-$dateStart  = $_GET['date_start'] ?? '';
-$dateEnd    = $_GET['date_end'] ?? '';
-$dateSingle = $_GET['date_single'] ?? '';
+$dateStart = $_GET['date_start'] ?? '';
+$dateEnd   = $_GET['date_end'] ?? '';
 
 $validDate = function (string $d): bool {
     if ($d === '') return false;
@@ -29,23 +27,31 @@ $filterWhereQt = '';
 $filterParams  = [];
 $filterLabel   = '';
 
-if ($filterMode === 'range' && $validDate($dateStart) && $validDate($dateEnd)) {
+if ($validDate($dateStart) && !$validDate($dateEnd)) {
+    $dateEnd = $dateStart;
+}
+
+if ($validDate($dateStart) && $validDate($dateEnd)) {
     if ($dateStart > $dateEnd) {
         [$dateStart, $dateEnd] = [$dateEnd, $dateStart];
     }
-    $hasFilter     = true;
-    $filterWhereSr = " AND DATE(sr.created_at) BETWEEN :fstart AND :fend ";
-    $filterWhereCt = " AND DATE(ct.created_at) BETWEEN :fstart AND :fend ";
-    $filterWhereQt = " AND DATE(qt.created_at) BETWEEN :fstart AND :fend ";
-    $filterParams  = [':fstart' => $dateStart, ':fend' => $dateEnd];
-    $filterLabel   = date('M d, Y', strtotime($dateStart)) . ' – ' . date('M d, Y', strtotime($dateEnd));
-} elseif ($filterMode === 'single' && $validDate($dateSingle)) {
-    $hasFilter     = true;
-    $filterWhereSr = " AND DATE(sr.created_at) = :fsingle ";
-    $filterWhereCt = " AND DATE(ct.created_at) = :fsingle ";
-    $filterWhereQt = " AND DATE(qt.created_at) = :fsingle ";
-    $filterParams  = [':fsingle' => $dateSingle];
-    $filterLabel   = date('M d, Y', strtotime($dateSingle));
+    $hasFilter = true;
+
+    if ($dateStart === $dateEnd) {
+        $filterWhereSr = " AND DATE(sr.created_at) = :fsingle ";
+        $filterWhereCt = " AND DATE(ct.created_at) = :fsingle ";
+        $filterWhereQt = " AND DATE(qt.created_at) = :fsingle ";
+        $filterParams  = [':fsingle' => $dateStart];
+        $filterLabel   = date('M d, Y', strtotime($dateStart));
+    } else {
+        $filterWhereSr = " AND DATE(sr.created_at) BETWEEN :fstart AND :fend ";
+        $filterWhereCt = " AND DATE(ct.created_at) BETWEEN :fstart AND :fend ";
+        $filterWhereQt = " AND DATE(qt.created_at) BETWEEN :fstart AND :fend ";
+        $filterParams  = [':fstart' => $dateStart, ':fend' => $dateEnd];
+        $filterLabel   = date('M d, Y', strtotime($dateStart)) . ' – ' . date('M d, Y', strtotime($dateEnd));
+    }
+} else {
+    $dateStart = $dateEnd = '';
 }
 
 $clientReportSql = "SELECT c.client_id, c.company_name,
@@ -75,12 +81,30 @@ foreach ($clientReport as $row) {
     $totCompleted += (int) $row['completed'];
     $totCancelled += (int) $row['cancelled'];
 }
+$clientsServed = count(array_filter($clientReport, fn($c) => (int) $c['total_requests'] > 0));
 
 $overallAvgSql = "SELECT AVG(TIMESTAMPDIFF(HOUR, sr.created_at, sr.updated_at)) FROM service_requests sr WHERE sr.status != 'New' $filterWhereSr";
 $overallAvgStmt = $pdo->prepare($overallAvgSql);
 $overallAvgStmt->execute($filterParams);
 $overallAvgResponse = $overallAvgStmt->fetchColumn();
 $overallAvgResponse = $overallAvgResponse !== null ? round((float) $overallAvgResponse, 1) : null;
+
+$weeklySql = "SELECT YEARWEEK(sr.created_at, 1) AS yw,
+            MIN(DATE(sr.created_at)) AS week_start,
+            COUNT(*) AS total,
+            SUM(CASE WHEN sr.status = 'Completed' THEN 1 ELSE 0 END) AS completed,
+            AVG(CASE WHEN sr.status != 'New' THEN TIMESTAMPDIFF(HOUR, sr.created_at, sr.updated_at) END) AS avg_resp
+     FROM service_requests sr
+     WHERE 1=1 $filterWhereSr
+     GROUP BY YEARWEEK(sr.created_at, 1)
+     ORDER BY yw ASC";
+$weeklyStmt = $pdo->prepare($weeklySql);
+$weeklyStmt->execute($filterParams);
+$weekly = array_slice($weeklyStmt->fetchAll(), -12);
+$weeklyLabels    = array_map(fn($w) => date('M d', strtotime($w['week_start'])), $weekly);
+$weeklyTotals    = array_map(fn($w) => (int) $w['total'], $weekly);
+$weeklyCompleted = array_map(fn($w) => (int) $w['completed'], $weekly);
+$weeklyResponse  = array_map(fn($w) => $w['avg_resp'] !== null ? round((float) $w['avg_resp'], 1) : null, $weekly);
 
 $staffPerfSql = "SELECT u.user_id, u.firstname, u.lastname, u.status,
             COUNT(sr.request_id) AS total_assigned,
@@ -155,6 +179,12 @@ $avgApprovalStmt->execute($filterParams);
 $avgApprovalHours = $avgApprovalStmt->fetchColumn();
 $avgApprovalHours = $avgApprovalHours !== null ? round((float) $avgApprovalHours, 1) : null;
 
+$topClients = array_slice(array_values(array_filter($clientReport, fn($c) => (int) $c['total_requests'] > 0)), 0, 3);
+$topSkills  = array_slice($skillDemand, 0, 3);
+$staffByDone = array_values(array_filter($staffPerf, fn($s) => (int) $s['total_assigned'] > 0));
+usort($staffByDone, fn($a, $b) => (int) $b['completed_tasks'] <=> (int) $a['completed_tasks']);
+$topStaff = array_slice($staffByDone, 0, 3);
+
 $statusColors = [
     'Draft'    => '#64748B',
     'Approved' => '#157A5F',
@@ -172,6 +202,26 @@ $money = function (float $n): string {
     return '₱' . number_format($n, 2);
 };
 
+$moneyShort = function (float $n): string {
+    if ($n >= 1000000) return '₱' . round($n / 1000000, 2) . 'M';
+    if ($n >= 1000) return '₱' . round($n / 1000, 1) . 'K';
+    return '₱' . number_format($n, 0);
+};
+
+$chartData = [
+    'statusLabels' => ['New', 'In Progress', 'Completed', 'Cancelled'],
+    'statusValues' => [$totNew, $totProgress, $totCompleted, $totCancelled],
+    'weekLabels'   => array_values($weeklyLabels),
+    'weekTotals'   => array_values($weeklyTotals),
+    'weekDone'     => array_values($weeklyCompleted),
+    'staffLabels'  => array_map(fn($x) => $x['firstname'] . ' ' . $x['lastname'], $staffPerf),
+    'staffAssigned' => array_map(fn($x) => (int) $x['total_assigned'], $staffPerf),
+    'staffDone'    => array_map(fn($x) => (int) $x['completed_tasks'], $staffPerf),
+    'quoteLabels'  => array_keys($quotationStatus),
+    'quoteCounts'  => array_values(array_map(fn($q) => $q['cnt'], $quotationStatus)),
+    'contractValues' => array_values($contractStatusCounts),
+];
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -181,6 +231,7 @@ $money = function (float $n): string {
 <title>Reports</title>
 <link rel="stylesheet" href="../assets/vendor/bootstrap-5.3.8/css/bootstrap.min.css">
 <link rel="stylesheet" href="../assets/vendor/fontawesome-free-7.3.1/css/all.min.css">
+<link rel="stylesheet" href="../assets/vendor/flatpickr/flatpickr.min.css">
 <link rel="stylesheet" href="../assets/css/dashboard.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lexend:wght@500;600;700&display=swap" rel="stylesheet">
@@ -194,6 +245,13 @@ $money = function (float $n): string {
   --indigo-text: #2E3E70;
   --slate: #475569;
   --slate-soft: #64748B;
+
+  --blue: #1F4FBF;
+  --blue-soft: #E8EEFC;
+  --sky: #0EA5E9;
+  --sky-soft: #E0F2FE;
+  --teal: #0E9AA7;
+  --teal-soft: #DDF3F5;
 
   --success: #157A5F;
   --success-soft: #E3F3EC;
@@ -213,7 +271,7 @@ $money = function (float $n): string {
   --ink: #1A2233;
   --ink-soft: #667085;
   --line: #E2E5EB;
-  --canvas: #FFFFFF;
+  --canvas: #F6F8FC;
   --card: #FFFFFF;
 }
 
@@ -235,17 +293,69 @@ body {
 .dashboard-subtitle { color: var(--ink-soft) !important; }
 .dashboard-topbar { border-bottom: 1px solid var(--line) !important; background-color: #fff; }
 
-.card { border-radius: 12px; border: 1px solid var(--line); box-shadow: none; }
+.card { border-radius: 14px; border: 1px solid var(--line); box-shadow: none; background-color: var(--card); }
 
 .card-header {
   border-bottom: 1px solid var(--line) !important;
   background-color: var(--card) !important;
-  border-radius: 12px 12px 0 0 !important;
+  border-radius: 14px 14px 0 0 !important;
   padding: 1rem 1.15rem;
 }
 
 .card-header h2 { color: var(--ink); letter-spacing: -0.01em; }
 .card-header p { color: var(--ink-soft) !important; }
+
+.kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .85rem;
+}
+@media (min-width: 768px) { .kpi-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1200px) { .kpi-strip { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+
+.kpi {
+  padding: 1.1rem .75rem 1rem;
+  text-align: center;
+  border-radius: 14px;
+  color: #fff;
+  background-color: #2E5272;
+}
+.kpi.k-amber { background-color: #A06B1F; }
+.kpi.k-sky { background-color: #3F6C8F; }
+.kpi.k-green { background-color: #3E7D5A; }
+.kpi.k-red { background-color: #B5523F; }
+.kpi.k-navy { background-color: #7B4F7D; }
+.kpi-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  margin-bottom: .55rem;
+  background-color: rgba(255, 255, 255, .2);
+  color: #fff;
+}
+.kpi-value { font-family: 'Lexend', sans-serif; font-size: 1.6rem; font-weight: 700; color: #fff; line-height: 1.15; }
+.kpi-label { font-size: .78rem; color: rgba(255, 255, 255, .92); margin-top: .2rem; }
+
+.chart-card { height: 100%; }
+.chart-card .card-body { padding: 1rem 1.15rem 1.15rem; }
+.chart-title { font-family: 'Lexend', sans-serif; font-size: .9rem; font-weight: 600; color: var(--navy-deep); text-align: center; margin: 0 0 .75rem; }
+.chart-box { position: relative; height: 220px; }
+.chart-empty { height: 220px; display: flex; align-items: center; justify-content: center; color: var(--ink-soft); font-size: .8rem; }
+
+.rank-card { padding: 1rem 1.15rem 1.1rem; }
+.rank-list { display: flex; flex-direction: column; gap: .7rem; }
+.rank-row { display: grid; grid-template-columns: 38% 1fr auto; align-items: center; gap: .6rem; font-size: .78rem; }
+.rank-row .rank-name { color: var(--slate); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank-row .rank-track { height: 14px; background-color: var(--navy-soft); border-radius: 3px; overflow: hidden; }
+.rank-row .rank-fill { height: 100%; border-radius: 3px; }
+.rank-row .rank-val { font-weight: 700; color: var(--navy-deep); min-width: 28px; }
+.rank-empty { color: var(--ink-soft); font-size: .8rem; text-align: center; padding: 1rem 0; }
+
+.section-heading { font-family: 'Lexend', sans-serif; font-size: 1rem; font-weight: 600; color: var(--navy-deep); margin: 1.5rem 0 .75rem; }
 
 .summary-grid {
   display: grid;
@@ -253,8 +363,7 @@ body {
   gap: .85rem;
 }
 @media (min-width: 768px) { .summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (min-width: 1400px) { .summary-grid.cols-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
-@media (min-width: 992px) { .summary-grid.cols-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+@media (min-width: 992px) { .summary-grid.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 
 .stat-card {
   background-color: var(--card);
@@ -283,10 +392,7 @@ body {
   display: flex;
   gap: .4rem;
   flex-wrap: wrap;
-  border-bottom: 1px solid var(--line);
-  padding: 0 1.15rem;
   background-color: var(--card);
-  border-radius: 12px 12px 0 0;
 }
 
 .status-tab {
@@ -354,123 +460,97 @@ body {
 .status-list-item .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 .status-list-item .count { color: var(--ink-soft); font-weight: 600; }
 
-.btn-ghost {
-  background-color: var(--navy-soft);
-  color: var(--navy);
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  font-weight: 600;
-  font-size: .8rem;
-}
-.btn-ghost:hover { background-color: #E4E8F0; color: var(--navy); }
-
-.btn-outline-print {
-  display: inline-flex;
-  align-items: center;
-  gap: .45rem;
-  background-color: transparent;
-  color: #000;
-  border: none;
-  border-radius: 6px;
-  font-weight: 600;
-  font-size: .85rem;
-  padding: .4rem .55rem;
-  outline: none !important;
-  box-shadow: none !important;
-}
-.btn-outline-print:hover,
-.btn-outline-print:focus,
-.btn-outline-print:active,
-.btn-outline-print:focus-visible,
-.btn-outline-print:active:focus {
-  background-color: transparent;
-  color: #000;
-  border: none;
-  outline: none !important;
-  box-shadow: none !important;
-}
-.btn-outline-print i { font-size: .85rem; color: #000; }
-
 .empty-state { color: var(--ink-soft); }
 .empty-state i { color: #C7D0D6; }
 
-.filter-bar {
-  background-color: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: .85rem 1.15rem;
+.date-filter {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: .9rem;
-  flex-wrap: wrap;
-}
-.filter-bar .filter-mode-toggle {
-  display: flex;
+  background-color: #fff;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  overflow: hidden;
+  border-radius: 10px;
+  height: 44px;
+  padding: 0 .75rem;
+  gap: .55rem;
+  min-width: 270px;
+  transition: border-color .15s, box-shadow .15s, background-color .15s;
+}
+.date-filter:hover { border-color: #C5CBD8; }
+.date-filter:focus-within { border-color: var(--indigo); box-shadow: 0 0 0 3px rgba(59, 78, 138, .15); }
+.date-filter > i.fa-calendar { color: var(--indigo); font-size: .95rem; }
+.date-filter input[type="text"] {
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--ink);
+  width: 100%;
+  cursor: pointer;
+  padding: 0;
+}
+.date-filter input::placeholder { color: var(--ink-soft); font-weight: 500; }
+.date-filter.is-active { border-color: var(--indigo); background-color: var(--indigo-soft); }
+.date-clear {
+  color: var(--ink-soft);
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: .75rem;
+  text-decoration: none;
   flex-shrink: 0;
 }
-.filter-bar .filter-mode-toggle label {
-  margin: 0;
-  padding: .45rem .8rem;
-  font-size: .78rem;
-  font-weight: 600;
-  color: var(--ink-soft);
-  cursor: pointer;
-  background-color: var(--navy-soft);
-}
-.filter-bar .filter-mode-toggle input { display: none; }
-.filter-bar .filter-mode-toggle input:checked + label {
-  background-color: var(--indigo);
-  color: #fff;
-}
-.filter-bar .filter-fields {
-  display: flex;
+.date-clear:hover { background-color: #fff; color: var(--danger); }
+
+.btn-print {
+  display: inline-flex;
   align-items: center;
   gap: .6rem;
-  flex-wrap: wrap;
-}
-.filter-bar label.field-label {
-  font-size: .72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .03em;
-  color: var(--ink-soft);
-  margin: 0 0 0 .2rem;
-}
-.filter-bar input[type="date"] {
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  padding: .4rem .6rem;
-  font-size: .82rem;
-  color: var(--ink);
-}
-.filter-bar .filter-actions {
-  display: flex;
-  gap: .5rem;
-  margin-left: auto;
-}
-.filter-active-badge {
-  font-size: .72rem;
+  height: 44px;
+  padding: 0 1.4rem;
+  background-color: #1F4FBF;
+  color: #fff;
+  border: 1px solid #1F4FBF;
+  border-radius: 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: .92rem;
   font-weight: 600;
-  color: var(--indigo-text);
-  background-color: var(--indigo-soft);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: .3rem .7rem;
-  display: flex;
-  align-items: center;
-  gap: .35rem;
+  letter-spacing: .01em;
+  white-space: nowrap;
+  transition: background-color .15s, transform .05s;
 }
-.filter-hint {
-  font-size: .74rem;
-  color: var(--ink-soft);
-  margin: -.4rem 0 .75rem 0;
+.btn-print i { font-size: 1rem; color: #fff; }
+.btn-print:hover { background-color: #1A44A3; border-color: #1A44A3; color: #fff; }
+.btn-print:active { transform: translateY(1px); }
+
+.flatpickr-calendar {
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, .15);
+  border: 1px solid var(--line);
+  font-family: 'Inter', sans-serif;
+}
+.flatpickr-day.selected,
+.flatpickr-day.startRange,
+.flatpickr-day.endRange { background: var(--indigo); border-color: var(--indigo); }
+.flatpickr-day.inRange {
+  background: var(--indigo-soft);
+  border-color: var(--indigo-soft);
+  box-shadow: -5px 0 0 var(--indigo-soft), 5px 0 0 var(--indigo-soft);
+}
+.flatpickr-day.today { border-color: var(--indigo); }
+
+@media (max-width: 767px) {
+  .date-filter { min-width: 0; width: 100%; }
+  .btn-print span { display: none; }
+  .btn-print { padding: 0 1rem; }
 }
 
 .print-header { display: none; }
-.print-footer { display: none; }
 
 @media print {
   .no-print { display: none !important; }
@@ -501,24 +581,13 @@ body {
     color: var(--ink-soft);
     margin: 0;
   }
-  .print-footer {
-    display: flex;
-    justify-content: center;
-    margin-top: 24px;
-    padding-top: 10px;
-    border-top: 1px solid var(--line);
-  }
-  .print-footer span {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--ink-soft);
-  }
-  body { background-color: #fff !important; }
+  body { background-color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .dashboard-layout { display: block !important; }
   .dashboard-layout > *:not(.dashboard-main) { display: none !important; }
   .dashboard-main { width: 100% !important; margin: 0 !important; }
   main.dashboard-content { padding: 0 24px 24px !important; }
   .card, .stat-card { border: 1px solid #D8DEE3 !important; box-shadow: none !important; break-inside: avoid; }
+  .kpi { break-inside: avoid; }
   .tab-pane { display: block !important; opacity: 1 !important; }
 
   .status-pill {
@@ -549,12 +618,25 @@ body {
         </button>
         <div>
           <h1 class="dashboard-title h6 h5-md fw-bold mb-0">Reports</h1>
-          <p class="dashboard-subtitle small mb-0 d-none d-sm-block">Client service and staff performance insights.</p>
+          <p class="dashboard-subtitle small mb-0 d-none d-sm-block">Client requests, staff workload, and contract status overview.</p>
         </div>
       </div>
-      <div class="dashboard-topbar-actions d-flex align-items-center gap-3 gap-md-4">
-        <button type="button" class="btn-outline-print" onclick="window.print()">
-          <i class="fa-solid fa-print"></i> Print
+
+      <div class="dashboard-topbar-actions d-flex align-items-center gap-2 gap-md-3">
+        <form method="GET" id="filterForm" class="d-flex align-items-center gap-2 m-0">
+          <div class="date-filter <?= $hasFilter ? 'is-active' : '' ?>">
+            <i class="fa-regular fa-calendar"></i>
+            <input type="text" id="dateRange" placeholder="Select date or range" autocomplete="off">
+            <?php if ($hasFilter): ?>
+              <a href="reports.php" class="date-clear" title="Clear filter" aria-label="Clear filter"><i class="fa-solid fa-xmark"></i></a>
+            <?php endif; ?>
+          </div>
+          <input type="hidden" name="date_start" id="date_start" value="<?= htmlspecialchars($dateStart) ?>">
+          <input type="hidden" name="date_end" id="date_end" value="<?= htmlspecialchars($dateEnd) ?>">
+        </form>
+
+        <button type="button" class="btn-print" onclick="window.print()">
+          <i class="fa-solid fa-print"></i><span>Print Report</span>
         </button>
       </div>
     </header>
@@ -569,98 +651,163 @@ body {
         </div>
       </div>
 
-      <form method="GET" class="filter-bar mb-2 no-print" id="filterForm">
-        <div class="filter-mode-toggle">
-          <input type="radio" name="filter_mode" id="mode-range" value="range" <?= $filterMode !== 'single' ? 'checked' : '' ?>>
-          <label for="mode-range"><i class="fa-regular fa-calendar-days me-1"></i>Date Range</label>
-          <input type="radio" name="filter_mode" id="mode-single" value="single" <?= $filterMode === 'single' ? 'checked' : '' ?>>
-          <label for="mode-single"><i class="fa-solid fa-calendar-day me-1"></i>Specific Date</label>
+      <section class="kpi-strip mb-3">
+        <div class="kpi">
+          <span class="kpi-icon"><i class="fa-solid fa-layer-group"></i></span>
+          <div class="kpi-value"><?= number_format($totRequests) ?></div>
+          <div class="kpi-label">Total Requests</div>
         </div>
-
-        <div class="filter-fields" id="range-fields" style="<?= $filterMode === 'single' ? 'display:none;' : 'display:flex;' ?>">
-          <label class="field-label" for="date_start">From</label>
-          <input type="date" name="date_start" id="date_start" value="<?= htmlspecialchars($dateStart) ?>" max="<?= date('Y-m-d') ?>">
-          <label class="field-label" for="date_end">To</label>
-          <input type="date" name="date_end" id="date_end" value="<?= htmlspecialchars($dateEnd) ?>" max="<?= date('Y-m-d') ?>">
+        <div class="kpi k-amber">
+          <span class="kpi-icon"><i class="fa-solid fa-inbox"></i></span>
+          <div class="kpi-value"><?= number_format($totNew) ?></div>
+          <div class="kpi-label">New / Pending</div>
         </div>
-
-        <div class="filter-fields" id="single-fields" style="<?= $filterMode === 'single' ? 'display:flex;' : 'display:none;' ?>">
-          <label class="field-label" for="date_single">Date</label>
-          <input type="date" name="date_single" id="date_single" value="<?= htmlspecialchars($dateSingle) ?>" max="<?= date('Y-m-d') ?>">
+        <div class="kpi k-sky">
+          <span class="kpi-icon"><i class="fa-solid fa-spinner"></i></span>
+          <div class="kpi-value"><?= number_format($totProgress) ?></div>
+          <div class="kpi-label">In Progress</div>
         </div>
-
-        <?php if ($hasFilter): ?>
-          <span class="filter-active-badge"><i class="fa-solid fa-filter"></i><?= htmlspecialchars($filterLabel) ?></span>
-        <?php endif; ?>
-
-        <div class="filter-actions">
-          <button type="submit" class="btn btn-ghost btn-sm px-3"><i class="fa-solid fa-magnifying-glass me-1"></i>Apply</button>
-          <?php if ($hasFilter): ?>
-            <a href="reports.php" class="btn btn-ghost btn-sm px-3"><i class="fa-solid fa-xmark me-1"></i>Clear</a>
-          <?php endif; ?>
+        <div class="kpi k-green">
+          <span class="kpi-icon"><i class="fa-solid fa-circle-check"></i></span>
+          <div class="kpi-value"><?= number_format($totCompleted) ?></div>
+          <div class="kpi-label">Completed</div>
         </div>
-      </form>
-      <p class="filter-hint no-print">
-        <i class="fa-regular fa-circle-question me-1"></i>
-        <?= $filterMode === 'single' ? 'Showing records for one exact day only.' : 'Showing records between two dates. Switch to "Specific Date" for a single day only.' ?>
-      </p>
-
-      <?php if ($filterMode === 'range' && ($dateStart || $dateEnd) && !$hasFilter): ?>
-        <div class="alert alert-warning py-2 px-3 mb-3 no-print" style="font-size:.8rem;">
-          <i class="fa-solid fa-triangle-exclamation me-1"></i>
-          Please select both a "From" and "To" date to apply the range filter.
+        <div class="kpi k-red">
+          <span class="kpi-icon"><i class="fa-solid fa-ban"></i></span>
+          <div class="kpi-value"><?= number_format($totCancelled) ?></div>
+          <div class="kpi-label">Cancelled</div>
         </div>
-      <?php elseif ($filterMode === 'single' && $dateSingle && !$hasFilter): ?>
-        <div class="alert alert-warning py-2 px-3 mb-3 no-print" style="font-size:.8rem;">
-          <i class="fa-solid fa-triangle-exclamation me-1"></i>
-          That date looks invalid. Please pick a valid date.
+        <div class="kpi k-navy">
+          <span class="kpi-icon"><i class="fa-solid fa-building"></i></span>
+          <div class="kpi-value"><?= number_format($clientsServed) ?></div>
+          <div class="kpi-label">Clients Served</div>
         </div>
-      <?php endif; ?>
+      </section>
 
-      <div class="summary-grid cols-6 mb-3">
-        <div class="stat-card">
-          <span class="stat-icon"><i class="fa-solid fa-layer-group"></i></span>
-          <div>
-            <div class="stat-label">Total Requests</div>
-            <div class="stat-value"><?= $totRequests ?></div>
+      <div class="row g-3 mb-3">
+
+        <div class="col-xl-8">
+          <div class="row g-3">
+
+            <div class="col-md-6">
+              <section class="card chart-card">
+                <div class="card-body">
+                  <h2 class="chart-title">Requests by Status</h2>
+                  <?php if ($totRequests > 0): ?>
+                    <div class="chart-box"><canvas id="statusChart"></canvas></div>
+                  <?php else: ?>
+                    <div class="chart-empty">No request data yet.</div>
+                  <?php endif; ?>
+                </div>
+              </section>
+            </div>
+
+            <div class="col-md-6">
+              <section class="card chart-card">
+                <div class="card-body">
+                  <h2 class="chart-title">Requests by Week</h2>
+                  <?php if (!empty($weekly)): ?>
+                    <div class="chart-box"><canvas id="weeklyChart"></canvas></div>
+                  <?php else: ?>
+                    <div class="chart-empty">No weekly data yet.</div>
+                  <?php endif; ?>
+                </div>
+              </section>
+            </div>
+
+            <div class="col-md-6">
+              <section class="card chart-card">
+                <div class="card-body">
+                  <h2 class="chart-title">Staff Workload</h2>
+                  <?php if (array_sum(array_map(fn($x) => (int) $x['total_assigned'], $staffPerf)) > 0): ?>
+                    <div class="chart-box"><canvas id="staffChart"></canvas></div>
+                  <?php else: ?>
+                    <div class="chart-empty">No assignments yet.</div>
+                  <?php endif; ?>
+                </div>
+              </section>
+            </div>
+
+            <div class="col-md-6">
+              <section class="card chart-card">
+                <div class="card-body">
+                  <h2 class="chart-title">Quotations and Contracts by Status</h2>
+                  <?php if ($quotationTotalCnt + $contractTotal > 0): ?>
+                    <div class="chart-box"><canvas id="docsChart"></canvas></div>
+                  <?php else: ?>
+                    <div class="chart-empty">No quotation or contract data yet.</div>
+                  <?php endif; ?>
+                </div>
+              </section>
+            </div>
+
           </div>
         </div>
-        <div class="stat-card">
-          <span class="stat-icon"><i class="fa-solid fa-inbox"></i></span>
-          <div>
-            <div class="stat-label">New</div>
-            <div class="stat-value"><?= $totNew ?></div>
+
+        <div class="col-xl-4">
+          <div class="d-flex flex-column gap-3 h-100">
+
+            <section class="card rank-card flex-fill">
+              <h2 class="chart-title">Top 3 Clients by Requests</h2>
+              <?php if (empty($topClients)): ?>
+                <div class="rank-empty">No data yet.</div>
+              <?php else: ?>
+                <?php $maxC = max(array_map(fn($c) => (int) $c['total_requests'], $topClients)) ?: 1; ?>
+                <div class="rank-list">
+                  <?php foreach ($topClients as $c): ?>
+                    <div class="rank-row">
+                      <span class="rank-name" title="<?= htmlspecialchars($c['company_name']) ?>"><?= htmlspecialchars($c['company_name']) ?></span>
+                      <div class="rank-track"><div class="rank-fill" style="width:<?= round(((int) $c['total_requests'] / $maxC) * 100) ?>%; background-color:#2E5272;"></div></div>
+                      <span class="rank-val"><?= (int) $c['total_requests'] ?></span>
+                    </div>
+                  <?php endforeach; ?>
+                </div>
+              <?php endif; ?>
+            </section>
+
+            <section class="card rank-card flex-fill">
+              <h2 class="chart-title">Top 3 Skills by Demand</h2>
+              <?php if (empty($topSkills)): ?>
+                <div class="rank-empty">No data yet.</div>
+              <?php else: ?>
+                <?php $maxS = max(array_map(fn($s) => (int) $s['demand'], $topSkills)) ?: 1; ?>
+                <div class="rank-list">
+                  <?php foreach ($topSkills as $sk): ?>
+                    <div class="rank-row">
+                      <span class="rank-name" title="<?= htmlspecialchars($sk['required_skill']) ?>"><?= htmlspecialchars($sk['required_skill']) ?></span>
+                      <div class="rank-track"><div class="rank-fill" style="width:<?= round(((int) $sk['demand'] / $maxS) * 100) ?>%; background-color:#3F6C8F;"></div></div>
+                      <span class="rank-val"><?= (int) $sk['demand'] ?></span>
+                    </div>
+                  <?php endforeach; ?>
+                </div>
+              <?php endif; ?>
+            </section>
+
+            <section class="card rank-card flex-fill">
+              <h2 class="chart-title">Top 3 Staff by Completed Tasks</h2>
+              <?php if (empty($topStaff)): ?>
+                <div class="rank-empty">No assignments yet.</div>
+              <?php else: ?>
+                <?php $maxT = max(array_map(fn($s) => (int) $s['completed_tasks'], $topStaff)) ?: 1; ?>
+                <div class="rank-list">
+                  <?php foreach ($topStaff as $s): ?>
+                    <?php $sName = $s['firstname'] . ' ' . $s['lastname']; ?>
+                    <div class="rank-row">
+                      <span class="rank-name" title="<?= htmlspecialchars($sName) ?>"><?= htmlspecialchars($sName) ?></span>
+                      <div class="rank-track"><div class="rank-fill" style="width:<?= round(((int) $s['completed_tasks'] / $maxT) * 100) ?>%; background-color:#2F6F6A;"></div></div>
+                      <span class="rank-val"><?= (int) $s['completed_tasks'] ?></span>
+                    </div>
+                  <?php endforeach; ?>
+                </div>
+              <?php endif; ?>
+            </section>
+
           </div>
         </div>
-        <div class="stat-card tone-warn">
-          <span class="stat-icon"><i class="fa-solid fa-clipboard-list"></i></span>
-          <div>
-            <div class="stat-label">In Progress</div>
-            <div class="stat-value"><?= $totProgress ?></div>
-          </div>
-        </div>
-        <div class="stat-card tone-success">
-          <span class="stat-icon"><i class="fa-solid fa-circle-check"></i></span>
-          <div>
-            <div class="stat-label">Completed</div>
-            <div class="stat-value"><?= $totCompleted ?></div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <span class="stat-icon"><i class="fa-solid fa-clock"></i></span>
-          <div>
-            <div class="stat-label">Avg. Response</div>
-            <div class="stat-value"><?= $overallAvgResponse !== null ? $overallAvgResponse . ' hrs' : '&mdash;' ?></div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <span class="stat-icon"><i class="fa-solid fa-hourglass-half"></i></span>
-          <div>
-            <div class="stat-label">Avg. Contract Approval</div>
-            <div class="stat-value"><?= $avgApprovalHours !== null ? $avgApprovalHours . ' hrs' : '&mdash;' ?></div>
-          </div>
-        </div>
+
       </div>
+
+      <h2 class="section-heading no-print">Detailed Reports</h2>
 
       <nav class="status-tabs mb-3 no-print" style="border-radius:12px; border:1px solid var(--line);">
         <ul class="nav gap-2 p-2" id="reportTabs" role="tablist" style="border-bottom:none;">
@@ -688,7 +835,7 @@ body {
           <section class="card">
             <div class="card-header">
               <h2 class="h6 fw-bold mb-0">Service Requests by Client</h2>
-              <p class="small mb-0">Volume, status, and response time per client.</p>
+              <p class="small mb-0">Number of requests and their status per client.</p>
             </div>
             <div class="table-responsive">
               <table class="table table-hover align-middle mb-0">
@@ -700,12 +847,11 @@ body {
                     <th scope="col" class="num">In Progress</th>
                     <th scope="col" class="num">Completed</th>
                     <th scope="col" class="num">Cancelled</th>
-                    <th scope="col" class="num d-none d-md-table-cell">Avg. Response</th>
                   </tr>
                 </thead>
                 <tbody>
                   <?php if (empty($clientReport)): ?>
-                    <tr><td colspan="7"><div class="empty-state text-center py-4"><i class="fa-regular fa-folder-open fs-4 d-block mb-2"></i><p class="small mb-0">No client data yet.</p></div></td></tr>
+                    <tr><td colspan="6"><div class="empty-state text-center py-4"><i class="fa-regular fa-folder-open fs-4 d-block mb-2"></i><p class="small mb-0">No client data yet.</p></div></td></tr>
                   <?php else: ?>
                     <?php foreach ($clientReport as $c): ?>
                       <tr>
@@ -715,9 +861,6 @@ body {
                         <td class="num"><?= (int) $c['in_progress'] ?></td>
                         <td class="num"><?= (int) $c['completed'] ?></td>
                         <td class="num"><?= (int) $c['cancelled'] ?></td>
-                        <td class="num d-none d-md-table-cell" style="color:var(--ink-soft);">
-                          <?= $c['avg_response_hours'] !== null ? round((float) $c['avg_response_hours'], 1) . ' hrs' : '&mdash;' ?>
-                        </td>
                       </tr>
                     <?php endforeach; ?>
                   <?php endif; ?>
@@ -731,7 +874,6 @@ body {
                       <td class="num"><?= $totProgress ?></td>
                       <td class="num"><?= $totCompleted ?></td>
                       <td class="num"><?= $totCancelled ?></td>
-                      <td class="num d-none d-md-table-cell"><?= $overallAvgResponse !== null ? $overallAvgResponse . ' hrs' : '&mdash;' ?></td>
                     </tr>
                   </tfoot>
                 <?php endif; ?>
@@ -817,7 +959,7 @@ body {
         </div>
 
         <div class="tab-pane fade" id="tab-contracts">
-          <div class="summary-grid cols-5 mb-3">
+          <div class="summary-grid cols-4 mb-3">
             <div class="stat-card">
               <span class="stat-icon"><i class="fa-solid fa-file-pen"></i></span>
               <div>
@@ -844,13 +986,6 @@ body {
               <div>
                 <div class="stat-label">Revert</div>
                 <div class="stat-value"><?= $contractStatusCounts['Revert'] ?></div>
-              </div>
-            </div>
-            <div class="stat-card">
-              <span class="stat-icon"><i class="fa-solid fa-peso-sign"></i></span>
-              <div>
-                <div class="stat-label">Approved Value</div>
-                <div class="stat-value" style="font-size:1rem;"><?= $money($approvedValue) ?></div>
               </div>
             </div>
           </div>
@@ -926,7 +1061,7 @@ body {
           <section class="card">
             <div class="card-header">
               <h2 class="h6 fw-bold mb-0">Quotations by Status</h2>
-              <p class="small mb-0">Count and total amount per quotation status.</p>
+              <p class="small mb-0">Number of quotations per status.</p>
             </div>
             <div class="table-responsive">
               <table class="table table-hover align-middle mb-0">
@@ -934,7 +1069,6 @@ body {
                   <tr>
                     <th scope="col">Status</th>
                     <th scope="col" class="num">Quotations</th>
-                    <th scope="col" class="num">Total Amount</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -942,7 +1076,6 @@ body {
                     <tr>
                       <td><span class="status-pill <?= $statusClass[$label] ?>"><?= $label ?></span></td>
                       <td class="num"><?= $q['cnt'] ?></td>
-                      <td class="num"><?= $money($q['amt']) ?></td>
                     </tr>
                   <?php endforeach; ?>
                 </tbody>
@@ -950,7 +1083,6 @@ body {
                   <tr>
                     <td>Total</td>
                     <td class="num"><?= $quotationTotalCnt ?></td>
-                    <td class="num"><?= $money($quotationTotalAmt) ?></td>
                   </tr>
                 </tfoot>
               </table>
@@ -958,10 +1090,6 @@ body {
           </section>
         </div>
 
-      </div>
-
-      <div class="print-footer">
-        <span><?= $hasFilter ? htmlspecialchars($filterLabel) : 'Filtered: All records' ?></span>
       </div>
 
     </main>
@@ -972,56 +1100,166 @@ body {
 
 <script src="../assets/vendor/bootstrap-5.3.8/js/bootstrap.bundle.min.js"></script>
 <script src="../assets/vendor/chartjs/chart.umd.js"></script>
+<script src="../assets/vendor/flatpickr/flatpickr.min.js"></script>
 <script>
-const contractStatusCanvas = document.getElementById('contractStatusChart');
-if (contractStatusCanvas && typeof Chart !== 'undefined') {
-  new Chart(contractStatusCanvas, {
-    type: 'doughnut',
-    data: {
-      labels: ['Draft', 'Approved', 'Rejected', 'Revert'],
-      datasets: [{
-        data: [
-          <?= $contractStatusCounts['Draft'] ?>,
-          <?= $contractStatusCounts['Approved'] ?>,
-          <?= $contractStatusCounts['Rejected'] ?>,
-          <?= $contractStatusCounts['Revert'] ?>
-        ],
-        backgroundColor: ['#64748B', '#157A5F', '#B4432F', '#B7791F'],
-        borderWidth: 2,
-        borderColor: '#fff'
-      }]
-    },
-    options: {
-      responsive: true,
-      cutout: '62%',
-      plugins: { legend: { display: false } }
-    }
-  });
+const D = <?= json_encode($chartData) ?>;
+
+if (typeof Chart !== 'undefined') {
+  Chart.defaults.font.family = "'Inter', sans-serif";
+  Chart.defaults.font.size = 11;
+  Chart.defaults.color = '#667085';
+  Chart.defaults.animation = false;
+
+  const gridColor = '#EEF1F6';
+
+  const statusCanvas = document.getElementById('statusChart');
+  if (statusCanvas) {
+    new Chart(statusCanvas, {
+      type: 'doughnut',
+      data: {
+        labels: D.statusLabels,
+        datasets: [{
+          data: D.statusValues,
+          backgroundColor: ['#A06B1F', '#3F6C8F', '#3E7D5A', '#B5523F'],
+          borderWidth: 2,
+          borderColor: '#fff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '60%',
+        plugins: { legend: { position: 'right', labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true } } }
+      }
+    });
+  }
+
+  const weeklyCanvas = document.getElementById('weeklyChart');
+  if (weeklyCanvas) {
+    new Chart(weeklyCanvas, {
+      type: 'line',
+      data: {
+        labels: D.weekLabels,
+        datasets: [
+          { label: 'Requests', data: D.weekTotals, borderColor: '#3F6C8F', backgroundColor: 'rgba(63, 108, 143, .18)', fill: true, tension: .3, pointRadius: 3, borderWidth: 2 },
+          { label: 'Completed', data: D.weekDone, borderColor: '#3E7D5A', backgroundColor: 'rgba(62, 125, 90, .14)', fill: true, tension: .3, pointRadius: 3, borderWidth: 2 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: gridColor } },
+          x: { grid: { display: false } }
+        },
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true } } }
+      }
+    });
+  }
+
+  const staffCanvas = document.getElementById('staffChart');
+  if (staffCanvas) {
+    new Chart(staffCanvas, {
+      type: 'bar',
+      data: {
+        labels: D.staffLabels,
+        datasets: [
+          { label: 'Assigned', data: D.staffAssigned, backgroundColor: '#3F6C8F', borderRadius: 4, maxBarThickness: 36 },
+          { label: 'Completed', data: D.staffDone, backgroundColor: '#3E7D5A', borderRadius: 4, maxBarThickness: 36 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: gridColor } },
+          x: { grid: { display: false } }
+        },
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true } } }
+      }
+    });
+  }
+
+  const docsCanvas = document.getElementById('docsChart');
+  if (docsCanvas) {
+    new Chart(docsCanvas, {
+      type: 'bar',
+      data: {
+        labels: D.quoteLabels,
+        datasets: [
+          { label: 'Quotations', data: D.quoteCounts, backgroundColor: '#3F6C8F', borderRadius: 4, maxBarThickness: 36 },
+          { label: 'Contracts', data: D.contractValues, backgroundColor: '#7B4F7D', borderRadius: 4, maxBarThickness: 36 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: gridColor } },
+          x: { grid: { display: false } }
+        },
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true } } }
+      }
+    });
+  }
+
+  const contractStatusCanvas = document.getElementById('contractStatusChart');
+  if (contractStatusCanvas) {
+    new Chart(contractStatusCanvas, {
+      type: 'doughnut',
+      data: {
+        labels: ['Draft', 'Approved', 'Rejected', 'Revert'],
+        datasets: [{
+          data: D.contractValues,
+          backgroundColor: ['#8B8F92', '#3E7D5A', '#B5523F', '#7B4F7D'],
+          borderWidth: 2,
+          borderColor: '#fff'
+        }]
+      },
+      options: {
+        responsive: true,
+        cutout: '62%',
+        plugins: { legend: { display: false } }
+      }
+    });
+  }
 }
 </script>
 <script>
-const rangeFields = document.getElementById('range-fields');
-const singleFields = document.getElementById('single-fields');
-const modeRange = document.getElementById('mode-range');
-const modeSingle = document.getElementById('mode-single');
+(function () {
+  if (typeof flatpickr === 'undefined') return;
 
-function syncFilterFields() {
-  if (modeSingle && modeSingle.checked) {
-    rangeFields.style.setProperty('display', 'none');
-    singleFields.style.setProperty('display', 'flex');
-  } else {
-    rangeFields.style.setProperty('display', 'flex');
-    singleFields.style.setProperty('display', 'none');
-  }
-}
+  const form    = document.getElementById('filterForm');
+  const startEl = document.getElementById('date_start');
+  const endEl   = document.getElementById('date_end');
+  const curStart = startEl.value;
+  const curEnd   = endEl.value;
 
-if (modeRange && modeSingle && rangeFields && singleFields) {
-  modeRange.addEventListener('change', syncFilterFields);
-  modeSingle.addEventListener('change', syncFilterFields);
-  modeRange.addEventListener('click', syncFilterFields);
-  modeSingle.addEventListener('click', syncFilterFields);
-  syncFilterFields();
-}
+  const preset = [];
+  if (curStart) preset.push(curStart);
+  if (curEnd && curEnd !== curStart) preset.push(curEnd);
+
+  flatpickr('#dateRange', {
+    mode: 'range',
+    showMonths: 2,
+    dateFormat: 'Y-m-d',
+    altInput: true,
+    altFormat: 'M j, Y',
+    rangeSeparator: '  –  ',
+    maxDate: 'today',
+    defaultDate: preset,
+    disableMobile: true,
+    onClose: function (selected, str, inst) {
+      if (!selected.length) return;
+      const s = inst.formatDate(selected[0], 'Y-m-d');
+      const e = inst.formatDate(selected[selected.length - 1], 'Y-m-d');
+      if (s === curStart && e === (curEnd || curStart)) return;
+      startEl.value = s;
+      endEl.value   = e;
+      form.submit();
+    }
+  });
+})();
 </script>
 
 </body>

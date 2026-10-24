@@ -18,11 +18,6 @@ if (!is_dir($uploadDir)) {
     mkdir($uploadDir, 0755, true);
 }
 
-$pdfCacheDir = __DIR__ . '/../uploads/pdf_cache/';
-if (!is_dir($pdfCacheDir)) {
-    mkdir($pdfCacheDir, 0755, true);
-}
-
 function folderPath(PDO $pdo, ?int $folderId): array
 {
     $trail = [];
@@ -61,8 +56,8 @@ function fileIcon(string $fileName): string
 function previewMode(string $ext): string
 {
     $ext = strtolower($ext);
-    if (in_array($ext, ['docx', 'doc', 'xlsx', 'xls', 'csv', 'pptx', 'ppt'], true)) {
-        return 'office-server';
+    if (in_array($ext, ['docx', 'xlsx', 'xls', 'csv'], true)) {
+        return 'browser';
     }
     if (in_array($ext, ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
         return 'native';
@@ -70,102 +65,16 @@ function previewMode(string $ext): string
     return 'none';
 }
 
-function convertToPdf(string $sourcePath, string $cacheDir, string $documentId): ?string
-{
-    if (!is_file($sourcePath)) {
-        error_log("convertToPdf: source not found: $sourcePath");
-        return null;
-    }
-
-    $cacheDir = rtrim($cacheDir, '/') . '/';
-    $cachedPdf = $cacheDir . $documentId . '.pdf';
-
-    if (is_file($cachedPdf) && filemtime($cachedPdf) >= filemtime($sourcePath)) {
-        return $cachedPdf;
-    }
-
-    if (!function_exists('exec')) {
-        error_log('convertToPdf: exec() disabled.');
-        return null;
-    }
-
-    if (!is_dir($cacheDir)) @mkdir($cacheDir, 0755, true);
-    if (!is_writable($cacheDir)) {
-        error_log("convertToPdf: cache dir not writable: $cacheDir");
-        return null;
-    }
-
-    $binaries = ['/usr/bin/libreoffice', '/usr/bin/soffice', '/usr/local/bin/libreoffice', '/usr/local/bin/soffice'];
-    $binary = null;
-    foreach ($binaries as $b) {
-        if (@is_executable($b)) { $binary = $b; break; }
-    }
-    if ($binary === null) {
-        error_log('convertToPdf: no libreoffice binary.');
-        return null;
-    }
-
-    $workDir = sys_get_temp_dir() . '/lo_' . uniqid();
-    @mkdir($workDir, 0700, true);
-    $cacheHome = $workDir . '/.cache';
-    $configHome = $workDir . '/.config';
-    @mkdir($cacheHome, 0700, true);
-    @mkdir($configHome, 0700, true);
-
-    $cmd = sprintf(
-        'env -u LD_LIBRARY_PATH -u LD_PRELOAD HOME=%s XDG_CACHE_HOME=%s XDG_CONFIG_HOME=%s timeout 60 %s --headless --norestore --nologo --nofirststartwizard --convert-to pdf --outdir %s -env:UserInstallation=%s %s 2>&1',
-        escapeshellarg($workDir),
-        escapeshellarg($cacheHome),
-        escapeshellarg($configHome),
-        escapeshellarg($binary),
-        escapeshellarg($cacheDir),
-        escapeshellarg('file://' . $workDir . '/lo_config'),
-        escapeshellarg($sourcePath)
-    );
-
-    $output = [];
-    $returnCode = 0;
-    @exec($cmd, $output, $returnCode);
-
-    error_log('convertToPdf cmd: ' . $cmd);
-    error_log('convertToPdf rc=' . $returnCode . ' out=' . implode(' | ', $output));
-
-    $expectedName = pathinfo($sourcePath, PATHINFO_FILENAME) . '.pdf';
-    $generated = $cacheDir . $expectedName;
-    if (is_file($generated) && $generated !== $cachedPdf) {
-        @rename($generated, $cachedPdf);
-    }
-
-    if (!is_file($cachedPdf)) {
-        foreach (glob($cacheDir . '*.pdf') as $p) {
-            if (filemtime($p) >= time() - 30) {
-                @rename($p, $cachedPdf);
-                break;
-            }
-        }
-    }
-
-    @exec('rm -rf ' . escapeshellarg($workDir));
-
-    if (is_file($cachedPdf)) return $cachedPdf;
-    error_log('convertToPdf: no PDF produced.');
-    return null;
-}
-
-function deleteFolderRecursive(PDO $pdo, int $folderId, string $uploadDir, string $pdfCacheDir): void
+function deleteFolderRecursive(PDO $pdo, int $folderId, string $uploadDir): void
 {
     $stmt = $pdo->prepare("SELECT document_id, item_type, file_path FROM knowledge_documents WHERE parent_id = ?");
     $stmt->execute([$folderId]);
     foreach ($stmt->fetchAll() as $child) {
         if ($child['item_type'] === 'folder') {
-            deleteFolderRecursive($pdo, (int) $child['document_id'], $uploadDir, $pdfCacheDir);
+            deleteFolderRecursive($pdo, (int) $child['document_id'], $uploadDir);
         } else {
             if ($child['file_path'] && is_file($uploadDir . basename($child['file_path']))) {
                 unlink($uploadDir . basename($child['file_path']));
-            }
-            $cachedPdf = $pdfCacheDir . $child['document_id'] . '.pdf';
-            if (is_file($cachedPdf)) {
-                unlink($cachedPdf);
             }
         }
     }
@@ -242,7 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $folderId = (int) ($_POST['folder_id'] ?? 0);
         if ($folderId > 0) {
-            deleteFolderRecursive($pdo, $folderId, $uploadDir, $pdfCacheDir);
+            deleteFolderRecursive($pdo, $folderId, $uploadDir);
         }
         $_SESSION['alert_type'] = 'success';
         $_SESSION['alert_message'] = 'Folder deleted successfully.';
@@ -275,10 +184,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $filePath = $stmt->fetchColumn();
         if ($filePath && is_file($uploadDir . basename($filePath))) {
             unlink($uploadDir . basename($filePath));
-        }
-        $cachedPdf = $pdfCacheDir . $fileId . '.pdf';
-        if (is_file($cachedPdf)) {
-            unlink($cachedPdf);
         }
         $pdo->prepare("DELETE FROM knowledge_documents WHERE document_id = ?")->execute([$fileId]);
         $_SESSION['alert_type'] = 'success';
@@ -407,6 +312,263 @@ if (isset($_GET['download'])) {
     }
 }
 
+if (isset($_GET['raw'])) {
+    $fileId = (int) $_GET['raw'];
+    $stmt = $pdo->prepare("SELECT title, file_path, file_type FROM knowledge_documents WHERE document_id = ? AND item_type = 'file'");
+    $stmt->execute([$fileId]);
+    $file = $stmt->fetch();
+    if ($file && is_file($uploadDir . basename($file['file_path']))) {
+        $sourcePath = $uploadDir . basename($file['file_path']);
+        $ext = strtolower($file['file_type'] ?? '');
+        $mimeTypes = [
+            'pdf' => 'application/pdf',
+            'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png',
+            'gif' => 'image/gif', 'webp' => 'image/webp',
+            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'xls' => 'application/vnd.ms-excel',
+            'csv' => 'text/csv; charset=utf-8',
+        ];
+        $mime = $mimeTypes[$ext] ?? 'application/octet-stream';
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: inline; filename="' . $file['title'] . '"');
+        header('Content-Length: ' . filesize($sourcePath));
+        header('Cache-Control: private, max-age=0, no-store');
+        header('X-Content-Type-Options: nosniff');
+        readfile($sourcePath);
+        exit;
+    }
+    http_response_code(404);
+    header('Content-Type: text/plain');
+    echo 'File not found.';
+    exit;
+}
+
+if (isset($_GET['preview'])) {
+    $fileId = (int) $_GET['preview'];
+    $stmt = $pdo->prepare("SELECT title, file_path, file_type FROM knowledge_documents WHERE document_id = ? AND item_type = 'file'");
+    $stmt->execute([$fileId]);
+    $file = $stmt->fetch();
+    if (!$file || !is_file($uploadDir . basename($file['file_path']))) {
+        http_response_code(404);
+        header('Content-Type: text/plain');
+        echo 'File not found.';
+        exit;
+    }
+    $ext = strtolower($file['file_type'] ?? '');
+    $isDocx = ($ext === 'docx');
+    $isXlsx = in_array($ext, ['xlsx', 'xls', 'csv'], true);
+
+    if (!$isDocx && !$isXlsx) {
+        header('Location: knowledge_repository.php?download=' . $fileId);
+        exit;
+    }
+
+    $titleHtml = htmlspecialchars($file['title'], ENT_QUOTES);
+    $rawUrl = 'knowledge_repository.php?raw=' . $fileId;
+    $downloadUrl = 'knowledge_repository.php?download=' . $fileId;
+    $headerIcon = $isDocx ? 'fa-file-word' : 'fa-file-excel';
+    $headerIconColor = $isDocx ? '#2B579A' : '#217346';
+    header('Content-Type: text/html; charset=utf-8');
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title><?= $titleHtml ?></title>
+<link rel="stylesheet" href="../assets/vendor/fontawesome-free-7.3.1/css/all.min.css">
+<style>
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;display:flex;flex-direction:column;background:#e9ebef;font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;color:#1A2233}
+
+.pv-header{flex:0 0 auto;height:56px;background:#fff;border-bottom:1px solid #dcdfe5;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:.75rem;padding:0 1rem;z-index:20}
+.pv-left{display:flex;align-items:center;gap:.55rem;min-width:0;justify-self:start;max-width:100%}
+.pv-left i{font-size:1.15rem;flex:0 0 auto}
+.pv-center{display:flex;align-items:center;justify-content:center;justify-self:center}
+.pv-right{display:flex;align-items:center;justify-self:end}
+.pv-name{font-size:.92rem;font-weight:600;color:#1A2233;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+
+.pv-download{display:inline-flex;align-items:center;gap:.45rem;height:36px;padding:0 .6rem;border:none;background:transparent;color:#475569;font-size:.85rem;font-weight:600;text-decoration:none;cursor:pointer;border-radius:6px;transition:color .12s ease,background-color .12s ease}
+.pv-download:hover{color:#1A2233;background:transparent}
+.pv-download:focus{outline:none}
+
+.pv-close{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:none;background:transparent;color:#475569;font-size:1.15rem;cursor:pointer;padding:0;transition:color .12s ease;border-radius:6px}
+.pv-close:hover{color:#1A2233;background:transparent}
+.pv-close:focus{outline:none}
+
+.pv-body{flex:1 1 auto;overflow:auto;position:relative}
+#out{min-height:100%}
+
+.pv-state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.8rem;min-height:60vh;color:#667085;font-size:.88rem;text-align:center;padding:1rem}
+.pv-spinner{width:30px;height:30px;border:3px solid #d5d9e2;border-top-color:#3B4E8A;border-radius:50%;animation:pvspin .8s linear infinite}
+@keyframes pvspin{to{transform:rotate(360deg)}}
+.pv-state.error{color:#B4432F}
+.pv-state.error i{font-size:2rem}
+
+#out .docx-wrapper{background:transparent!important;padding:24px 0!important;align-items:center}
+#out .docx-wrapper>section.docx{background:#fff;box-shadow:0 0 0 1px rgba(15,23,42,.06),0 2px 10px rgba(15,23,42,.14)!important;margin:0 auto 20px!important;flex:0 0 auto}
+
+.sheet-view{display:flex;flex-direction:column;height:100%}
+.sheet-panels{flex:1 1 auto;overflow:auto;background:#fff}
+.sheet-panel{display:none;padding:0}
+.sheet-panel.active{display:block}
+.sheet-panel table{border-collapse:collapse;font-size:.82rem;font-family:Calibri,'Segoe UI',Arial,sans-serif;background:#fff}
+.sheet-panel td,.sheet-panel th{border:1px solid #d4d7dd;padding:3px 8px;white-space:nowrap;text-align:left;vertical-align:bottom;min-width:64px;height:24px}
+.sheet-panel tr:first-child td{background:#f3f4f7;font-weight:600;border-bottom:2px solid #c5c9d2;position:sticky;top:0;z-index:2}
+.sheet-tabs{flex:0 0 auto;display:flex;gap:2px;overflow-x:auto;background:#f3f4f7;border-top:1px solid #d4d7dd;padding:0 .5rem}
+.sheet-tab{border:none;background:transparent;padding:.55rem 1rem;font-size:.78rem;font-weight:600;color:#475569;cursor:pointer;white-space:nowrap;border-top:2px solid transparent}
+.sheet-tab:hover{background:#e8eaef}
+.sheet-tab.active{background:#fff;color:#217346;border-top-color:#217346}
+
+@media (max-width:575.98px){
+  .pv-header{padding:0 .65rem;gap:.5rem;grid-template-columns:1fr auto auto}
+  .pv-download{font-size:.8rem;padding:0 .4rem}
+  .pv-name{font-size:.8rem}
+  #out .docx-wrapper{padding:12px 0!important}
+}
+</style>
+</head>
+<body>
+
+<header class="pv-header">
+  <div class="pv-left">
+    <i class="fa-solid <?= $headerIcon ?>" style="color:<?= $headerIconColor ?>;"></i>
+    <div class="pv-name" title="<?= $titleHtml ?>"><?= $titleHtml ?></div>
+  </div>
+  <div class="pv-center">
+    <a href="<?= $downloadUrl ?>" class="pv-download" title="Download">
+      <i class="fa-solid fa-download"></i><span>Download</span>
+    </a>
+  </div>
+  <div class="pv-right">
+    <button type="button" class="pv-close" title="Close" aria-label="Close" onclick="window.close()">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+  </div>
+</header>
+
+<div class="pv-body" id="viewer">
+  <div id="out">
+    <div class="pv-state"><div class="pv-spinner"></div><div>Loading preview...</div></div>
+  </div>
+</div>
+
+<script src="../assets/vendor/viewer/jszip.min.js"></script>
+<?php if ($isDocx): ?>
+<script src="../assets/vendor/viewer/docx-preview.min.js"></script>
+<script>
+(function () {
+  var out = document.getElementById('out');
+  var viewer = document.getElementById('viewer');
+
+  function fitPages() {
+    var wrapper = out.querySelector('.docx-wrapper');
+    var page = out.querySelector('section.docx');
+    if (!wrapper || !page) return;
+    wrapper.style.zoom = 1;
+    var pageWidth = page.offsetWidth;
+    var available = viewer.clientWidth - 24;
+    var scale = Math.min(1, available / pageWidth);
+    wrapper.style.zoom = scale;
+  }
+
+  fetch('<?= $rawUrl ?>', { credentials: 'same-origin' })
+    .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
+    .then(function (buf) {
+      out.innerHTML = '';
+      return docx.renderAsync(buf, out, null, {
+        className: 'docx',
+        inWrapper: true,
+        ignoreWidth: false,
+        ignoreHeight: false,
+        ignoreFonts: false,
+        breakPages: true,
+        ignoreLastRenderedPageBreak: false,
+        renderHeaders: true,
+        renderFooters: true,
+        renderFootnotes: true,
+        renderEndnotes: true,
+        useBase64URL: true
+      });
+    })
+    .then(function () {
+      fitPages();
+      var timer;
+      window.addEventListener('resize', function () {
+        clearTimeout(timer);
+        timer = setTimeout(fitPages, 100);
+      });
+    })
+    .catch(function (err) {
+      out.innerHTML = '<div class="pv-state error"><i class="fa-regular fa-circle-xmark"></i><div>Preview failed. Please download the file instead.</div></div>';
+      if (window.console) console.error(err);
+    });
+})();
+</script>
+<?php else: ?>
+<script src="../assets/vendor/viewer/xlsx.full.min.js"></script>
+<script>
+(function () {
+  var out = document.getElementById('out');
+
+  fetch('<?= $rawUrl ?>', { credentials: 'same-origin' })
+    .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
+    .then(function (buf) {
+      var wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
+      out.innerHTML = '';
+
+      var view = document.createElement('div');
+      view.className = 'sheet-view';
+      var panels = document.createElement('div');
+      panels.className = 'sheet-panels';
+      var tabs = document.createElement('div');
+      tabs.className = 'sheet-tabs';
+
+      var panelEls = [];
+      var tabEls = [];
+
+      function activate(index) {
+        panelEls.forEach(function (p, i) { p.classList.toggle('active', i === index); });
+        tabEls.forEach(function (t, i) { t.classList.toggle('active', i === index); });
+      }
+
+      wb.SheetNames.forEach(function (name, index) {
+        var panel = document.createElement('div');
+        panel.className = 'sheet-panel';
+        panel.innerHTML = XLSX.utils.sheet_to_html(wb.Sheets[name]);
+        panels.appendChild(panel);
+        panelEls.push(panel);
+
+        var tab = document.createElement('button');
+        tab.type = 'button';
+        tab.className = 'sheet-tab';
+        tab.textContent = name;
+        tab.addEventListener('click', function () { activate(index); });
+        tabs.appendChild(tab);
+        tabEls.push(tab);
+      });
+
+      view.appendChild(panels);
+      view.appendChild(tabs);
+      out.appendChild(view);
+      out.style.height = '100%';
+      activate(0);
+    })
+    .catch(function (err) {
+      out.innerHTML = '<div class="pv-state error"><i class="fa-regular fa-circle-xmark"></i><div>Preview failed. Please download the file instead.</div></div>';
+      if (window.console) console.error(err);
+    });
+})();
+</script>
+<?php endif; ?>
+</body>
+</html>
+<?php
+    exit;
+}
+
 if (isset($_GET['view'])) {
     $fileId = (int) $_GET['view'];
     $stmt = $pdo->prepare("SELECT title, file_path, file_type FROM knowledge_documents WHERE document_id = ? AND item_type = 'file'");
@@ -416,33 +578,6 @@ if (isset($_GET['view'])) {
     if ($file && is_file($uploadDir . basename($file['file_path']))) {
         $sourcePath = $uploadDir . basename($file['file_path']);
         $ext = strtolower($file['file_type'] ?? '');
-        $baseTitle = pathinfo($file['title'], PATHINFO_FILENAME);
-
-        $officeExts = ['doc', 'docx', 'xls', 'xlsx', 'csv', 'ppt', 'pptx'];
-
-        if (in_array($ext, $officeExts, true)) {
-            $pdfPath = convertToPdf($sourcePath, $pdfCacheDir, (string) $fileId);
-
-            if ($pdfPath === null || !is_file($pdfPath)) {
-                http_response_code(500);
-                header('Content-Type: text/html; charset=utf-8');
-                echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Preview Error</title>';
-                echo '<style>body{font-family:system-ui,sans-serif;padding:2rem;max-width:640px;margin:auto;color:#1A2233;}h1{color:#B4432F;font-size:1.25rem;}code{background:#F5F6F9;padding:.1rem .35rem;border-radius:4px;}a{color:#2E3E70;}</style>';
-                echo '</head><body>';
-                echo '<h1>Preview not available</h1>';
-                echo '<p>Hindi ma-convert ang file na ito sa PDF.</p>';
-                echo '<p><a href="knowledge_repository.php?download=' . (int) $fileId . '">⬇ Download na lang ang file</a></p>';
-                echo '</body></html>';
-                exit;
-            }
-
-            header('Content-Type: application/pdf');
-            header('Content-Disposition: inline; filename="' . $baseTitle . '.pdf"');
-            header('Content-Length: ' . filesize($pdfPath));
-            readfile($pdfPath);
-            exit;
-        }
-
         $mimeTypes = [
             'pdf'  => 'application/pdf',
             'jpg'  => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png',
@@ -908,10 +1043,9 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
                   <?php
                     $ext = strtolower($file['file_type'] ?? '');
                     $mode = previewMode($ext);
-                    $viewUrl = 'knowledge_repository.php?view=' . $file['document_id'];
                     $downloadUrl = 'knowledge_repository.php?download=' . $file['document_id'];
 
-                    if ($mode === 'office-server') {
+                    if ($mode === 'browser') {
                         $clickAction = "viewDoc(this, " . $file['document_id'] . ");";
                     } elseif ($mode === 'native') {
                         $clickAction = "viewPdf(" . $file['document_id'] . ");";
@@ -925,7 +1059,7 @@ body { background-color: var(--canvas); color: var(--ink); font-family: 'Inter',
                       <i class="fa-solid fa-ellipsis-vertical"></i>
                     </button>
                     <ul class="dropdown-menu" onclick="event.stopPropagation()">
-                      <?php if ($mode === 'office-server'): ?>
+                      <?php if ($mode === 'browser'): ?>
                         <li><a class="dropdown-item" href="#" onclick="viewDoc(null, <?= $file['document_id'] ?>); return false;"><i class="fa-regular fa-eye me-2"></i>View</a></li>
                       <?php elseif ($mode === 'native'): ?>
                         <li><a class="dropdown-item" href="#" onclick="viewPdf(<?= $file['document_id'] ?>); return false;"><i class="fa-regular fa-eye me-2"></i>View</a></li>
@@ -1185,7 +1319,7 @@ function viewDoc(cardEl, id) {
       cardEl.classList.remove('is-loading');
     }, 3000);
   }
-  window.open('knowledge_repository.php?view=' + id + '#toolbar=1&navpanes=0', '_blank', 'noopener,noreferrer');
+  window.open('knowledge_repository.php?preview=' + id, '_blank', 'noopener,noreferrer');
 }
 
 const repoSearchInput = document.getElementById('repoLiveSearch');

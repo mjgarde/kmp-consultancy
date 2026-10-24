@@ -1166,7 +1166,6 @@ body {
                   <option value="<?= htmlspecialchars($existingSkill) ?>"><?= htmlspecialchars($existingSkill) ?></option>
                 <?php endforeach; ?>
               </select>
-              <div class="form-text">This determines which staff will be recommended in Resource Matching.</div>
             </div>
           </div>
         </div>

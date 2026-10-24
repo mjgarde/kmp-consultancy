@@ -1,9 +1,9 @@
 <?php
-session_name('SUPERVISOR_SESSION');
+session_name('MANAGER_SESSION');
 session_start();
 require_once __DIR__ . '/../config/database.php';
 
-if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'supervisor') {
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'manager') {
     header('Location: ../login.php');
     exit;
 }
@@ -850,7 +850,7 @@ body {
 
 <div class="dashboard-layout d-flex">
 
-<?php require __DIR__ . '/../includes/supervisor/sidebar.php'; ?>
+<?php require __DIR__ . '/../includes/manager/sidebar.php'; ?>
 
   <div class="dashboard-main flex-grow-1" style="min-width:0;">
 

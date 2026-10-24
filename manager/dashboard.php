@@ -11,10 +11,8 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'manager') {
 
 $pdo = getConnection();
 
-$filterMode = $_GET['filter_mode'] ?? '';
 $dateStart = $_GET['date_start'] ?? '';
 $dateEnd = $_GET['date_end'] ?? '';
-$dateSingle = $_GET['date_single'] ?? '';
 
 $validDate = function (string $d): bool {
     if ($d === '') return false;
@@ -30,22 +28,33 @@ $filterWhereCtAlias = '';
 $filterParams = [];
 $filterLabel = '';
 
-if ($filterMode === 'range' && $validDate($dateStart) && $validDate($dateEnd)) {
+if ($validDate($dateStart) && !$validDate($dateEnd)) {
+    $dateEnd = $dateStart;
+}
+
+if ($validDate($dateStart) && $validDate($dateEnd)) {
+    if ($dateStart > $dateEnd) {
+        [$dateStart, $dateEnd] = [$dateEnd, $dateStart];
+    }
     $hasFilter = true;
-    $filterWhereSr = " AND DATE(sr.created_at) BETWEEN :fstart AND :fend ";
-    $filterWhereQt = " AND DATE(q.created_at) BETWEEN :fstart AND :fend ";
-    $filterWhereCt = " AND DATE(created_at) BETWEEN :fstart AND :fend ";
-    $filterWhereCtAlias = " AND DATE(ct.created_at) BETWEEN :fstart AND :fend ";
-    $filterParams = [':fstart' => $dateStart, ':fend' => $dateEnd];
-    $filterLabel = 'Filtered: ' . date('M d, Y', strtotime($dateStart)) . ' – ' . date('M d, Y', strtotime($dateEnd));
-} elseif ($filterMode === 'single' && $validDate($dateSingle)) {
-    $hasFilter = true;
-    $filterWhereSr = " AND DATE(sr.created_at) = :fsingle ";
-    $filterWhereQt = " AND DATE(q.created_at) = :fsingle ";
-    $filterWhereCt = " AND DATE(created_at) = :fsingle ";
-    $filterWhereCtAlias = " AND DATE(ct.created_at) = :fsingle ";
-    $filterParams = [':fsingle' => $dateSingle];
-    $filterLabel = 'Filtered: ' . date('M d, Y', strtotime($dateSingle));
+
+    if ($dateStart === $dateEnd) {
+        $filterWhereSr = " AND DATE(sr.created_at) = :fsingle ";
+        $filterWhereQt = " AND DATE(q.created_at) = :fsingle ";
+        $filterWhereCt = " AND DATE(created_at) = :fsingle ";
+        $filterWhereCtAlias = " AND DATE(ct.created_at) = :fsingle ";
+        $filterParams = [':fsingle' => $dateStart];
+        $filterLabel = date('M d, Y', strtotime($dateStart));
+    } else {
+        $filterWhereSr = " AND DATE(sr.created_at) BETWEEN :fstart AND :fend ";
+        $filterWhereQt = " AND DATE(q.created_at) BETWEEN :fstart AND :fend ";
+        $filterWhereCt = " AND DATE(created_at) BETWEEN :fstart AND :fend ";
+        $filterWhereCtAlias = " AND DATE(ct.created_at) BETWEEN :fstart AND :fend ";
+        $filterParams = [':fstart' => $dateStart, ':fend' => $dateEnd];
+        $filterLabel = date('M d, Y', strtotime($dateStart)) . ' – ' . date('M d, Y', strtotime($dateEnd));
+    }
+} else {
+    $dateStart = $dateEnd = '';
 }
 
 $totalClients = (int) $pdo->query('SELECT COUNT(*) FROM clients')->fetchColumn();
@@ -144,6 +153,24 @@ $staffWorkloadStmt = $pdo->query(
 );
 $staffWorkload = $staffWorkloadStmt->fetchAll();
 
+$requestSlices = [
+    ['label' => 'New',         'value' => $newRequests,        'color' => '#0B67B8'],
+    ['label' => 'In Progress', 'value' => $inProgressRequests, 'color' => '#12AEEF'],
+    ['label' => 'Completed',   'value' => $completedRequests,  'color' => '#33B9CC'],
+    ['label' => 'Cancelled',   'value' => $cancelledRequests,  'color' => '#A9B4C2'],
+];
+$requestTotal = array_sum(array_column($requestSlices, 'value'));
+
+$approvalBars = [
+    ['label' => 'Quotations Approved', 'value' => $approvedQuotations, 'color' => '#0B67B8'],
+    ['label' => 'Contracts Approved',  'value' => $approvedContracts,  'color' => '#12AEEF'],
+    ['label' => 'Pending Approval',    'value' => $pendingApproval,    'color' => '#33B9CC'],
+    ['label' => 'Needs Revision',      'value' => $revertTotal,        'color' => '#A9B4C2'],
+];
+$approvalMax = max(array_column($approvalBars, 'value')) ?: 1;
+
+$workloadMax = $staffWorkload ? (max(array_column($staffWorkload, 'workload')) ?: 1) : 1;
+
 function requestStatusClass(string $status): string
 {
     return match ($status) {
@@ -175,38 +202,38 @@ function quotationStatusClass(string $status): string
 <title>Dashboard</title>
 <link rel="stylesheet" href="../assets/vendor/bootstrap-5.3.8/css/bootstrap.min.css">
 <link rel="stylesheet" href="../assets/vendor/fontawesome-free-7.3.1/css/all.min.css">
+<link rel="stylesheet" href="../assets/vendor/flatpickr/flatpickr.min.css">
 <link rel="stylesheet" href="../assets/css/dashboard.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lexend:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  --navy: #1E293B;
-  --navy-deep: #0F172A;
-  --navy-soft: #EEF1F6;
-  --indigo: #3B4E8A;
-  --indigo-soft: #E9ECF6;
-  --indigo-text: #2E3E70;
-  --slate: #475569;
-  --slate-soft: #64748B;
+  --blue: #0B67B8;
+  --blue-dark: #084F8F;
+  --sky: #12AEEF;
+  --teal: #33B9CC;
+  --grey: #A9B4C2;
 
-  --success: #157A5F;
+  --blue-soft: #E8F1FA;
+  --blue-text: #0B4F8F;
+  --surface: #F4F7FA;
+  --chip: #EEF2F6;
+
   --success-soft: #E3F3EC;
   --success-text: #0F5F49;
   --success-border: #BFE3D3;
 
-  --warn: #B7791F;
   --warn-soft: #FBF0DD;
   --warn-text: #8A5A15;
   --warn-border: #EFD8A8;
 
-  --danger: #B4432F;
   --danger-soft: #FAECE8;
   --danger-text: #93382A;
   --danger-border: #EDC7BC;
 
-  --ink: #1A2233;
-  --ink-soft: #667085;
-  --line: #E2E5EB;
+  --ink: #1F2933;
+  --ink-soft: #6B7785;
+  --line: #E3E8EF;
   --canvas: #FFFFFF;
   --card: #FFFFFF;
 }
@@ -215,7 +242,6 @@ body {
   background-color: var(--canvas);
   color: var(--ink);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  letter-spacing: -0.005em;
 }
 
 .dashboard-layout, .dashboard-main, .dashboard-content {
@@ -227,7 +253,7 @@ body {
 }
 
 .dashboard-title {
-  color: var(--navy-deep);
+  color: var(--ink);
   letter-spacing: -0.01em;
   font-size: 1.15rem !important;
 }
@@ -239,139 +265,164 @@ body {
   padding-bottom: .75rem;
 }
 
-.card {
-  border-radius: 12px;
-  border: 1px solid var(--line) !important;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, .04) !important;
-  transition: box-shadow .15s ease;
-}
-.card:hover { box-shadow: 0 4px 14px rgba(15, 23, 42, .06) !important; }
-
-.card-header {
-  border-bottom: 1px solid var(--line) !important;
-  background-color: var(--card) !important;
-  border-radius: 12px 12px 0 0 !important;
-  padding: 1rem 1.15rem;
-}
-.card-header h2 { color: var(--ink); letter-spacing: -0.01em; }
-.card-header p { color: var(--ink-soft) !important; margin-bottom: 0; }
-.card-header.d-flex { flex-wrap: wrap; row-gap: .5rem; }
-
-.metric-card {
-  border-radius: 12px;
-  border: 1px solid var(--line);
+.kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
   background-color: var(--card);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
-  padding: 1.1rem 1.2rem;
-  height: 100%;
-  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1.15rem 0;
 }
-.metric-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
+.kpi-item {
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: .2rem .75rem;
+  border-left: 1px solid var(--line);
+  min-width: 0;
+}
+.kpi-item:first-child { border-left: none; }
+.kpi-icon {
+  position: relative;
+  width: 78px;
+  height: 46px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  margin-bottom: .55rem;
+}
+.kpi-icon::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 15px;
+  border-radius: 50%;
+  background-color: var(--chip);
+}
+.kpi-icon i {
+  position: relative;
+  font-size: 1.85rem;
+  color: var(--blue);
+  line-height: 1;
+  margin-top: .15rem;
+}
+.kpi-value {
+  font-family: 'Lexend', sans-serif;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.1;
+}
+.kpi-label {
+  font-size: .78rem;
+  color: var(--ink-soft);
+  margin-top: .2rem;
+}
+
+.panel {
+  background-color: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1rem 1.1rem 1.1rem;
+  height: 100%;
+}
+.panel-title {
+  font-family: 'Lexend', 'Inter', sans-serif;
+  font-size: .95rem;
+  font-weight: 600;
+  color: var(--ink);
+  text-align: center;
+  margin: 0 0 .15rem;
+}
+.panel-sub {
+  font-size: .74rem;
+  color: var(--ink-soft);
+  text-align: center;
+  margin: 0 0 .9rem;
+}
+.panel-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-bottom: .9rem;
+}
+.panel-head-row .panel-title { text-align: left; margin: 0; }
+.panel-head-row .panel-sub { text-align: left; margin: .1rem 0 0; }
+
+.donut-wrap {
+  position: relative;
+  height: 175px;
+}
+.donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 1.05rem;
-  flex-shrink: 0;
+  pointer-events: none;
 }
-.metric-label { font-size: .72rem; color: var(--ink-soft); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; word-break: break-word; }
-.metric-value { font-size: 1.5rem; font-weight: 700; font-family: 'Lexend', sans-serif; color: var(--navy-deep); }
-
-.chart-legend-item {
+.donut-center .donut-total {
+  font-family: 'Lexend', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink);
+}
+.donut-center .donut-caption {
+  font-size: .68rem;
+  color: var(--ink-soft);
+  margin-top: .2rem;
+}
+.legend-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: .45rem 1.1rem;
+  margin-top: .9rem;
+}
+.legend-item {
   display: flex;
   align-items: center;
-  gap: .5rem;
-  font-size: .78rem;
+  gap: .4rem;
+  font-size: .76rem;
   color: var(--ink-soft);
   white-space: nowrap;
 }
-.chart-legend-dot {
+.legend-dot {
   width: 9px;
   height: 9px;
   border-radius: 50%;
   flex-shrink: 0;
 }
-.chart-legend-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: .9rem 1.4rem;
-  justify-content: center;
-}
+.legend-item strong { color: var(--ink); font-weight: 700; }
 
-.approved-icon {
-  width: 46px;
-  height: 46px;
-  border-radius: 12px;
-  background-color: var(--success-soft);
-  color: var(--success-text);
-  display: flex;
+.chart-box { position: relative; height: 215px; }
+
+.hbar-list { display: flex; flex-direction: column; gap: .95rem; padding-top: .35rem; }
+.hbar-row {
+  display: grid;
+  grid-template-columns: 112px 1fr;
   align-items: center;
-  justify-content: center;
-  font-size: 1.15rem;
-  margin-bottom: .2rem;
+  gap: .75rem;
 }
-.approval-split {
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  gap: 1rem;
-  padding: .6rem 0;
+.hbar-label {
+  font-size: .76rem;
+  color: var(--ink);
+  text-align: right;
+  line-height: 1.2;
 }
-.approval-split-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: .35rem;
-  flex: 1;
+.hbar-track { display: flex; align-items: center; gap: .55rem; min-width: 0; }
+.hbar-fill {
+  height: 20px;
+  border-radius: 2px;
+  min-width: 3px;
 }
-.approval-split-item .approved-value {
-  font-family: 'Lexend', sans-serif;
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--success-text);
-  line-height: 1;
-}
-.approval-split-item .approved-label {
-  font-size: .7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .03em;
-  color: var(--ink-soft);
-}
-.approval-divider {
-  width: 1px;
-  align-self: stretch;
-  background-color: var(--line);
-}
-.approval-sub {
-  display: flex;
-  justify-content: space-around;
-  gap: 1rem;
-  margin-top: .8rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--line);
-}
-.approval-sub-item {
-  flex: 1;
-  text-align: center;
-}
-.approval-sub-value {
-  font-family: 'Lexend', sans-serif;
-  font-size: 1.3rem;
-  font-weight: 700;
-  line-height: 1;
-}
-.approval-sub-label {
-  font-size: .66rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .03em;
-  color: var(--ink-soft);
-  margin-top: .35rem;
-}
+.hbar-value { font-size: .76rem; font-weight: 700; color: var(--ink); }
 
 .status-pill {
   font-size: .68rem;
@@ -381,7 +432,7 @@ body {
   white-space: nowrap;
   border: 1px solid transparent;
 }
-.status-new { background-color: var(--navy-soft); color: var(--slate); border-color: var(--line); }
+.status-new { background-color: var(--blue-soft); color: var(--blue-text); border-color: #CFE1F3; }
 .status-progress { background-color: var(--warn-soft); color: var(--warn-text); border-color: var(--warn-border); }
 .status-approved { background-color: var(--success-soft); color: var(--success-text); border-color: var(--success-border); }
 .status-rejected { background-color: var(--danger-soft); color: var(--danger-text); border-color: var(--danger-border); }
@@ -393,66 +444,95 @@ body {
   font-size: .68rem;
   letter-spacing: .05em;
   text-transform: uppercase;
-  background-color: var(--navy-soft) !important;
+  background-color: var(--surface) !important;
 }
 .table td { border-bottom: 1px solid var(--line); vertical-align: middle; font-size: .82rem; }
-.table-hover tbody tr:hover { background-color: var(--navy-soft); }
-
-.workload-bar-track {
-  background-color: var(--navy-soft);
-  border-radius: 999px;
-  height: 6px;
+.table-hover tbody tr:hover { background-color: var(--surface); }
+.table-wrap {
+  border: 1px solid var(--line);
+  border-radius: 10px;
   overflow: hidden;
-  width: 100%;
 }
-.workload-bar-fill { background-color: var(--indigo); height: 100%; border-radius: 999px; }
+.table-wrap .table tbody tr:last-child td { border-bottom: none; }
+.amount { color: var(--blue-text); font-weight: 600; }
 
 .empty-state { color: var(--ink-soft); }
-.empty-state i { color: #C7D0D6; }
+.empty-state i { color: #C5CED8; }
 
 .btn-view-all {
-  background-color: var(--navy-soft);
-  color: var(--navy);
+  background-color: var(--blue-soft);
+  color: var(--blue-text);
   font-weight: 600;
   border-radius: 7px;
-  font-size: .78rem;
+  font-size: .76rem;
+  padding: .3rem .7rem;
 }
-.btn-view-all:hover { background-color: #E4E8F0; color: var(--navy); }
+.btn-view-all:hover { background-color: #D8E8F6; color: var(--blue-text); }
 
-.btn-ghost {
-  background-color: var(--navy-soft);
-  color: var(--navy);
+.date-filter {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background-color: #fff;
   border: 1px solid var(--line);
-  border-radius: 7px;
-  font-weight: 600;
-  font-size: .8rem;
+  border-radius: 10px;
+  height: 44px;
+  padding: 0 .75rem;
+  gap: .55rem;
+  min-width: 270px;
+  transition: border-color .15s, box-shadow .15s, background-color .15s;
 }
-.btn-ghost:hover { background-color: #E4E8F0; color: var(--navy); }
-
-.btn-print-text {
+.date-filter:hover { border-color: #C5CED8; }
+.date-filter:focus-within { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(11, 103, 184, .15) !important; }
+.date-filter > i.fa-calendar { color: var(--blue); font-size: .95rem; }
+.date-filter input[type="text"] {
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--ink);
+  width: 100%;
+  cursor: pointer;
+  padding: 0;
+}
+.date-filter input::placeholder { color: var(--ink-soft); font-weight: 500; }
+.date-filter.is-active { border-color: var(--blue); background-color: var(--blue-soft); }
+.date-clear {
+  color: var(--ink-soft);
+  width: 22px;
+  height: 22px;
   display: inline-flex;
   align-items: center;
-  gap: .45rem;
-  background-color: transparent;
-  color: var(--navy);
-  border: none;
-  border-radius: 8px;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: .75rem;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+.date-clear:hover { background-color: #fff; color: #B4432F; }
+
+.btn-print {
+  display: inline-flex;
+  align-items: center;
+  gap: .6rem;
+  height: 44px;
+  padding: 0 1.4rem;
+  background-color: var(--blue);
+  color: #fff;
+  border: 1px solid var(--blue);
+  border-radius: 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: .92rem;
   font-weight: 600;
-  font-size: .85rem;
-  padding: .4rem .7rem;
-  transition: background-color .15s ease;
+  letter-spacing: .01em;
+  white-space: nowrap;
+  transition: background-color .15s, transform .05s;
 }
-.btn-print-text:hover,
-.btn-print-text:focus,
-.btn-print-text:active,
-.btn-print-text:focus-visible {
-  background-color: var(--navy-soft);
-  color: var(--navy);
-  outline: none !important;
-  box-shadow: none !important;
-}
-.btn-print-text:active { background-color: #E4E8F0; }
-.btn-print-text i { font-size: .95rem; }
+.btn-print i { font-size: 1rem; color: #fff; }
+.btn-print:hover { background-color: var(--blue-dark); border-color: var(--blue-dark); color: #fff; }
+.btn-print:active { transform: translateY(1px); }
 
 button, .btn, .btn:focus, .btn:active, .btn:focus-visible, .btn:active:focus,
 input, input:focus, input:focus-visible,
@@ -464,81 +544,77 @@ button::-moz-focus-inner {
   border: 0 !important;
 }
 
-.filter-bar {
-  background-color: var(--card);
+.flatpickr-calendar {
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, .15);
   border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: .85rem 1.15rem;
-  display: flex;
-  align-items: center;
-  gap: .9rem;
-  flex-wrap: wrap;
-  row-gap: .7rem;
+  font-family: 'Inter', sans-serif;
 }
-.filter-bar .filter-mode-toggle {
-  display: flex;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  overflow: hidden;
-  flex-shrink: 0;
+.flatpickr-day.selected,
+.flatpickr-day.startRange,
+.flatpickr-day.endRange { background: var(--blue); border-color: var(--blue); }
+.flatpickr-day.inRange {
+  background: var(--blue-soft);
+  border-color: var(--blue-soft);
+  box-shadow: -5px 0 0 var(--blue-soft), 5px 0 0 var(--blue-soft);
 }
-.filter-bar .filter-mode-toggle label {
-  margin: 0;
-  padding: .45rem .8rem;
-  font-size: .78rem;
-  font-weight: 600;
-  color: var(--ink-soft);
-  cursor: pointer;
-  background-color: var(--navy-soft);
-}
-.filter-bar .filter-mode-toggle input { display: none; }
-.filter-bar .filter-mode-toggle input:checked + label {
-  background-color: var(--indigo);
-  color: #fff;
-}
-.filter-bar .filter-fields {
-  display: flex;
-  align-items: center;
-  gap: .6rem;
-  flex-wrap: wrap;
-  row-gap: .5rem;
-}
-.filter-bar label.field-label {
-  font-size: .72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .03em;
-  color: var(--ink-soft);
-  margin: 0 0 0 .2rem;
-}
-.filter-bar input[type="date"] {
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  padding: .4rem .6rem;
-  font-size: .82rem;
-  color: var(--ink);
-}
-.filter-bar .filter-actions {
-  display: flex;
-  gap: .5rem;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-.filter-active-badge {
-  font-size: .72rem;
-  font-weight: 600;
-  color: var(--indigo-text);
-  background-color: var(--indigo-soft);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: .3rem .7rem;
-  display: flex;
-  align-items: center;
-  gap: .35rem;
-  white-space: nowrap;
-}
+.flatpickr-day.today { border-color: var(--blue); }
 
 .print-header { display: none; }
+
+@media (max-width: 1199.98px) {
+  .kpi-strip { grid-template-columns: repeat(3, 1fr); row-gap: 1.1rem; }
+  .kpi-item { border-left: 1px solid var(--line); }
+  .kpi-item:nth-child(3n+1) { border-left: none; }
+}
+@media (max-width: 767.98px) {
+  .dashboard-topbar-actions { min-width: 0; flex: 1 1 auto; justify-content: flex-end; }
+  #filterForm { min-width: 0; flex: 1 1 auto; justify-content: flex-end; }
+  .date-filter {
+    min-width: 0;
+    width: 100%;
+    max-width: 190px;
+    height: 38px;
+    padding: 0 .6rem;
+    gap: .4rem;
+    border-radius: 8px;
+  }
+  .date-filter > i.fa-calendar { font-size: .8rem; }
+  .date-filter input[type="text"] { font-size: .74rem; text-overflow: ellipsis; }
+  .date-clear { width: 18px; height: 18px; font-size: .65rem; }
+  .btn-print {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    justify-content: center;
+    gap: 0;
+    border-radius: 8px;
+  }
+  .btn-print span { display: none; }
+  .btn-print i { font-size: .85rem; }
+}
+@media (max-width: 575.98px) {
+  .date-filter { max-width: 150px; height: 34px; }
+  .btn-print { width: 34px; height: 34px; }
+}
+@media (max-width: 575.98px) {
+  .kpi-strip {
+    grid-template-columns: repeat(3, 1fr);
+    row-gap: .85rem;
+    padding: .8rem 0;
+  }
+  .kpi-item { padding: .1rem .3rem; }
+  .kpi-item:nth-child(n) { border-left: 1px solid var(--line); }
+  .kpi-item:nth-child(3n+1) { border-left: none; }
+  .kpi-icon { width: 46px; height: 28px; margin-bottom: .35rem; }
+  .kpi-icon::before { height: 9px; }
+  .kpi-icon i { font-size: 1.05rem; margin-top: .1rem; }
+  .kpi-value { font-size: .95rem; }
+  .kpi-label { font-size: .62rem; margin-top: .1rem; line-height: 1.2; }
+}
+@media (max-width: 575.98px) {
+  .hbar-row { grid-template-columns: 92px 1fr; }
+}
 
 @media print {
   .no-print { display: none !important; }
@@ -550,7 +626,7 @@ button::-moz-focus-inner {
     text-align: center;
     margin-bottom: 24px;
     padding-bottom: 14px;
-    border-bottom: 2px solid var(--navy);
+    border-bottom: 2px solid var(--blue);
   }
   .print-header img {
     height: 48px;
@@ -561,7 +637,7 @@ button::-moz-focus-inner {
     font-family: 'Lexend', sans-serif;
     font-size: 20px;
     font-weight: 700;
-    color: var(--navy);
+    color: var(--blue);
     margin-bottom: 2px;
   }
   .print-header p {
@@ -574,7 +650,11 @@ button::-moz-focus-inner {
   .dashboard-layout > *:not(.dashboard-main) { display: none !important; }
   .dashboard-main { width: 100% !important; margin: 0 !important; }
   main.dashboard-content { padding: 0 24px 24px !important; }
-  .card, .metric-card { border: 1px solid #D8DEE3 !important; box-shadow: none !important; break-inside: avoid; }
+  .panel, .kpi-strip { break-inside: avoid; }
+  .hbar-fill, .legend-dot {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
 }
 </style>
 </head>
@@ -597,9 +677,22 @@ button::-moz-focus-inner {
           <p class="dashboard-subtitle small mb-0 d-none d-sm-block">Welcome back, <?= htmlspecialchars($_SESSION['fullname'] ?? $_SESSION['manager_fullname'] ?? 'Manager') ?>.</p>
         </div>
       </div>
-      <div class="dashboard-topbar-actions d-flex align-items-center gap-3 gap-md-4">
-        <button type="button" class="btn-print-text" onclick="window.print()">
-          <i class="fa-solid fa-print"></i> <span>Print</span>
+
+      <div class="dashboard-topbar-actions d-flex align-items-center gap-2 gap-md-3">
+        <form method="GET" id="filterForm" class="d-flex align-items-center gap-2 m-0">
+          <div class="date-filter <?= $hasFilter ? 'is-active' : '' ?>">
+            <i class="fa-regular fa-calendar"></i>
+            <input type="text" id="dateRange" placeholder="Select date or range" autocomplete="off">
+            <?php if ($hasFilter): ?>
+              <a href="dashboard.php" class="date-clear" title="Clear filter" aria-label="Clear filter"><i class="fa-solid fa-xmark"></i></a>
+            <?php endif; ?>
+          </div>
+          <input type="hidden" name="date_start" id="date_start" value="<?= htmlspecialchars($dateStart) ?>">
+          <input type="hidden" name="date_end" id="date_end" value="<?= htmlspecialchars($dateEnd) ?>">
+        </form>
+
+        <button type="button" class="btn-print" onclick="window.print()">
+          <i class="fa-solid fa-print"></i><span>Print Report</span>
         </button>
       </div>
     </header>
@@ -614,303 +707,238 @@ button::-moz-focus-inner {
         </div>
       </div>
 
-      <form method="GET" class="filter-bar mb-3 no-print" id="filterForm">
-        <div class="filter-mode-toggle">
-          <input type="radio" name="filter_mode" id="mode-range" value="range" <?= $filterMode !== 'single' ? 'checked' : '' ?>>
-          <label for="mode-range"><i class="fa-regular fa-calendar-days me-1"></i>Date Range</label>
-          <input type="radio" name="filter_mode" id="mode-single" value="single" <?= $filterMode === 'single' ? 'checked' : '' ?>>
-          <label for="mode-single"><i class="fa-solid fa-calendar-day me-1"></i>Specific Date</label>
+      <div class="kpi-strip mb-3">
+        <div class="kpi-item">
+          <div class="kpi-icon"><i class="fa-solid fa-users"></i></div>
+          <div class="kpi-value"><?= $totalClients ?></div>
+          <div class="kpi-label">Total Clients</div>
         </div>
-
-        <div class="filter-fields" id="range-fields" style="<?= $filterMode === 'single' ? 'display:none;' : 'display:flex;' ?>">
-          <label class="field-label" for="date_start">From</label>
-          <input type="date" name="date_start" id="date_start" value="<?= htmlspecialchars($dateStart) ?>" max="<?= date('Y-m-d') ?>">
-          <label class="field-label" for="date_end">To</label>
-          <input type="date" name="date_end" id="date_end" value="<?= htmlspecialchars($dateEnd) ?>" max="<?= date('Y-m-d') ?>">
+        <div class="kpi-item">
+          <div class="kpi-icon"><i class="fa-solid fa-clipboard-list"></i></div>
+          <div class="kpi-value"><?= $newRequests ?></div>
+          <div class="kpi-label">Pending Requests</div>
         </div>
-
-        <div class="filter-fields" id="single-fields" style="<?= $filterMode === 'single' ? 'display:flex;' : 'display:none;' ?>">
-          <label class="field-label" for="date_single">Date</label>
-          <input type="date" name="date_single" id="date_single" value="<?= htmlspecialchars($dateSingle) ?>" max="<?= date('Y-m-d') ?>">
+        <div class="kpi-item">
+          <div class="kpi-icon"><i class="fa-solid fa-user-check"></i></div>
+          <div class="kpi-value"><?= $activeStaffCount ?></div>
+          <div class="kpi-label">Active Staff</div>
         </div>
-
-        <?php if ($hasFilter): ?>
-          <span class="filter-active-badge"><i class="fa-solid fa-filter"></i><?= htmlspecialchars($filterLabel) ?></span>
-        <?php endif; ?>
-
-        <div class="filter-actions">
-          <button type="submit" class="btn btn-ghost btn-sm px-3"><i class="fa-solid fa-magnifying-glass me-1"></i>Apply</button>
-          <?php if ($hasFilter): ?>
-            <a href="dashboard.php" class="btn btn-ghost btn-sm px-3"><i class="fa-solid fa-xmark me-1"></i>Clear</a>
-          <?php endif; ?>
+        <div class="kpi-item">
+          <div class="kpi-icon"><i class="fa-solid fa-user-clock"></i></div>
+          <div class="kpi-value"><?= $awaitingAssignment ?></div>
+          <div class="kpi-label">Awaiting Assignment</div>
         </div>
-      </form>
-
-      <div class="row g-3 mb-3">
-        <div class="col-6 col-lg-4">
-          <div class="metric-card d-flex align-items-center gap-3">
-            <span class="metric-icon" style="background-color:var(--indigo-soft);">
-              <i class="fa-solid fa-building" style="color:var(--indigo-text);"></i>
-            </span>
-            <div>
-              <div class="metric-label">Total Clients</div>
-              <div class="metric-value"><?= $totalClients ?></div>
-            </div>
-          </div>
+        <div class="kpi-item">
+          <div class="kpi-icon"><i class="fa-solid fa-hourglass-half"></i></div>
+          <div class="kpi-value"><?= $pendingApproval ?></div>
+          <div class="kpi-label">Pending Approval</div>
         </div>
-        <div class="col-6 col-lg-4">
-          <div class="metric-card d-flex align-items-center gap-3">
-            <span class="metric-icon" style="background-color:var(--warn-soft);">
-              <i class="fa-solid fa-clipboard-list" style="color:var(--warn-text);"></i>
-            </span>
-            <div>
-              <div class="metric-label">Pending Requests</div>
-              <div class="metric-value"><?= $newRequests ?></div>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-4">
-          <div class="metric-card d-flex align-items-center gap-3">
-            <span class="metric-icon" style="background-color:var(--success-soft);">
-              <i class="fa-solid fa-user-check" style="color:var(--success-text);"></i>
-            </span>
-            <div>
-              <div class="metric-label">Active Staff</div>
-              <div class="metric-value"><?= $activeStaffCount ?></div>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-4">
-          <div class="metric-card d-flex align-items-center gap-3">
-            <span class="metric-icon" style="background-color:var(--danger-soft);">
-              <i class="fa-solid fa-user-clock" style="color:var(--danger-text);"></i>
-            </span>
-            <div>
-              <div class="metric-label">Awaiting Assignment</div>
-              <div class="metric-value"><?= $awaitingAssignment ?></div>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-4">
-          <div class="metric-card d-flex align-items-center gap-3">
-            <span class="metric-icon" style="background-color:var(--navy-soft);">
-              <i class="fa-solid fa-hourglass-half" style="color:var(--slate);"></i>
-            </span>
-            <div>
-              <div class="metric-label">Pending Approval</div>
-              <div class="metric-value"><?= $pendingApproval ?></div>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-4">
-          <div class="metric-card d-flex align-items-center gap-3">
-            <span class="metric-icon" style="background-color:var(--warn-soft);">
-              <i class="fa-solid fa-rotate-left" style="color:var(--warn-text);"></i>
-            </span>
-            <div>
-              <div class="metric-label">Needs Revision</div>
-              <div class="metric-value"><?= $revertTotal ?></div>
-            </div>
-          </div>
+        <div class="kpi-item">
+          <div class="kpi-icon"><i class="fa-solid fa-rotate-left"></i></div>
+          <div class="kpi-value"><?= $revertTotal ?></div>
+          <div class="kpi-label">Needs Revision</div>
         </div>
       </div>
 
       <div class="row g-3 mb-3">
-        <div class="col-lg-8">
-          <section class="card h-100">
-            <div class="card-header">
-              <h2 class="h6 fw-bold mb-0">Service Requests</h2>
-              <p class="small mb-0">Status distribution.</p>
-            </div>
-            <div class="card-body">
-              <div class="row align-items-center g-3">
-                <div class="col-md-6">
-                  <div style="height:150px;">
-                    <canvas id="requestsChart"></canvas>
-                  </div>
-                </div>
-                <div class="col-md-6">
-                  <div class="chart-legend-row" style="flex-direction:column; align-items:flex-start; gap:.7rem;">
-                    <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#1E293B;"></span>New</span>
-                    <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#B7791F;"></span>In Progress</span>
-                    <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#157A5F;"></span>Completed</span>
-                    <span class="chart-legend-item"><span class="chart-legend-dot" style="background-color:#B4432F;"></span>Cancelled</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-        </div>
+
         <div class="col-lg-4">
-          <section class="card h-100">
-            <div class="card-header">
-              <h2 class="h6 fw-bold mb-0">Approvals Overview</h2>
-              <p class="small mb-0">Quotations and contracts at a glance.</p>
-            </div>
-            <div class="card-body">
-              <div class="approval-split">
-                <div class="approval-split-item">
-                  <span class="approved-icon"><i class="fa-solid fa-file-invoice-dollar"></i></span>
-                  <div class="approved-value"><?= $approvedQuotations ?></div>
-                  <div class="approved-label">Quotations Approved</div>
-                </div>
-                <div class="approval-divider"></div>
-                <div class="approval-split-item">
-                  <span class="approved-icon"><i class="fa-solid fa-file-signature"></i></span>
-                  <div class="approved-value"><?= $approvedContracts ?></div>
-                  <div class="approved-label">Contracts Approved</div>
-                </div>
+          <section class="panel">
+            <h2 class="panel-title">Service Requests</h2>
+            <p class="panel-sub">Status distribution</p>
+            <div class="donut-wrap">
+              <canvas id="requestsChart"></canvas>
+              <div class="donut-center">
+                <span class="donut-total"><?= $requestTotal ?></span>
+                <span class="donut-caption">Total</span>
               </div>
-              <div class="approval-sub">
-                <div class="approval-sub-item">
-                  <div class="approval-sub-value" style="color:var(--slate);"><?= $pendingApproval ?></div>
-                  <div class="approval-sub-label">Pending</div>
-                </div>
-                <div class="approval-sub-item">
-                  <div class="approval-sub-value" style="color:var(--warn-text);"><?= $revertTotal ?></div>
-                  <div class="approval-sub-label">Revert</div>
-                </div>
+            </div>
+            <div class="legend-list">
+              <?php foreach ($requestSlices as $slice): ?>
+                <?php $slicePct = $requestTotal > 0 ? round(($slice['value'] / $requestTotal) * 100) : 0; ?>
+                <span class="legend-item">
+                  <span class="legend-dot" style="background-color:<?= $slice['color'] ?>;"></span>
+                  <?= htmlspecialchars($slice['label']) ?> <strong><?= $slice['value'] ?></strong> (<?= $slicePct ?>%)
+                </span>
+              <?php endforeach; ?>
+            </div>
+          </section>
+        </div>
+
+        <div class="col-lg-4">
+          <section class="panel">
+            <h2 class="panel-title">Quotations &amp; Contracts</h2>
+            <p class="panel-sub">Approved, pending and revert</p>
+            <div class="chart-box">
+              <canvas id="approvalsChart"></canvas>
+            </div>
+          </section>
+        </div>
+
+        <div class="col-lg-4">
+          <section class="panel">
+            <h2 class="panel-title">Staff Workload</h2>
+            <p class="panel-sub"><?= $activeStaffCount ?> active staff &middot; tasks in progress</p>
+            <?php if (empty($staffWorkload)): ?>
+              <div class="empty-state text-center py-4"><p class="small mb-0">No staff accounts found.</p></div>
+            <?php else: ?>
+              <div class="hbar-list">
+                <?php foreach ($staffWorkload as $s): ?>
+                  <?php $barPct = round(($s['workload'] / $workloadMax) * 100); ?>
+                  <div class="hbar-row">
+                    <div class="hbar-label"><?= htmlspecialchars($s['firstname'] . ' ' . $s['lastname']) ?></div>
+                    <div class="hbar-track">
+                      <div class="hbar-fill" style="width:<?= max($barPct * 0.72, 1) ?>%; background-color:var(--blue);"></div>
+                      <span class="hbar-value"><?= $s['workload'] ?></span>
+                    </div>
+                  </div>
+                <?php endforeach; ?>
+              </div>
+            <?php endif; ?>
+          </section>
+        </div>
+
+      </div>
+
+      <div class="row g-3 mb-3">
+
+        <div class="col-lg-6">
+          <section class="panel">
+            <div class="panel-head-row">
+              <div>
+                <h2 class="panel-title">Recent Service Requests</h2>
+                <p class="panel-sub">Latest requests across all clients</p>
+              </div>
+              <a href="client_management.php?tab=requests" class="btn btn-sm btn-view-all no-print">View All</a>
+            </div>
+            <div class="table-wrap">
+              <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th scope="col">Request</th>
+                      <th scope="col" class="d-none d-md-table-cell">Client</th>
+                      <th scope="col">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <?php if (empty($recentRequests)): ?>
+                      <tr><td colspan="3"><div class="empty-state text-center py-4"><i class="fa-regular fa-folder-open fs-4 d-block mb-2"></i><p class="small mb-0">No service requests yet.</p></div></td></tr>
+                    <?php else: ?>
+                      <?php foreach ($recentRequests as $r): ?>
+                        <tr>
+                          <td class="fw-semibold"><?= htmlspecialchars($r['request_title']) ?></td>
+                          <td class="d-none d-md-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars($r['company_name']) ?></td>
+                          <td><span class="status-pill <?= requestStatusClass($r['status']) ?>"><?= htmlspecialchars($r['status']) ?></span></td>
+                        </tr>
+                      <?php endforeach; ?>
+                    <?php endif; ?>
+                  </tbody>
+                </table>
               </div>
             </div>
           </section>
         </div>
+
+        <div class="col-lg-6">
+          <section class="panel">
+            <div class="panel-head-row">
+              <div>
+                <h2 class="panel-title">Recent Quotations</h2>
+                <p class="panel-sub">Latest quotations issued</p>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th scope="col">Quotation #</th>
+                      <th scope="col" class="d-none d-md-table-cell">Client</th>
+                      <th scope="col">Total</th>
+                      <th scope="col">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <?php if (empty($recentQuotations)): ?>
+                      <tr><td colspan="4"><div class="empty-state text-center py-4"><i class="fa-regular fa-file-lines fs-4 d-block mb-2"></i><p class="small mb-0">No quotations yet.</p></div></td></tr>
+                    <?php else: ?>
+                      <?php foreach ($recentQuotations as $q): ?>
+                        <tr>
+                          <td class="fw-semibold"><?= htmlspecialchars($q['quotation_number']) ?></td>
+                          <td class="d-none d-md-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars($q['company_name']) ?></td>
+                          <td class="amount">&#8369;<?= number_format((float) $q['total_amount'], 2) ?></td>
+                          <td><span class="status-pill <?= quotationStatusClass($q['status']) ?>"><?= htmlspecialchars($q['status']) ?></span></td>
+                        </tr>
+                      <?php endforeach; ?>
+                    <?php endif; ?>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        </div>
+
       </div>
 
       <div class="row g-3">
 
-        <div class="col-lg-8">
-
-          <section class="card mb-3">
-            <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="col-lg-6">
+          <section class="panel">
+            <div class="panel-head-row">
               <div>
-                <h2 class="h6 fw-bold mb-0">Recent Service Requests</h2>
-                <p class="small mb-0">Latest requests recorded across all clients.</p>
+                <h2 class="panel-title">Contracts Awaiting Approval</h2>
+                <p class="panel-sub">Draft contracts that need a decision</p>
               </div>
-              <a href="client_management.php?tab=requests" class="btn btn-sm btn-view-all no-print">View All</a>
             </div>
-            <div class="table-responsive">
-              <table class="table table-hover align-middle mb-0">
-                <thead>
-                  <tr>
-                    <th scope="col">Request</th>
-                    <th scope="col" class="d-none d-md-table-cell">Client</th>
-                    <th scope="col">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <?php if (empty($recentRequests)): ?>
-                    <tr><td colspan="3"><div class="empty-state text-center py-4"><i class="fa-regular fa-folder-open fs-4 d-block mb-2"></i><p class="small mb-0">No service requests yet.</p></div></td></tr>
-                  <?php else: ?>
-                    <?php foreach ($recentRequests as $r): ?>
-                      <tr>
-                        <td class="fw-semibold"><?= htmlspecialchars($r['request_title']) ?></td>
-                        <td class="d-none d-md-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars($r['company_name']) ?></td>
-                        <td><span class="status-pill <?= requestStatusClass($r['status']) ?>"><?= htmlspecialchars($r['status']) ?></span></td>
-                      </tr>
-                    <?php endforeach; ?>
-                  <?php endif; ?>
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <section class="card mb-3">
-            <div class="card-header">
-              <h2 class="h6 fw-bold mb-0">Recent Quotations</h2>
-            </div>
-            <div class="table-responsive">
-              <table class="table table-hover align-middle mb-0">
-                <thead>
-                  <tr>
-                    <th scope="col">Quotation #</th>
-                    <th scope="col" class="d-none d-md-table-cell">Client</th>
-                    <th scope="col">Total</th>
-                    <th scope="col">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <?php if (empty($recentQuotations)): ?>
-                    <tr><td colspan="4"><div class="empty-state text-center py-4"><i class="fa-regular fa-file-lines fs-4 d-block mb-2"></i><p class="small mb-0">No quotations yet.</p></div></td></tr>
-                  <?php else: ?>
-                    <?php foreach ($recentQuotations as $q): ?>
-                      <tr>
-                        <td class="fw-semibold"><?= htmlspecialchars($q['quotation_number']) ?></td>
-                        <td class="d-none d-md-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars($q['company_name']) ?></td>
-                        <td style="color:var(--indigo-text);">&#8369;<?= number_format((float) $q['total_amount'], 2) ?></td>
-                        <td><span class="status-pill <?= quotationStatusClass($q['status']) ?>"><?= htmlspecialchars($q['status']) ?></span></td>
-                      </tr>
-                    <?php endforeach; ?>
-                  <?php endif; ?>
-                </tbody>
-              </table>
+            <div class="table-wrap">
+              <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th scope="col">Contract #</th>
+                      <th scope="col" class="d-none d-md-table-cell">Client</th>
+                      <th scope="col">Total</th>
+                      <th scope="col">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <?php if (empty($pendingContracts)): ?>
+                      <tr><td colspan="4"><div class="empty-state text-center py-4"><i class="fa-regular fa-circle-check fs-4 d-block mb-2"></i><p class="small mb-0">No contracts awaiting approval.</p></div></td></tr>
+                    <?php else: ?>
+                      <?php foreach ($pendingContracts as $ct): ?>
+                        <tr>
+                          <td class="fw-semibold"><?= htmlspecialchars($ct['contract_number']) ?></td>
+                          <td class="d-none d-md-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars($ct['company_name']) ?></td>
+                          <td class="amount">&#8369;<?= number_format((float) $ct['total_amount'], 2) ?></td>
+                          <td><span class="status-pill <?= quotationStatusClass($ct['status']) ?>"><?= htmlspecialchars($ct['status']) ?></span></td>
+                        </tr>
+                      <?php endforeach; ?>
+                    <?php endif; ?>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </section>
-
-          <section class="card">
-            <div class="card-header">
-              <h2 class="h6 fw-bold mb-0">Contracts Awaiting Approval</h2>
-              <p class="small mb-0">Draft contracts that need a decision.</p>
-            </div>
-            <div class="table-responsive">
-              <table class="table table-hover align-middle mb-0">
-                <thead>
-                  <tr>
-                    <th scope="col">Contract #</th>
-                    <th scope="col" class="d-none d-md-table-cell">Client</th>
-                    <th scope="col">Total</th>
-                    <th scope="col">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <?php if (empty($pendingContracts)): ?>
-                    <tr><td colspan="4"><div class="empty-state text-center py-4"><i class="fa-regular fa-circle-check fs-4 d-block mb-2"></i><p class="small mb-0">No contracts awaiting approval.</p></div></td></tr>
-                  <?php else: ?>
-                    <?php foreach ($pendingContracts as $ct): ?>
-                      <tr>
-                        <td class="fw-semibold"><?= htmlspecialchars($ct['contract_number']) ?></td>
-                        <td class="d-none d-md-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars($ct['company_name']) ?></td>
-                        <td style="color:var(--indigo-text);">&#8369;<?= number_format((float) $ct['total_amount'], 2) ?></td>
-                        <td><span class="status-pill <?= quotationStatusClass($ct['status']) ?>"><?= htmlspecialchars($ct['status']) ?></span></td>
-                      </tr>
-                    <?php endforeach; ?>
-                  <?php endif; ?>
-                </tbody>
-              </table>
-            </div>
-          </section>
-
         </div>
 
-        <div class="col-lg-4">
-
-          <section class="card">
-            <div class="card-header">
-              <h2 class="h6 fw-bold mb-0">Staff Workload</h2>
-              <p class="small mb-0"><?= $activeStaffCount ?> active staff members</p>
-            </div>
-            <div class="card-body d-flex flex-column gap-3">
-              <?php if (empty($staffWorkload)): ?>
-                <div class="empty-state text-center py-3"><p class="small mb-0">No staff accounts found.</p></div>
-              <?php else: ?>
-                <?php
-                  $maxWorkload = max(array_column($staffWorkload, 'workload')) ?: 1;
-                  foreach ($staffWorkload as $s):
-                    $pct = $maxWorkload > 0 ? round(($s['workload'] / $maxWorkload) * 100) : 0;
-                ?>
-                  <div>
-                    <div class="d-flex justify-content-between mb-1">
-                      <span class="small fw-semibold"><?= htmlspecialchars($s['firstname'] . ' ' . $s['lastname']) ?></span>
-                      <span class="small" style="color:var(--ink-soft);"><?= $s['workload'] ?> task<?= $s['workload'] == 1 ? '' : 's' ?></span>
-                    </div>
-                    <div class="workload-bar-track">
-                      <div class="workload-bar-fill" style="width:<?= $pct ?>%;"></div>
-                    </div>
+        <div class="col-lg-6">
+          <section class="panel">
+            <h2 class="panel-title">Approvals Overview</h2>
+            <p class="panel-sub">Quotations and contracts at a glance</p>
+            <div class="hbar-list">
+              <?php foreach ($approvalBars as $bar): ?>
+                <?php $barPct = round(($bar['value'] / $approvalMax) * 100); ?>
+                <div class="hbar-row">
+                  <div class="hbar-label"><?= htmlspecialchars($bar['label']) ?></div>
+                  <div class="hbar-track">
+                    <div class="hbar-fill" style="width:<?= max($barPct * 0.72, 1) ?>%; background-color:<?= $bar['color'] ?>;"></div>
+                    <span class="hbar-value"><?= $bar['value'] ?></span>
                   </div>
-                <?php endforeach; ?>
-              <?php endif; ?>
+                </div>
+              <?php endforeach; ?>
             </div>
           </section>
-
         </div>
 
       </div>
@@ -923,58 +951,132 @@ button::-moz-focus-inner {
 
 <script src="../assets/vendor/bootstrap-5.3.8/js/bootstrap.bundle.min.js"></script>
 <script src="../assets/vendor/chartjs/chart.umd.js"></script>
+<script src="../assets/vendor/flatpickr/flatpickr.min.js"></script>
 <script>
 Chart.defaults.font.family = "'Inter', sans-serif";
 Chart.defaults.font.size = 12;
-Chart.defaults.color = '#667085';
+Chart.defaults.color = '#6B7785';
 
-function buildDoughnut(canvasId, values, colors) {
-  const canvas = document.getElementById(canvasId);
-  if (!canvas) return;
-  new Chart(canvas, {
+const requestValues = <?= json_encode(array_column($requestSlices, 'value')) ?>;
+const requestColors = <?= json_encode(array_column($requestSlices, 'color')) ?>;
+const requestLabels = <?= json_encode(array_column($requestSlices, 'label')) ?>;
+const requestHasData = requestValues.some(function (v) { return v > 0; });
+
+const requestsCanvas = document.getElementById('requestsChart');
+if (requestsCanvas) {
+  new Chart(requestsCanvas, {
     type: 'doughnut',
     data: {
+      labels: requestLabels,
       datasets: [{
-        data: values,
-        backgroundColor: colors,
-        borderWidth: 0,
-        hoverOffset: 6
+        data: requestHasData ? requestValues : [1],
+        backgroundColor: requestHasData ? requestColors : ['#E3E8EF'],
+        borderColor: '#FFFFFF',
+        borderWidth: 3,
+        hoverOffset: 4
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      cutout: '68%',
-      plugins: { legend: { display: false } }
+      cutout: '64%',
+      plugins: {
+        legend: { display: false },
+        tooltip: { enabled: requestHasData }
+      }
     }
   });
 }
 
-buildDoughnut('requestsChart', [<?= $newRequests ?>, <?= $inProgressRequests ?>, <?= $completedRequests ?>, <?= $cancelledRequests ?>], ['#1E293B', '#B7791F', '#157A5F', '#B4432F']);
+const approvalsCanvas = document.getElementById('approvalsChart');
+if (approvalsCanvas) {
+  new Chart(approvalsCanvas, {
+    type: 'bar',
+    data: {
+      labels: ['Approved', 'Pending', 'Revert'],
+      datasets: [
+        {
+          label: 'Quotations',
+          data: [<?= $approvedQuotations ?>, <?= $draftQuotations ?>, <?= $revertQuotations ?>],
+          backgroundColor: '#0B67B8',
+          borderRadius: 3,
+          barPercentage: 0.7,
+          categoryPercentage: 0.7
+        },
+        {
+          label: 'Contracts',
+          data: [<?= $approvedContracts ?>, <?= $draftContracts ?>, <?= $revertContracts ?>],
+          backgroundColor: '#33B9CC',
+          borderRadius: 3,
+          barPercentage: 0.7,
+          categoryPercentage: 0.7
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: {
+            usePointStyle: true,
+            pointStyle: 'rect',
+            boxWidth: 10,
+            boxHeight: 10,
+            padding: 16,
+            font: { weight: '600' }
+          }
+        }
+      },
+      scales: {
+        x: { grid: { display: false }, border: { color: '#E3E8EF' } },
+        y: {
+          beginAtZero: true,
+          ticks: { precision: 0 },
+          grid: { color: '#EEF2F6' },
+          border: { display: false }
+        }
+      }
+    }
+  });
+}
 </script>
 <script>
-const rangeFields = document.getElementById('range-fields');
-const singleFields = document.getElementById('single-fields');
-const modeRange = document.getElementById('mode-range');
-const modeSingle = document.getElementById('mode-single');
+(function () {
+  if (typeof flatpickr === 'undefined') return;
 
-function syncFilterFields() {
-  if (modeSingle && modeSingle.checked) {
-    rangeFields.style.setProperty('display', 'none');
-    singleFields.style.setProperty('display', 'flex');
-  } else {
-    rangeFields.style.setProperty('display', 'flex');
-    singleFields.style.setProperty('display', 'none');
-  }
-}
+  const form = document.getElementById('filterForm');
+  const startEl = document.getElementById('date_start');
+  const endEl = document.getElementById('date_end');
+  const curStart = startEl.value;
+  const curEnd = endEl.value;
 
-if (modeRange && modeSingle && rangeFields && singleFields) {
-  modeRange.addEventListener('change', syncFilterFields);
-  modeSingle.addEventListener('change', syncFilterFields);
-  modeRange.addEventListener('click', syncFilterFields);
-  modeSingle.addEventListener('click', syncFilterFields);
-  syncFilterFields();
-}
+  const preset = [];
+  if (curStart) preset.push(curStart);
+  if (curEnd && curEnd !== curStart) preset.push(curEnd);
+
+  flatpickr('#dateRange', {
+    mode: 'range',
+    showMonths: window.innerWidth < 768 ? 1 : 2,
+    dateFormat: 'Y-m-d',
+    altInput: true,
+    altFormat: 'M j, Y',
+    rangeSeparator: '  –  ',
+    maxDate: 'today',
+    defaultDate: preset,
+    disableMobile: true,
+    onClose: function (selected, str, inst) {
+      if (!selected.length) return;
+      const s = inst.formatDate(selected[0], 'Y-m-d');
+      const e = inst.formatDate(selected[selected.length - 1], 'Y-m-d');
+      if (s === curStart && e === (curEnd || curStart)) return;
+      startEl.value = s;
+      endEl.value = e;
+      form.submit();
+    }
+  });
+})();
 </script>
 
 </body>

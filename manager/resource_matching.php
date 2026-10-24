@@ -249,8 +249,10 @@ body {
 }
 
 .stat-card {
-  background-color: var(--card);
-  border: 1px solid var(--line);
+  position: relative;
+  overflow: hidden;
+  background-color: var(--stat-bg, var(--card));
+  border: 1px solid var(--stat-border, var(--line));
   border-radius: 12px;
   padding: 1rem 1.25rem;
   box-shadow: 0 1px 2px rgba(42, 45, 47, .04);
@@ -267,7 +269,8 @@ body {
   font-weight: 700;
   letter-spacing: .05em;
   text-transform: uppercase;
-  color: var(--ink-soft);
+  color: var(--stat-color, var(--ink-soft));
+  opacity: .85;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -277,9 +280,16 @@ body {
   font-family: 'Lexend', sans-serif;
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--charcoal);
+  color: var(--stat-color, var(--charcoal));
   margin-top: .15rem;
 }
+
+.stat-pending   { --stat-color: #FFFFFF; --stat-bg: #1E3A8A; --stat-border: #1E3A8A; }
+.stat-total     { --stat-color: #FFFFFF; --stat-bg: #1D4ED8; --stat-border: #1D4ED8; }
+.stat-available { --stat-color: #FFFFFF; --stat-bg: #2563EB; --stat-border: #2563EB; }
+.stat-busy      { --stat-color: #FFFFFF; --stat-bg: #0284C7; --stat-border: #0284C7; }
+.stat-progress  { --stat-color: #FFFFFF; --stat-bg: #0E7490; --stat-border: #0E7490; }
+.stat-assigned  { --stat-color: #FFFFFF; --stat-bg: #334E7B; --stat-border: #334E7B; }
 
 .section-label {
   font-size: .7rem;
@@ -703,37 +713,37 @@ body {
 
       <div class="row g-3 mb-3 align-items-stretch">
         <div class="col-4 col-xl-2 d-flex">
-          <div class="stat-card">
+          <div class="stat-card stat-pending">
             <div class="stat-label">Pending Requests</div>
             <div class="stat-value"><?= $pendingCount ?></div>
           </div>
         </div>
         <div class="col-4 col-xl-2 d-flex">
-          <div class="stat-card">
+          <div class="stat-card stat-total">
             <div class="stat-label">Total Staff</div>
             <div class="stat-value"><?= $totalStaffCount ?></div>
           </div>
         </div>
         <div class="col-4 col-xl-2 d-flex">
-          <div class="stat-card">
+          <div class="stat-card stat-available">
             <div class="stat-label">Available Staff</div>
-            <div class="stat-value" style="color:var(--success-text);"><?= $availableStaffCount ?></div>
+            <div class="stat-value"><?= $availableStaffCount ?></div>
           </div>
         </div>
         <div class="col-4 col-xl-2 d-flex">
-          <div class="stat-card">
+          <div class="stat-card stat-busy">
             <div class="stat-label">On Assignment</div>
-            <div class="stat-value" style="color:var(--warn-text);"><?= $onAssignmentCount ?></div>
+            <div class="stat-value"><?= $onAssignmentCount ?></div>
           </div>
         </div>
         <div class="col-4 col-xl-2 d-flex">
-          <div class="stat-card">
+          <div class="stat-card stat-progress">
             <div class="stat-label">In Progress</div>
             <div class="stat-value"><?= $inProgressCount ?></div>
           </div>
         </div>
         <div class="col-4 col-xl-2 d-flex">
-          <div class="stat-card">
+          <div class="stat-card stat-assigned">
             <div class="stat-label">Total Assigned</div>
             <div class="stat-value"><?= $totalAssigned ?></div>
           </div>

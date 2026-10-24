@@ -22,122 +22,204 @@ $page         = max(1, (int) ($_GET['page'] ?? 1));
 $perPage      = 15;
 $offset       = ($page - 1) * $perPage;
 
+/**
+ * Repository events (documents / folders). Admin uploads live in the
+ * `administrator` table, everyone else in `users`.
+ */
+function repoBlock(bool $admin, string $kind): string
+{
+    $actor = $admin
+        ? "a.admin_id, a.fullname, '', 'Admin'"
+        : "u.user_id, u.firstname, u.lastname, u.role";
+    $join = $admin
+        ? "INNER JOIN administrator a ON a.admin_id = kd.uploaded_by"
+        : "INNER JOIN users u ON u.user_id = kd.uploaded_by";
+    $where = $admin
+        ? "kd.uploaded_by_role = 'admin'"
+        : "kd.uploaded_by_role IN ('manager', 'supervisor', 'staff')";
+
+    if ($kind === 'created') {
+        $label = "IF(kd.item_type = 'folder', 'Created folder', 'Uploaded document')";
+        $time  = 'kd.created_at';
+    } else {
+        $label = "IF(kd.item_type = 'folder', 'Updated folder', 'Updated document')";
+        $time  = 'kd.updated_at';
+        $where .= ' AND kd.updated_at != kd.created_at';
+    }
+
+    return "
+    SELECT {$actor},
+           'Repository', {$label},
+           CONCAT(kd.title, IF(kd.category IS NULL, '', CONCAT(' (', kd.category, ')'))),
+           {$time}, NULL,
+           c.company_name, NULL, NULL,
+           CONCAT('Type: ', UPPER(COALESCE(kd.file_type, kd.item_type)),
+                  ' · Location: ', COALESCE(p.title, 'Root'),
+                  IF(kd.file_size > 0, CONCAT(' · Size: ', ROUND(kd.file_size / 1024, 1), ' KB'), ''))
+    FROM knowledge_documents kd
+    {$join}
+    LEFT JOIN knowledge_documents p ON p.document_id = kd.parent_id
+    LEFT JOIN clients c ON c.company_name = IF(kd.item_type = 'folder', kd.title, p.title)
+    WHERE {$where}";
+}
+
 $unionQuery = "
     SELECT u.user_id AS actor_id, u.firstname, u.lastname, u.role,
            'Assignment' AS action_type,
            CONCAT('Assigned service request to ', s.firstname, ' ', s.lastname) AS action_label,
            sr.request_title AS target_label, sr.updated_at AS occurred_at,
-           CONCAT(s.firstname, ' ', s.lastname) AS related_staff
+           CONCAT(s.firstname, ' ', s.lastname) AS related_staff,
+           c.company_name AS client_name,
+           sr.status AS record_status,
+           CAST(NULL AS DECIMAL(12,2)) AS amount,
+           CONCAT('Required skill: ', COALESCE(sr.required_skill, '—')) AS note
     FROM service_requests sr
     INNER JOIN users u ON u.user_id = sr.assigned_by
     INNER JOIN users s ON s.user_id = sr.assigned_to
+    LEFT JOIN clients c ON c.client_id = sr.client_id
     WHERE sr.assigned_to IS NOT NULL
 
     UNION ALL
 
     SELECT u.user_id, u.firstname, u.lastname, u.role,
            'Progress Update', CONCAT('Marked request as ', sr.status),
-           sr.request_title, sr.updated_at, NULL
+           sr.request_title, sr.updated_at, NULL,
+           c.company_name, sr.status, NULL,
+           CONCAT('Required skill: ', COALESCE(sr.required_skill, '—'))
     FROM service_requests sr
     INNER JOIN users u ON u.user_id = sr.assigned_to
+    LEFT JOIN clients c ON c.client_id = sr.client_id
     WHERE sr.status IN ('In Progress', 'Completed', 'Cancelled')
 
     UNION ALL
 
     SELECT u.user_id, u.firstname, u.lastname, u.role,
            'Quotation', 'Created quotation',
-           q.quotation_number, q.created_at, NULL
+           q.quotation_number, q.created_at, NULL,
+           c.company_name, q.status, q.total_amount, q.project_scope
     FROM quotations q
     INNER JOIN users u ON u.user_id = q.prepared_by
+    LEFT JOIN clients c ON c.client_id = q.client_id
+
+    UNION ALL
+
+    SELECT u.user_id, u.firstname, u.lastname, u.role,
+           'Quotation', 'Reverted quotation',
+           COALESCE(q.quotation_number, CONCAT('Quotation #', qr.quotation_id)), qr.created_at, NULL,
+           c.company_name, q.status, q.total_amount, qr.revision_note
+    FROM quotation_revisions qr
+    INNER JOIN users u ON u.user_id = qr.revised_by
+    LEFT JOIN quotations q ON q.quotation_id = qr.quotation_id
+    LEFT JOIN clients c ON c.client_id = q.client_id
 
     UNION ALL
 
     SELECT u.user_id, u.firstname, u.lastname, u.role,
            'Contract', 'Generated contract',
-           ct.contract_number, ct.created_at, NULL
+           ct.contract_number, ct.created_at, NULL,
+           c.company_name, ct.status, ct.total_amount, ct.scope_summary
     FROM contracts ct
     INNER JOIN users u ON u.user_id = ct.prepared_by
+    LEFT JOIN clients c ON c.client_id = ct.client_id
 
     UNION ALL
 
     SELECT u.user_id, u.firstname, u.lastname, u.role,
            'Contract', 'Approved contract',
-           ct.contract_number, ct.approved_at, NULL
+           ct.contract_number, ct.approved_at, NULL,
+           c.company_name, ct.status, ct.total_amount, ct.scope_summary
     FROM contracts ct
     INNER JOIN users u ON u.user_id = ct.approved_by
+    LEFT JOIN clients c ON c.client_id = ct.client_id
     WHERE ct.approved_at IS NOT NULL
 
     UNION ALL
 
     SELECT u.user_id, u.firstname, u.lastname, u.role,
            'Revision', 'Recorded contract revision',
-           (SELECT contract_number FROM contracts WHERE contract_id = cr.contract_id), cr.created_at, NULL
+           ct.contract_number, cr.created_at, NULL,
+           c.company_name, ct.status, ct.total_amount, cr.revision_note
     FROM contract_revisions cr
     INNER JOIN users u ON u.user_id = cr.revised_by
+    LEFT JOIN contracts ct ON ct.contract_id = cr.contract_id
+    LEFT JOIN clients c ON c.client_id = ct.client_id
 
-    UNION ALL
-
-    SELECT u.user_id, u.firstname, u.lastname, 'Admin' AS role,
-           'Repository', 'Uploaded document',
-           CONCAT(kd.title, ' (', kd.category, ')'), kd.created_at, NULL
-    FROM knowledge_documents kd
-    INNER JOIN users u ON u.user_id = kd.uploaded_by
-    WHERE kd.uploaded_by_role = 'admin'
-
-    UNION ALL
-
-    SELECT u.user_id, u.firstname, u.lastname, u.role,
-           'Repository', 'Uploaded document',
-           CONCAT(kd.title, ' (', kd.category, ')'), kd.created_at, NULL
-    FROM knowledge_documents kd
-    INNER JOIN users u ON u.user_id = kd.uploaded_by
-    WHERE kd.uploaded_by_role IN ('manager', 'supervisor')
-
-    UNION ALL
-
-    SELECT u.user_id, u.firstname, u.lastname, 'Admin' AS role,
-           'Repository', 'Updated document',
-           CONCAT(kd.title, ' (', kd.category, ')'), kd.updated_at, NULL
-    FROM knowledge_documents kd
-    INNER JOIN users u ON u.user_id = kd.uploaded_by
-    WHERE kd.uploaded_by_role = 'admin' AND kd.updated_at != kd.created_at
-
-    UNION ALL
-
-    SELECT u.user_id, u.firstname, u.lastname, u.role,
-           'Repository', 'Updated document',
-           CONCAT(kd.title, ' (', kd.category, ')'), kd.updated_at, NULL
-    FROM knowledge_documents kd
-    INNER JOIN users u ON u.user_id = kd.uploaded_by
-    WHERE kd.uploaded_by_role IN ('manager', 'supervisor') AND kd.updated_at != kd.created_at
+    UNION ALL " . repoBlock(true, 'created') . "
+    UNION ALL " . repoBlock(false, 'created') . "
+    UNION ALL " . repoBlock(true, 'updated') . "
+    UNION ALL " . repoBlock(false, 'updated') . "
 ";
 
-$conditions = [];
-$params = [];
-
-if (in_array($roleFilter, ['Manager', 'Supervisor', 'Staff', 'Admin'], true)) {
-    $conditions[] = 'role = ?';
-    $params[] = $roleFilter;
-}
-
+/* ---- Filters (each condition carries its own params so they never get misaligned) ---- */
+$baseConds = [];
 if ($actionFilter !== '') {
-    $conditions[] = 'action_type = ?';
-    $params[] = $actionFilter;
+    $baseConds[] = ['action_type = ?', [$actionFilter]];
 }
-
 if ($searchTerm !== '') {
-    $conditions[] = '(target_label LIKE ? OR CONCAT(firstname, " ", lastname) LIKE ?)';
     $like = '%' . $searchTerm . '%';
-    $params[] = $like;
-    $params[] = $like;
+    $baseConds[] = [
+        '(target_label LIKE ? OR client_name LIKE ? OR CONCAT(firstname, " ", lastname) LIKE ?)',
+        [$like, $like, $like],
+    ];
 }
-
 if ($dateFilter !== '') {
-    $conditions[] = 'DATE(occurred_at) = ?';
-    $params[] = $dateFilter;
+    $baseConds[] = ['DATE(occurred_at) = ?', [$dateFilter]];
 }
 
-$whereClause = empty($conditions) ? '' : 'WHERE ' . implode(' AND ', $conditions);
+$roleCond = in_array($roleFilter, ['Manager', 'Supervisor', 'Staff', 'Admin'], true)
+    ? ['role = ?', [$roleFilter]]
+    : null;
+
+function buildWhere(array $conds): array
+{
+    if (empty($conds)) {
+        return ['', []];
+    }
+    $sql = [];
+    $params = [];
+    foreach ($conds as [$c, $p]) {
+        $sql[] = $c;
+        foreach ($p as $v) {
+            $params[] = $v;
+        }
+    }
+    return ['WHERE ' . implode(' AND ', $sql), $params];
+}
+
+$allConds = $baseConds;
+if ($roleCond) {
+    $allConds[] = $roleCond;
+}
+[$whereClause, $params] = buildWhere($allConds);
+[$roleCountWhere, $roleCountParams] = buildWhere($baseConds);
+
+/* ---- CSV export (uses the same filters) ---- */
+if (($_GET['export'] ?? '') === 'csv') {
+    $exStmt = $pdo->prepare("SELECT * FROM ({$unionQuery}) AS activity_feed {$whereClause} ORDER BY occurred_at DESC");
+    $exStmt->execute($params);
+    header('Content-Type: text/csv; charset=UTF-8');
+    header('Content-Disposition: attachment; filename="activity_logs_' . date('Ymd_His') . '.csv"');
+    $out = fopen('php://output', 'w');
+    fwrite($out, "\xEF\xBB\xBF");
+    fputcsv($out, ['Timestamp', 'Actor', 'Role', 'Event Type', 'Description', 'Record', 'Company / Client', 'Status', 'Amount', 'Assigned To', 'Details']);
+    while ($r = $exStmt->fetch()) {
+        fputcsv($out, [
+            $r['occurred_at'],
+            trim($r['firstname'] . ' ' . $r['lastname']),
+            $r['role'],
+            $r['action_type'],
+            $r['action_label'],
+            $r['target_label'],
+            $r['client_name'],
+            $r['record_status'],
+            $r['amount'],
+            $r['related_staff'],
+            $r['note'],
+        ]);
+    }
+    fclose($out);
+    exit;
+}
 
 $countStmt = $pdo->prepare("SELECT COUNT(*) FROM ({$unionQuery}) AS activity_feed {$whereClause}");
 $countStmt->execute($params);
@@ -152,15 +234,6 @@ $logsStmt = $pdo->prepare(
 );
 $logsStmt->execute($params);
 $logs = $logsStmt->fetchAll();
-
-$roleCountConditions = array_filter($conditions, fn($c) => $c !== 'role = ?');
-$roleCountParams = [];
-foreach ($conditions as $i => $c) {
-    if ($c !== 'role = ?') {
-        $roleCountParams[] = $params[$i];
-    }
-}
-$roleCountWhere = empty($roleCountConditions) ? '' : 'WHERE ' . implode(' AND ', $roleCountConditions);
 
 $roleCountsStmt = $pdo->prepare(
     "SELECT role, COUNT(*) AS cnt FROM ({$unionQuery}) AS activity_feed {$roleCountWhere} GROUP BY role"
@@ -213,6 +286,25 @@ function roleClass(?string $role): string
     return 'role-' . strtolower(trim((string) $role));
 }
 
+function statusClass(?string $status): string
+{
+    $s = strtolower(trim((string) $status));
+    return $s === '' ? '' : 'st-' . preg_replace('/[^a-z]+/', '-', $s);
+}
+
+function initialsFor(?string $first, ?string $last): string
+{
+    $first = trim((string) $first);
+    $last = trim((string) $last);
+    if ($last === '') {
+        $parts = preg_split('/\s+/', $first) ?: [];
+        $a = $parts[0] ?? '';
+        $b = $parts[1] ?? '';
+        return strtoupper(substr($a, 0, 1) . substr($b, 0, 1));
+    }
+    return strtoupper(substr($first, 0, 1) . substr($last, 0, 1));
+}
+
 function buildLogPageUrl(int $targetPage, string $role, string $action, string $search, string $date): string
 {
     return '?' . http_build_query([
@@ -231,9 +323,6 @@ function relativeTime(?string $datetime): string
         return '';
     }
     $diff = time() - $ts;
-    if ($diff < 0) {
-        return 'just now';
-    }
     if ($diff < 60) {
         return 'just now';
     }
@@ -292,6 +381,13 @@ $rangeFrom = $totalLogs === 0 ? 0 : $offset + 1;
 $rangeTo = min($offset + $perPage, $totalLogs);
 $todayYmd = date('Y-m-d');
 $yesterdayYmd = date('Y-m-d', strtotime('-1 day'));
+$exportUrl = '?' . http_build_query([
+    'role' => $roleFilter,
+    'action' => $actionFilter,
+    'search' => $searchTerm,
+    'date' => $dateFilter,
+    'export' => 'csv',
+]);
 
 ?>
 <!DOCTYPE html>
@@ -378,31 +474,27 @@ body {
   margin: 0;
 }
 
+/* ---------- Metric boxes ---------- */
 .metrics {
   display: grid;
   grid-template-columns: 1.35fr repeat(4, 1fr);
   gap: .75rem;
 }
 .metric {
-  position: relative;
   display: block;
   text-decoration: none;
-  color: inherit;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  color: #fff;
+  background: rgba(23, 49, 120, .85);
+  border: 1px solid rgba(23, 49, 120, .85);
   border-radius: 10px;
-  padding: .95rem 1.05rem .9rem;
-  transition: border-color .15s ease, box-shadow .15s ease;
-  overflow: hidden;
+  padding: .95rem 1.05rem;
+  transition: background .15s ease, border-color .15s ease;
 }
-a.metric:hover {
-  border-color: var(--border-strong);
-  box-shadow: 0 2px 8px rgba(18, 25, 38, .06);
-  color: inherit;
-}
+a.metric:hover,
 .metric.is-active {
-  border-color: var(--brand);
-  box-shadow: 0 0 0 1px var(--brand);
+  background: rgb(23, 49, 120);
+  border-color: rgb(23, 49, 120);
+  color: #fff;
 }
 .metric-head {
   display: flex;
@@ -413,21 +505,12 @@ a.metric:hover {
 .metric-label {
   font-size: .78rem;
   font-weight: 600;
-  color: var(--text-2);
-  display: inline-flex;
-  align-items: center;
-  gap: .45rem;
-}
-.metric-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
-  flex-shrink: 0;
+  color: rgba(255, 255, 255, .9);
 }
 .metric-pct {
   font-family: var(--mono);
   font-size: .7rem;
-  color: var(--text-3);
+  color: rgba(255, 255, 255, .75);
 }
 .metric-value {
   font-size: 1.75rem;
@@ -435,32 +518,10 @@ a.metric:hover {
   letter-spacing: -0.025em;
   line-height: 1.1;
   margin-top: .55rem;
+  color: #fff;
   font-variant-numeric: tabular-nums;
 }
-.metric-bar {
-  height: 3px;
-  background: var(--surface-3);
-  border-radius: 3px;
-  margin-top: .75rem;
-  overflow: hidden;
-}
-.metric-bar > span {
-  display: block;
-  height: 100%;
-  border-radius: 3px;
-}
 .metric-total .metric-value { font-size: 2rem; }
-.metric-total .metric-note {
-  font-size: .74rem;
-  color: var(--text-3);
-  margin-top: .35rem;
-}
-
-.bg-r-manager { background: var(--r-manager); }
-.bg-r-supervisor { background: var(--r-supervisor); }
-.bg-r-staff { background: var(--r-staff); }
-.bg-r-admin { background: var(--r-admin); }
-.bg-r-all { background: var(--brand); }
 
 .panel {
   background: var(--surface);
@@ -580,12 +641,28 @@ a.metric:hover {
   margin: 0;
   letter-spacing: -0.01em;
 }
+.log-panel-right { display: flex; align-items: center; gap: .85rem; flex-wrap: wrap; }
 .log-panel-meta {
   font-size: .78rem;
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
 }
 .log-panel-meta b { color: var(--text-2); font-weight: 600; }
+.btn-export {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  height: 32px;
+  padding: 0 .75rem;
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--brand);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  text-decoration: none;
+}
+.btn-export:hover { background: var(--brand-soft); border-color: var(--brand); color: var(--brand); }
 
 .table-responsive { max-height: none; }
 #logsTable {
@@ -709,6 +786,18 @@ tr.log-row.cat-repository { --row-accent: var(--c-repository); }
   line-height: 1.4;
 }
 
+.client-name {
+  display: block;
+  font-weight: 600;
+  font-size: .82rem;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.client-name i { color: var(--text-3); margin-right: .35rem; font-size: .72rem; }
+.muted-dash { color: var(--text-3); }
+
 .target-ref {
   font-family: var(--mono);
   font-size: .76rem;
@@ -718,12 +807,32 @@ tr.log-row.cat-repository { --row-accent: var(--c-repository); }
   border-radius: 5px;
   padding: .18rem .45rem;
   display: inline-block;
-  max-width: 280px;
+  max-width: 240px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   vertical-align: middle;
 }
+
+/* status badges */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  font-size: .72rem;
+  font-weight: 600;
+  padding: .18rem .55rem;
+  border-radius: 999px;
+  color: var(--text-2);
+  background: var(--surface-3);
+  white-space: nowrap;
+}
+.status-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.status-badge.st-approved, .status-badge.st-completed { color: #0F8A6A; background: #E4F5EF; }
+.status-badge.st-draft, .status-badge.st-new { color: #475569; background: #EDF0F4; }
+.status-badge.st-rejected, .status-badge.st-cancelled { color: #BE3A34; background: #FBEBEA; }
+.status-badge.st-revert { color: #B45309; background: #FDF1E0; }
+.status-badge.st-in-progress { color: #4F46E5; background: #EEF0FE; }
 
 .ts { white-space: nowrap; }
 .ts-main { font-family: var(--mono); font-size: .78rem; color: var(--text); font-variant-numeric: tabular-nums; }
@@ -795,194 +904,154 @@ tr.log-row:hover .row-chevron { color: var(--brand); }
 .pager .is-disabled { color: var(--text-3); opacity: .5; pointer-events: none; }
 .pager .is-gap { border-color: transparent; background: transparent; min-width: 20px; padding: 0; }
 
-.detail-modal .modal-dialog {
-  width: 80vw;
-  max-width: 80vw;
-  margin: auto;
-}
-.detail-modal .modal-dialog.modal-dialog-scrollable .modal-content {
-  height: 80vh;
-  max-height: 80vh;
-}
-.detail-modal .modal-content {
+/* ---------- Detail modal (fullscreen, same look as CPQ view) ---------- */
+#logDetailModal .modal-content {
   --accent: var(--brand);
   --accent-bg: var(--brand-soft);
-  border: none;
-  border-radius: 18px;
-  background: var(--surface);
-  box-shadow: 0 30px 80px rgba(18, 25, 38, .28), 0 8px 24px rgba(18, 25, 38, .12);
-  overflow: hidden;
+  border-radius: 0;
+  background-color: #FFFEFC;
 }
-.detail-modal .modal-content.cat-assignment { --accent: var(--c-assignment); --accent-bg: var(--c-assignment-bg); }
-.detail-modal .modal-content.cat-progress { --accent: var(--c-progress); --accent-bg: var(--c-progress-bg); }
-.detail-modal .modal-content.cat-quotation { --accent: var(--c-quotation); --accent-bg: var(--c-quotation-bg); }
-.detail-modal .modal-content.cat-contract { --accent: var(--c-contract); --accent-bg: var(--c-contract-bg); }
-.detail-modal .modal-content.cat-revision { --accent: var(--c-revision); --accent-bg: var(--c-revision-bg); }
-.detail-modal .modal-content.cat-repository { --accent: var(--c-repository); --accent-bg: var(--c-repository-bg); }
-.modal-backdrop.show { opacity: .55; }
+#logDetailModal .modal-content.cat-assignment { --accent: var(--c-assignment); --accent-bg: var(--c-assignment-bg); }
+#logDetailModal .modal-content.cat-progress { --accent: var(--c-progress); --accent-bg: var(--c-progress-bg); }
+#logDetailModal .modal-content.cat-quotation { --accent: var(--c-quotation); --accent-bg: var(--c-quotation-bg); }
+#logDetailModal .modal-content.cat-contract { --accent: var(--c-contract); --accent-bg: var(--c-contract-bg); }
+#logDetailModal .modal-content.cat-revision { --accent: var(--c-revision); --accent-bg: var(--c-revision-bg); }
+#logDetailModal .modal-content.cat-repository { --accent: var(--c-repository); --accent-bg: var(--c-repository-bg); }
 
-.detail-modal .modal-header {
-  position: relative;
+#logDetailModal .modal-header {
+  padding: .9rem 1.25rem;
+  background-color: #FFFEFC;
+  border-bottom: 1px solid #E6E2DA;
+}
+#logDetailModal .modal-title {
+  display: flex;
   align-items: center;
-  gap: 1.1rem;
-  padding: 1.6rem 2.25rem 1.4rem;
-  border-bottom: 1px solid var(--border);
-  background: linear-gradient(180deg, var(--accent-bg) 0%, var(--surface) 100%);
+  gap: .65rem;
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #2B3134;
 }
-.detail-modal .modal-header::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 6px;
-  background: var(--accent);
-}
-.mh-main { display: flex; align-items: center; gap: 1.1rem; min-width: 0; flex: 1 1 auto; }
-.mh-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 16px;
+#logDetailModal .mh-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.6rem;
+  font-size: .85rem;
   color: #fff;
   background: var(--accent);
   flex-shrink: 0;
-  box-shadow: 0 8px 20px rgba(18, 25, 38, .18);
 }
-.drawer-kicker {
-  font-size: .9rem;
-  font-weight: 600;
-  color: var(--accent);
-  margin: 0 0 .2rem;
-  letter-spacing: .01em;
+#logDetailModal .modal-body {
+  background-color: #F6F4EF;
+  padding: 1.25rem;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
-.detail-modal .modal-title {
-  font-size: 1.9rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-  margin: 0;
-  color: var(--text);
-}
-.detail-modal .btn-close {
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  margin: 0;
-  background-size: 14px;
-  background-color: var(--surface);
-  border: 1px solid var(--border-strong);
+#logDetailModal .modal-footer { display: none; }
+
+.quote-shell { max-width: 1400px; margin: 0 auto; }
+.quote-panel {
+  background-color: #FFFEFC;
+  border: 1px solid #E6E2DA;
   border-radius: 12px;
-  opacity: 1;
-  flex-shrink: 0;
-  transition: background-color .12s ease, border-color .12s ease;
+  padding: 1.1rem 1.25rem;
+  box-shadow: 0 1px 2px rgba(42, 45, 47, .04);
 }
-.detail-modal .btn-close:hover { background-color: var(--surface-3); border-color: var(--text-3); }
-.detail-modal .btn-close:focus { box-shadow: 0 0 0 3px var(--focus); }
-
-.detail-modal .modal-body {
-  padding: 2rem 2.25rem 2.25rem;
-  background: var(--surface-2);
-}
-
-.hero-actor {
-  display: flex;
-  align-items: center;
-  gap: 1.4rem;
-  padding: 1.5rem 1.75rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  margin-bottom: 1.25rem;
-}
-.hero-actor .avatar {
-  width: 84px;
-  height: 84px;
-  border-radius: 20px;
-  font-size: 1.9rem;
-}
-.hero-actor-name {
-  font-size: 1.9rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-  word-break: break-word;
-}
-.hero-actor-role {
-  display: inline-flex;
-  align-items: center;
-  gap: .55rem;
-  margin-top: .45rem;
-  font-size: 1.2rem;
-  font-weight: 600;
-  color: var(--text-2);
-}
-.hero-actor-role::before {
-  content: '';
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  background: var(--text-3);
-}
-.hero-actor-role.role-manager::before { background: var(--r-manager); }
-.hero-actor-role.role-supervisor::before { background: var(--r-supervisor); }
-.hero-actor-role.role-staff::before { background: var(--r-staff); }
-.hero-actor-role.role-admin::before { background: var(--r-admin); }
-
-.detail-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1.25rem;
-}
-.detail-tile {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 1.4rem 1.6rem;
-  min-width: 0;
-}
-.detail-tile.is-wide { grid-column: span 2; }
-.detail-tile.is-accent { border-left: 6px solid var(--accent); }
-.tile-label {
+.quote-panel-title {
   display: flex;
   align-items: center;
   gap: .55rem;
   font-size: .95rem;
   font-weight: 600;
-  color: var(--text-3);
-  margin: 0 0 .65rem;
+  color: #2B3134;
+  margin-bottom: 1rem;
 }
-.tile-label i { color: var(--text-3); font-size: .9rem; width: 1rem; text-align: center; }
-.tile-value {
-  font-size: 1.5rem;
+.quote-panel-title .step-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background-color: var(--brand-soft);
+  color: var(--brand);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .75rem;
+  flex-shrink: 0;
+}
+.quote-sticky { position: sticky; top: 0; }
+
+.view-section-label {
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #6E7275;
+  margin-bottom: .3rem;
+}
+.view-value {
+  font-size: .95rem;
   font-weight: 600;
-  line-height: 1.4;
   color: var(--text);
-  margin: 0;
   word-break: break-word;
 }
-.tile-value.mono {
-  font-family: var(--mono);
-  font-size: 1.35rem;
+.view-value.mono { font-family: var(--mono); font-size: .88rem; font-weight: 500; }
+.view-value.money { font-family: var(--mono); color: var(--c-progress); }
+.view-lead {
+  margin: 0;
+  font-size: 1.05rem;
   font-weight: 500;
+  line-height: 1.55;
+  color: var(--text);
+  word-break: break-word;
 }
-.tile-sub {
-  display: block;
-  margin-top: .4rem;
-  font-size: 1rem;
-  font-weight: 500;
-  color: var(--text-3);
-}
-.detail-modal .event-cat {
-  font-size: 1.2rem;
-  padding: .45rem .95rem;
+.view-notes-box {
+  background-color: #F6F4EF;
+  border: 1px solid #E6E2DA;
   border-radius: 10px;
-  gap: .6rem;
+  padding: .75rem .9rem;
+  white-space: pre-line;
+  word-break: break-word;
+  min-height: 2.5rem;
+  color: var(--text);
+  font-size: .9rem;
+  margin: 0;
 }
-.detail-modal .event-cat i { font-size: 1.05rem; }
+.actor-card { display: flex; align-items: center; gap: 1rem; }
+.actor-card .avatar { width: 56px; height: 56px; border-radius: 14px; font-size: 1.15rem; }
+.actor-card-name { font-size: 1.1rem; font-weight: 700; line-height: 1.25; word-break: break-word; }
+.hero-actor-role {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  margin-top: .2rem;
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.hero-actor-role::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); }
+.hero-actor-role.role-manager::before { background: var(--r-manager); }
+.hero-actor-role.role-supervisor::before { background: var(--r-supervisor); }
+.hero-actor-role.role-staff::before { background: var(--r-staff); }
+.hero-actor-role.role-admin::before { background: var(--r-admin); }
+#logDetailModal .event-cat { font-size: .82rem; padding: .3rem .7rem; }
+#logDetailModal .status-badge { font-size: .8rem; padding: .28rem .7rem; }
+
+@media (max-width: 991.98px) {
+  .quote-sticky { position: static; }
+  #logDetailModal .modal-body { padding: .9rem; }
+}
+@media (max-width: 767.98px) {
+  #logDetailModal .modal-header { padding: .7rem .8rem; }
+  #logDetailModal .modal-title { font-size: .95rem; }
+  #logDetailModal .modal-body { padding: .65rem; }
+  .quote-panel { padding: .8rem .85rem; border-radius: 10px; }
+  .quote-panel-title { font-size: .84rem; margin-bottom: .7rem; }
+  .view-lead { font-size: .95rem; }
+}
 
 .mobile-label { display: none; }
 
@@ -1003,19 +1072,6 @@ tr.log-row:hover .row-chevron { color: var(--brand); }
   .metric-total { grid-column: span 3; }
   .page-title { font-size: 1rem; }
 
-  .detail-modal .modal-dialog { width: 90vw; max-width: 90vw; }
-  .detail-modal .modal-dialog.modal-dialog-scrollable .modal-content { height: 85vh; max-height: 85vh; }
-  .detail-modal .modal-header { padding: 1.3rem 1.5rem 1.15rem; }
-  .detail-modal .modal-body { padding: 1.5rem; }
-  .detail-modal .modal-title { font-size: 1.55rem; }
-  .mh-icon { width: 56px; height: 56px; font-size: 1.4rem; border-radius: 14px; }
-  .hero-actor { padding: 1.2rem 1.35rem; }
-  .hero-actor .avatar { width: 72px; height: 72px; font-size: 1.6rem; }
-  .hero-actor-name { font-size: 1.6rem; }
-  .hero-actor-role { font-size: 1.1rem; }
-  .detail-tile { padding: 1.2rem 1.35rem; }
-  .tile-value { font-size: 1.3rem; }
-  .tile-value.mono { font-size: 1.2rem; }
 }
 
 @media (max-width: 767.98px) {
@@ -1026,7 +1082,6 @@ tr.log-row:hover .row-chevron { color: var(--brand); }
   .metric-total { grid-column: span 2; }
   .metric { padding: .75rem .8rem; border-radius: 9px; }
   .metric-value { font-size: 1.3rem; margin-top: .4rem; }
-  .metric-bar { margin-top: .55rem; }
 
   .filters { padding: .8rem; }
   .quick-range { width: 100%; }
@@ -1066,41 +1121,13 @@ tr.log-row:hover .row-chevron { color: var(--brand); }
   .actor { justify-content: flex-end; text-align: left; }
   .actor-id { display: none; }
   .target-ref { max-width: 100%; }
+  .client-name { max-width: 100%; }
   .row-chevron { display: none !important; }
   .ts-rel { display: inline; margin-left: .4rem; }
 
   .log-foot { padding: .75rem .85rem; justify-content: center; }
   .pager a, .pager span { min-width: 30px; height: 30px; font-size: .75rem; }
 
-  .detail-modal .modal-dialog { width: 94vw; max-width: 94vw; }
-  .detail-modal .modal-dialog.modal-dialog-scrollable .modal-content {
-    height: auto;
-    max-height: 88vh;
-    border-radius: 16px;
-  }
-  .detail-modal .modal-header { padding: 1rem 1rem .9rem; gap: .7rem; }
-  .detail-modal .modal-header::before { height: 5px; }
-  .mh-main { gap: .75rem; }
-  .mh-icon { width: 42px; height: 42px; font-size: 1.05rem; border-radius: 11px; }
-  .drawer-kicker { font-size: .72rem; }
-  .detail-modal .modal-title { font-size: 1.1rem; }
-  .detail-modal .btn-close { width: 36px; height: 36px; border-radius: 10px; background-size: 11px; }
-  .detail-modal .modal-body { padding: 1rem; }
-  .hero-actor { padding: .9rem; gap: .85rem; margin-bottom: .8rem; border-radius: 13px; }
-  .hero-actor .avatar { width: 54px; height: 54px; font-size: 1.15rem; border-radius: 14px; }
-  .hero-actor-name { font-size: 1.1rem; }
-  .hero-actor-role { font-size: .85rem; margin-top: .25rem; gap: .4rem; }
-  .hero-actor-role::before { width: 8px; height: 8px; }
-  .detail-grid { grid-template-columns: 1fr; gap: .7rem; }
-  .detail-tile.is-wide { grid-column: span 1; }
-  .detail-tile { padding: .85rem 1rem; border-radius: 13px; }
-  .tile-label { font-size: .72rem; margin-bottom: .35rem; gap: .4rem; }
-  .tile-label i { font-size: .72rem; }
-  .tile-value { font-size: 1rem; }
-  .tile-value.mono { font-size: .92rem; }
-  .tile-sub { font-size: .76rem; }
-  .detail-modal .event-cat { font-size: .88rem; padding: .3rem .65rem; border-radius: 8px; }
-  .detail-modal .event-cat i { font-size: .8rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1124,7 +1151,6 @@ tr.log-row:hover .row-chevron { color: var(--brand); }
         </button>
         <div>
           <h1 class="page-title">Activity Logs</h1>
-          <p class="page-sub d-none d-sm-block">Chronological audit trail of user actions across the system</p>
         </div>
       </div>
     </header>
@@ -1134,21 +1160,19 @@ tr.log-row:hover .row-chevron { color: var(--brand); }
       <section class="metrics mb-3" aria-label="Event summary">
         <a class="metric metric-total <?= $roleFilter === '' ? 'is-active' : '' ?>" href="<?= e(buildLogPageUrl(1, '', $actionFilter, $searchTerm, $dateFilter)) ?>">
           <div class="metric-head">
-            <span class="metric-label"><span class="metric-dot bg-r-all"></span>All events</span>
+            <span class="metric-label">All events</span>
             <span class="metric-pct"><?= $hasActiveFilters ? 'filtered' : 'all time' ?></span>
           </div>
           <div class="metric-value"><?= number_format($totalLogs) ?></div>
-          <div class="metric-bar"><span class="bg-r-all" style="width:100%;"></span></div>
         </a>
         <?php foreach ($roleTypes as $rt): ?>
-          <?php $pct = $roleFilter === '' || $roleFilter === $rt ? round(($roleCounts[$rt] / $roleBase) * 100) : round(($roleCounts[$rt] / $roleBase) * 100); ?>
+          <?php $pct = round(($roleCounts[$rt] / $roleBase) * 100); ?>
           <a class="metric <?= $roleFilter === $rt ? 'is-active' : '' ?>" href="<?= e(buildLogPageUrl(1, $rt, $actionFilter, $searchTerm, $dateFilter)) ?>">
             <div class="metric-head">
-              <span class="metric-label"><span class="metric-dot bg-r-<?= e(strtolower($rt)) ?>"></span><?= e($rt) ?></span>
+              <span class="metric-label"><?= e($rt) ?></span>
               <span class="metric-pct"><?= $pct ?>%</span>
             </div>
             <div class="metric-value"><?= number_format($roleCounts[$rt]) ?></div>
-            <div class="metric-bar"><span class="bg-r-<?= e(strtolower($rt)) ?>" style="width:<?= $pct ?>%;"></span></div>
           </a>
         <?php endforeach; ?>
       </section>
@@ -1159,7 +1183,7 @@ tr.log-row:hover .row-chevron { color: var(--brand); }
             <label class="field-label" for="searchInput">Search</label>
             <div class="input-group">
               <span class="input-group-text"><i class="fa-solid fa-magnifying-glass"></i></span>
-              <input type="text" name="search" id="searchInput" class="form-control" placeholder="User name or record reference" value="<?= e($searchTerm) ?>" autocomplete="off">
+              <input type="text" name="search" id="searchInput" class="form-control" placeholder="User, company, or record reference" value="<?= e($searchTerm) ?>" autocomplete="off">
             </div>
           </div>
           <div class="col-6 col-lg-2">
@@ -1215,9 +1239,12 @@ tr.log-row:hover .row-chevron { color: var(--brand); }
       <section class="panel log-panel">
         <div class="log-panel-head">
           <h2 class="log-panel-title">Event log</h2>
-          <span class="log-panel-meta">
-            Showing <b><?= number_format($rangeFrom) ?>–<?= number_format($rangeTo) ?></b> of <b><?= number_format($totalLogs) ?></b> events
-          </span>
+          <div class="log-panel-right">
+            <span class="log-panel-meta">
+              Showing <b><?= number_format($rangeFrom) ?>–<?= number_format($rangeTo) ?></b> of <b><?= number_format($totalLogs) ?></b> events
+            </span>
+            <a class="btn-export" href="<?= e($exportUrl) ?>"><i class="fa-solid fa-file-csv"></i>Export CSV</a>
+          </div>
         </div>
 
         <div class="table-responsive">
@@ -1227,6 +1254,7 @@ tr.log-row:hover .row-chevron { color: var(--brand); }
                 <th scope="col">Actor</th>
                 <th scope="col" class="d-none d-md-table-cell">Role</th>
                 <th scope="col">Event</th>
+                <th scope="col" class="d-none d-xl-table-cell">Company</th>
                 <th scope="col" class="d-none d-lg-table-cell">Record</th>
                 <th scope="col">Timestamp</th>
                 <th scope="col" class="d-none d-md-table-cell"></th>
@@ -1235,7 +1263,7 @@ tr.log-row:hover .row-chevron { color: var(--brand); }
             <tbody>
               <?php if (empty($logs)): ?>
                 <tr>
-                  <td colspan="6">
+                  <td colspan="7">
                     <div class="empty-state">
                       <div class="empty-icon"><i class="fa-solid fa-clipboard-list"></i></div>
                       <h3 class="empty-title">No events match these filters</h3>
@@ -1253,18 +1281,26 @@ tr.log-row:hover .row-chevron { color: var(--brand); }
                     $ts = $log['occurred_at'] ? strtotime($log['occurred_at']) : false;
                     $dayKey = $ts !== false ? date('Y-m-d', $ts) : 'unknown';
                     $fullName = trim($log['firstname'] . ' ' . $log['lastname']);
-                    $initials = strtoupper(substr($log['firstname'], 0, 1) . substr($log['lastname'], 0, 1));
+                    $initials = initialsFor($log['firstname'], $log['lastname']);
                     $rClass = roleClass($log['role']);
                     $avatarClass = in_array($rClass, ['role-manager', 'role-supervisor', 'role-staff', 'role-admin'], true) ? $rClass : 'role-unknown';
                     $catClass = actionTypeClass($log['action_type']);
                     $targetText = $log['target_label'] ?? '—';
+                    $clientName = trim((string) ($log['client_name'] ?? ''));
+                    $recStatus = trim((string) ($log['record_status'] ?? ''));
+                    $amountText = ($log['amount'] !== null && $log['amount'] !== '') ? '₱' . number_format((float) $log['amount'], 2) : '';
+                    $noteText = trim((string) ($log['note'] ?? ''));
                     $fullStamp = $ts !== false ? date('F d, Y g:i:s A', $ts) : '—';
                     $rel = relativeTime($log['occurred_at']);
+                    $summary = $fullName . ' ' . lcfirst((string) $log['action_label'])
+                        . ($targetText !== '—' && $targetText !== '' ? ' “' . $targetText . '”' : '')
+                        . ($clientName !== '' ? ' for ' . $clientName : '')
+                        . '.';
                   ?>
                   <?php if ($dayKey !== $lastDay): ?>
                     <?php $lastDay = $dayKey; ?>
                     <tr class="day-divider">
-                      <td colspan="6"><i class="fa-regular fa-calendar"></i><?= $dayKey === 'unknown' ? 'Undated' : e(dayHeading($dayKey)) ?></td>
+                      <td colspan="7"><i class="fa-regular fa-calendar"></i><?= $dayKey === 'unknown' ? 'Undated' : e(dayHeading($dayKey)) ?></td>
                     </tr>
                   <?php endif; ?>
                   <tr class="log-row <?= e($catClass) ?>" tabindex="0" role="button" aria-label="View details for <?= e($log['action_type']) ?> by <?= e($fullName) ?>"
@@ -1279,6 +1315,12 @@ tr.log-row:hover .row-chevron { color: var(--brand); }
                     data-cat-icon="<?= e(actionTypeIcon($log['action_type'])) ?>"
                     data-target="<?= e($targetText) ?>"
                     data-related="<?= e($log['related_staff'] ?? '') ?>"
+                    data-client="<?= e($clientName) ?>"
+                    data-status="<?= e($recStatus) ?>"
+                    data-status-class="<?= e(statusClass($recStatus)) ?>"
+                    data-amount="<?= e($amountText) ?>"
+                    data-note="<?= e($noteText) ?>"
+                    data-summary="<?= e($summary) ?>"
                     data-occurred="<?= e($fullStamp) ?>"
                     data-relative="<?= e($rel) ?>">
                     <td>
@@ -1304,9 +1346,23 @@ tr.log-row:hover .row-chevron { color: var(--brand); }
                         <span class="event-desc"><?= e($log['action_label']) ?></span>
                       </span>
                     </td>
+                    <td class="d-none d-xl-table-cell">
+                      <span class="mobile-label">Company</span>
+                      <span class="cell-body">
+                        <?php if ($clientName !== ''): ?>
+                          <span class="client-name" title="<?= e($clientName) ?>"><i class="fa-regular fa-building"></i><?= e($clientName) ?></span>
+                          <?php if ($amountText !== ''): ?><span class="ts-rel"><?= e($amountText) ?></span><?php endif; ?>
+                        <?php else: ?>
+                          <span class="muted-dash">—</span>
+                        <?php endif; ?>
+                      </span>
+                    </td>
                     <td class="d-none d-lg-table-cell">
                       <span class="mobile-label">Record</span>
-                      <span class="cell-body"><span class="target-ref" title="<?= e($targetText) ?>"><?= e($targetText) ?></span></span>
+                      <span class="cell-body">
+                        <span class="target-ref" title="<?= e($targetText) ?>"><?= e($targetText) ?></span>
+                        <?php if ($recStatus !== ''): ?><span class="d-block mt-1"><span class="status-badge <?= e(statusClass($recStatus)) ?>"><?= e($recStatus) ?></span></span><?php endif; ?>
+                      </span>
                     </td>
                     <td class="ts">
                       <span class="mobile-label">When</span>
@@ -1366,54 +1422,94 @@ tr.log-row:hover .row-chevron { color: var(--brand); }
 </div>
 
 <div class="modal fade detail-modal" id="logDetailModal" tabindex="-1" aria-labelledby="modalTitle" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+  <div class="modal-dialog modal-fullscreen">
     <div class="modal-content" id="detail_content">
-      <div class="modal-header">
-        <div class="mh-main">
-          <span class="mh-icon"><i id="detail_icon" class="fa-solid fa-circle-dot"></i></span>
-          <div class="min-w-0">
-            <p class="drawer-kicker">Audit event</p>
-            <h2 class="modal-title" id="modalTitle">Event details</h2>
-          </div>
-        </div>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      <div class="modal-header d-flex align-items-center justify-content-between">
+        <h2 class="modal-title" id="modalTitle"><span class="mh-icon"><i id="detail_icon" class="fa-solid fa-circle-dot"></i></span><span id="modalTitleText">Event details</span></h2>
+        <button type="button" class="btn-close m-0 ms-auto" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
+
       <div class="modal-body">
-        <div class="hero-actor">
-          <span class="avatar" id="detail_avatar"></span>
-          <div class="min-w-0">
-            <div class="hero-actor-name" id="detail_name"></div>
-            <div class="hero-actor-role" id="detail_role"></div>
-          </div>
-        </div>
-        <div class="detail-grid">
-          <div class="detail-tile">
-            <p class="tile-label"><i class="fa-solid fa-tag"></i>Event type</p>
-            <p class="tile-value"><span class="event-cat" id="detail_cat"></span></p>
-          </div>
-          <div class="detail-tile" id="detail_related_wrap">
-            <p class="tile-label"><i class="fa-solid fa-user-check"></i>Assigned to</p>
-            <p class="tile-value" id="detail_related"></p>
-          </div>
-          <div class="detail-tile is-wide is-accent">
-            <p class="tile-label"><i class="fa-solid fa-align-left"></i>Description</p>
-            <p class="tile-value" id="detail_action"></p>
-          </div>
-          <div class="detail-tile is-wide">
-            <p class="tile-label"><i class="fa-solid fa-hashtag"></i>Record</p>
-            <p class="tile-value mono" id="detail_target"></p>
-          </div>
-          <div class="detail-tile">
-            <p class="tile-label"><i class="fa-solid fa-id-badge"></i>Actor ID</p>
-            <p class="tile-value mono" id="detail_actor_id"></p>
-          </div>
-          <div class="detail-tile">
-            <p class="tile-label"><i class="fa-regular fa-clock"></i>Timestamp</p>
-            <p class="tile-value mono" id="detail_occurred"></p>
-            <span class="tile-sub" id="detail_relative"></span>
+        <div class="quote-shell">
+          <div class="row g-2 g-md-3">
+
+            <div class="col-lg-8">
+              <div class="d-flex flex-column gap-2 gap-md-3">
+
+                <div class="quote-panel">
+                  <div class="quote-panel-title"><span class="step-icon"><i class="fa-solid fa-bolt"></i></span>What happened</div>
+                  <p class="view-lead" id="detail_summary"></p>
+                </div>
+
+                <div class="quote-panel">
+                  <div class="quote-panel-title"><span class="step-icon"><i class="fa-solid fa-circle-info"></i></span>Overview</div>
+                  <div class="row g-2 g-md-3">
+                    <div class="col-6">
+                      <div class="view-section-label">Event type</div>
+                      <span class="event-cat" id="detail_cat"></span>
+                    </div>
+                    <div class="col-6" id="detail_status_wrap">
+                      <div class="view-section-label">Status</div>
+                      <span class="status-badge" id="detail_status"></span>
+                    </div>
+                    <div class="col-12" id="detail_client_wrap">
+                      <div class="view-section-label">Company / Client</div>
+                      <div class="view-value" id="detail_client"></div>
+                    </div>
+                    <div class="col-6" id="detail_related_wrap">
+                      <div class="view-section-label">Assigned to</div>
+                      <div class="view-value" id="detail_related"></div>
+                    </div>
+                    <div class="col-6" id="detail_amount_wrap">
+                      <div class="view-section-label">Amount</div>
+                      <div class="view-value money" id="detail_amount"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="quote-panel" id="detail_note_wrap">
+                  <div class="quote-panel-title"><span class="step-icon"><i class="fa-solid fa-align-left"></i></span>Details</div>
+                  <p class="view-notes-box" id="detail_note"></p>
+                </div>
+
+              </div>
+            </div>
+
+            <div class="col-lg-4">
+              <div class="quote-sticky d-flex flex-column gap-2 gap-md-3">
+
+                <div class="quote-panel">
+                  <div class="quote-panel-title"><span class="step-icon"><i class="fa-solid fa-user"></i></span>Performed by</div>
+                  <div class="actor-card">
+                    <span class="avatar" id="detail_avatar"></span>
+                    <div class="min-w-0">
+                      <div class="actor-card-name" id="detail_name"></div>
+                      <div class="hero-actor-role" id="detail_role"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="quote-panel">
+                  <div class="quote-panel-title"><span class="step-icon"><i class="fa-solid fa-hashtag"></i></span>Record &amp; Time</div>
+                  <div class="mb-3">
+                    <div class="view-section-label">Record</div>
+                    <div class="view-value mono" id="detail_target"></div>
+                  </div>
+                  <div>
+                    <div class="view-section-label">Timestamp</div>
+                    <div class="view-value mono" id="detail_occurred"></div>
+                    <div class="small mt-1" style="color:var(--text-3);" id="detail_relative"></div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
+
+      <div class="modal-footer"></div>
     </div>
   </div>
 </div>
@@ -1424,6 +1520,16 @@ const modalEl = document.getElementById('logDetailModal');
 const detailModal = bootstrap.Modal.getOrCreateInstance(modalEl);
 const catClasses = ['cat-assignment', 'cat-progress', 'cat-quotation', 'cat-contract', 'cat-revision', 'cat-repository'];
 
+function setTile(wrapId, valueId, value) {
+  const wrap = document.getElementById(wrapId);
+  if (value) {
+    wrap.classList.remove('d-none');
+    document.getElementById(valueId).textContent = value;
+  } else {
+    wrap.classList.add('d-none');
+  }
+}
+
 function openDetail(row) {
   const d = row.dataset;
 
@@ -1432,7 +1538,7 @@ function openDetail(row) {
   content.classList.add(d.catClass);
 
   document.getElementById('detail_icon').className = 'fa-solid ' + d.catIcon;
-  document.getElementById('modalTitle').textContent = d.actionType;
+  document.getElementById('modalTitleText').textContent = d.actionType;
 
   const avatar = document.getElementById('detail_avatar');
   avatar.textContent = d.initials;
@@ -1443,6 +1549,8 @@ function openDetail(row) {
   role.textContent = d.role;
   role.className = 'hero-actor-role ' + d.roleClass;
 
+  document.getElementById('detail_summary').textContent = d.summary || d.actionLabel;
+
   const cat = document.getElementById('detail_cat');
   cat.className = 'event-cat ' + d.catClass;
   cat.innerHTML = '';
@@ -1451,19 +1559,24 @@ function openDetail(row) {
   cat.appendChild(icon);
   cat.appendChild(document.createTextNode(d.actionType));
 
-  document.getElementById('detail_action').textContent = d.actionLabel;
+  const statusWrap = document.getElementById('detail_status_wrap');
+  if (d.status) {
+    statusWrap.classList.remove('d-none');
+    const st = document.getElementById('detail_status');
+    st.textContent = d.status;
+    st.className = 'status-badge ' + (d.statusClass || '');
+  } else {
+    statusWrap.classList.add('d-none');
+  }
+
+  setTile('detail_client_wrap', 'detail_client', d.client);
+  setTile('detail_amount_wrap', 'detail_amount', d.amount);
+  setTile('detail_related_wrap', 'detail_related', d.related);
+  setTile('detail_note_wrap', 'detail_note', d.note);
+
   document.getElementById('detail_target').textContent = d.target;
-  document.getElementById('detail_actor_id').textContent = d.actorId;
   document.getElementById('detail_occurred').textContent = d.occurred;
   document.getElementById('detail_relative').textContent = d.relative || '';
-
-  const relatedWrap = document.getElementById('detail_related_wrap');
-  if (d.related) {
-    relatedWrap.classList.remove('d-none');
-    document.getElementById('detail_related').textContent = d.related;
-  } else {
-    relatedWrap.classList.add('d-none');
-  }
 
   detailModal.show();
 }

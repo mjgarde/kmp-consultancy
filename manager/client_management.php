@@ -556,12 +556,12 @@ body {
 .client-management-tabs a.tab-reports  { --tab-color: #157A5F; }
 
 .client-management-tabs a.active {
-  box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--tab-color);
+  box-shadow: none;
 }
 
 .client-management-tabs a:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--tab-color);
+  box-shadow: none;
 }
 
 .client-management-tabs .tab-count {

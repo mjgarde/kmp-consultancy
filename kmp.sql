@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost
--- Generation Time: Oct 09, 2026 at 09:05 AM
+-- Generation Time: Oct 22, 2026 at 04:26 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.1.25
 
@@ -67,10 +67,24 @@ CREATE TABLE `clients` (
 --
 
 INSERT INTO `clients` (`client_id`, `company_name`, `contact_person`, `email`, `contact_number`, `address`, `industry`, `created_at`, `updated_at`) VALUES
-(36, 'Cotabato Trans Rentals', 'Mark Anthony Santos', 'mark.santos@ctransrentals.com', '091784526', 'Cotabato City, Maguindanao del Norte', 'Transportation and Logistics', '2026-09-22 05:51:22', '2026-09-22 05:51:22'),
-(37, 'CodeWave Technologies', 'Juan Pablo Deigo', 'juan1@gmail.com', '09070909099', 'Rizal 3, Banga, South Cotabato', 'Information Technology', '2026-09-29 00:35:25', '2026-09-29 00:35:25'),
-(38, 'Gryk\'s Food House', 'Juan Pablo Deigos', 'juan1@gmail.com', '09070909011', 'Rizal 3, Banga, South Cotabato', 'Information Technology', '2026-10-06 22:02:12', '2026-10-06 22:02:12'),
-(39, 'Gryk\'s Food House', 's', 's@d.c', '09090909099', 'banga', 'Information Technology', '2026-10-06 22:02:46', '2026-10-06 22:02:46');
+(41, 'Gryk\'s', 'Gerald Reyes', 'gryks@example.com', '09171234501', 'Gen. Santos Drive, Zone III, Koronadal City', 'Food & Restaurant', '2026-10-19 12:03:20', '2026-10-19 12:03:20'),
+(42, 'Kamrynne Skills Pathway & Assessment Center, Inc.', 'Karen Villanueva', 'kamrynneskills@example.com', '09171234502', 'Roxas Street, Zone IV, Koronadal City', 'Education & Training', '2026-10-19 12:03:20', '2026-10-19 12:03:20'),
+(43, 'Pabalaque Training Institute', 'Marites Dela Cruz', 'trainingcenter@example.com', '09171234503', 'Brgy. Zone II, Koronadal City', 'Education & Training', '2026-10-19 12:03:20', '2026-10-19 12:03:20'),
+(44, 'LD Since 2023', 'Lorna Dizon', 'ld2023@example.com', '09171234504', 'Morales Avenue, Brgy. Morales, Koronadal City', 'Retail', '2026-10-19 12:03:20', '2026-10-19 12:03:20'),
+(45, 'Jeri\'s Meats', 'Jerry Atienza', 'jerismeats@example.com', '09171234505', 'Aquino Street, Zone II, Koronadal City', 'Food & Meat Retail', '2026-10-19 12:03:20', '2026-10-19 12:03:20'),
+(46, 'KMP Car Rental', 'Kevin Mendoza', 'kmpcarrental@example.com', '09171234506', 'Brgy. Carpenter Hill, Koronadal City', 'Automotive & Rental', '2026-10-19 12:03:20', '2026-10-19 12:03:20'),
+(47, 'Clothina Online Shop', 'Clarissa Ramos', 'clothina@example.com', '09171234507', 'Brgy. Zone IV, Koronadal City', 'E-commerce & Fashion', '2026-10-19 12:03:20', '2026-10-19 12:03:20'),
+(48, 'ArmAnn Pharma and Medical Supplies Distribution', 'Armando Lopez', 'armann@example.com', '09171234508', 'Roxas Street, Zone IV, Koronadal City', 'Pharmacy & Medical Supplies', '2026-10-19 12:03:20', '2026-10-19 12:03:20'),
+(49, 'Eternity', 'Elena Mercado', 'eternity@example.com', '09171234509', 'Brgy. Assumption, Koronadal City', 'Health & Wellness', '2026-10-19 12:03:20', '2026-10-19 12:03:20'),
+(50, '8Talk Custom Apparel', 'Eight Santos', '8talk@example.com', '09171234510', 'Brgy. San Isidro, Koronadal City', 'Apparel & Printing', '2026-10-19 12:03:20', '2026-10-19 12:03:20'),
+(51, 'CampusTop QQ English', 'Queenie Cruz', 'campustop@example.com', '09171234511', 'Brgy. Zone I, Koronadal City', 'Education & Online Tutoring', '2026-10-19 12:03:20', '2026-10-19 12:03:20'),
+(52, 'R&R Designers Shop', 'Rodel Bautista', 'rrdesigners@example.com', '09171234512', 'Gen. Santos Drive, Zone III, Koronadal City', 'Design & Printing', '2026-10-19 12:03:20', '2026-10-19 12:03:20'),
+(53, 'Fry Avenue', 'Francis Pascual', 'fryavenue@example.com', '09171234513', 'Morales Avenue, Brgy. Morales, Koronadal City', 'Food & Restaurant', '2026-10-19 12:03:20', '2026-10-19 12:03:20'),
+(54, 'Kamrynne Paddle Park (KPP)', 'Kristine Fernandez', 'kpp@example.com', '09171234514', 'Brgy. Assumption, Koronadal City', 'Sports & Recreation', '2026-10-19 12:03:20', '2026-10-19 12:03:20'),
+(55, 'Keystone Credit Cooperative', 'Kenneth Garcia', 'keystonecoop@example.com', '09171234515', 'Gen. Santos Drive, Zone III, Koronadal City', 'Finance & Cooperative', '2026-10-19 12:03:20', '2026-10-19 12:03:20'),
+(56, 'Office of the Barangay Council, Brgy. Tampakan', 'Hon. Ruben Torres', 'brgytampakan@example.com', '09171234516', 'Tampakan, South Cotabato', 'Government', '2026-10-19 12:03:20', '2026-10-19 12:03:20'),
+(57, 'Remegio E. Magan, MD Ophthalmologist', 'Dr. Remegio Magan', 'drmagan@example.com', '09171234517', 'Roxas Street, Zone IV, Koronadal City', 'Healthcare', '2026-10-19 12:03:20', '2026-10-19 12:03:20'),
+(58, 'eBenta', 'Ella Benitez', 'ebenta@example.com', '09171234518', 'Brgy. Zone IV, Koronadal City', 'E-commerce', '2026-10-19 12:03:20', '2026-10-19 12:03:20');
 
 -- --------------------------------------------------------
 
@@ -104,8 +118,16 @@ CREATE TABLE `contracts` (
 --
 
 INSERT INTO `contracts` (`contract_id`, `contract_number`, `quotation_id`, `request_id`, `client_id`, `scope_summary`, `total_amount`, `start_date`, `end_date`, `status`, `prepared_by`, `approved_by`, `approved_at`, `created_at`, `updated_at`, `contract_file_name`, `contract_file_path`, `contract_file_size`) VALUES
-(7, 'SOW-2026-0001', 15, 42, 36, 'Conduct a comprehensive fleet risk assessment covering vehicle operations, safety practices, operational risks, and existing risk controls. The project will include risk identification, assessment of current controls, and preparation of a report with recommended improvements.', 11200.00, '2026-09-23', '2026-09-24', 'Approved', 1, 1, '2026-09-22 06:50:14', '2026-09-22 06:50:14', '2026-09-22 06:50:14', NULL, NULL, NULL),
-(11, 'SOW-2026-0002', 18, 46, 37, 'Hello sample revert', 100.80, '2026-10-08', '2026-10-09', 'Approved', 2, 2, '2026-10-09 03:02:55', '2026-10-06 21:50:00', '2026-10-09 03:02:55', NULL, NULL, NULL);
+(13, 'SOW-2026-0001', 50, 63, 41, 'Assistance with DTI Business Name Registration, including document preparation, submission, and follow-up.', 3360.00, '2026-10-26', '2026-11-25', 'Draft', 1, NULL, NULL, '2026-10-20 06:53:00', '2026-10-21 06:26:43', NULL, NULL, NULL),
+(14, 'SOW-2026-0002', 51, 64, 42, 'Assistance with Mayor\'s Permit Renewal, including document preparation, submission, and follow-up.', 5040.00, '2026-10-26', '2026-11-25', 'Draft', 1, NULL, NULL, '2026-10-19 07:06:00', '2026-10-21 06:26:43', NULL, NULL, NULL),
+(15, 'SOW-2026-0003', 52, 65, 43, 'Assistance with BIR Registration (Certificate of Registration), including document preparation, submission, and follow-up.', 6160.00, '2026-10-26', '2026-11-25', 'Draft', 1, NULL, NULL, '2026-10-20 08:19:00', '2026-10-21 06:26:43', NULL, NULL, NULL),
+(16, 'SOW-2026-0004', 53, 66, 44, 'Assistance with Barangay Business Clearance Application, including document preparation, submission, and follow-up.', 1904.00, '2026-10-26', '2026-11-25', 'Draft', 1, NULL, NULL, '2026-10-19 09:32:00', '2026-10-21 06:26:43', NULL, NULL, NULL),
+(17, 'SOW-2026-0005', 54, 67, 45, 'Assistance with Sanitary Permit Application, including document preparation, submission, and follow-up.', 3472.00, '2026-10-26', '2026-11-25', 'Draft', 1, NULL, NULL, '2026-10-20 05:45:00', '2026-10-21 06:26:43', NULL, NULL, NULL),
+(18, 'SOW-2026-0006', 55, 68, 46, 'Assistance with Business Name Renewal (DTI), including document preparation, submission, and follow-up.', 2240.00, '2026-10-26', '2026-11-25', 'Approved', 1, 2, '2026-10-19 12:25:00', '2026-10-19 06:58:00', '2026-10-21 06:26:43', NULL, NULL, NULL),
+(19, 'SOW-2026-0007', 56, 69, 47, 'Assistance with Fire Safety Inspection Certificate (FSIC) Assistance, including document preparation, submission, and follow-up.', 4816.00, '2026-10-26', '2026-11-25', 'Draft', 3, NULL, NULL, '2026-10-20 07:11:00', '2026-10-21 06:26:43', NULL, NULL, NULL),
+(20, 'SOW-2026-0008', 57, 70, 48, 'Assistance with SEC Registration Basic Guidance, including document preparation, submission, and follow-up.', 3920.00, '2026-10-26', '2026-11-25', 'Draft', 3, NULL, NULL, '2026-10-19 08:24:00', '2026-10-21 06:26:43', NULL, NULL, NULL),
+(21, 'SOW-2026-0009', 58, 71, 49, 'Assistance with Cooperative Registration Requirements Guidance, including document preparation, submission, and follow-up.', 5040.00, '2026-10-26', '2026-11-25', 'Draft', 3, NULL, NULL, '2026-10-20 09:37:00', '2026-10-21 06:26:43', NULL, NULL, NULL),
+(22, 'SOW-2026-0010', 59, 72, 50, 'Assistance with BIR Books of Accounts Registration, including document preparation, submission, and follow-up.', 5040.00, '2026-10-26', '2026-11-25', 'Approved', 3, 2, '2026-10-19 12:25:07', '2026-10-19 05:50:00', '2026-10-21 06:26:43', NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -156,7 +178,30 @@ INSERT INTO `knowledge_documents` (`document_id`, `item_type`, `parent_id`, `tit
 (53, 'folder', 52, 'CodeWave Technologies', NULL, NULL, NULL, NULL, 0, NULL, 1, 'staff', '2026-09-29 01:38:41', '2026-09-29 01:38:41'),
 (54, 'folder', 52, 'ABC Company', NULL, NULL, NULL, NULL, 0, NULL, 1, 'staff', '2026-09-29 01:38:49', '2026-09-29 01:38:49'),
 (55, 'folder', 52, 'Gryk\'s Food House', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-10-06 22:02:12', '2026-10-06 22:02:12'),
-(56, 'folder', 52, 'ABCD Company', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-10-06 22:07:41', '2026-10-06 22:07:41');
+(56, 'folder', 52, 'ABCD Company', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-10-06 22:07:41', '2026-10-06 22:07:41'),
+(57, 'folder', 52, 'Gryk\'s', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-10-19 12:34:38', '2026-10-19 12:34:38'),
+(58, 'folder', 52, 'Kamrynne Skills Pathway & Assessment Center, Inc.', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-10-19 12:34:38', '2026-10-19 12:34:38'),
+(59, 'folder', 52, 'Pabalaque Training Institute', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-10-19 12:34:38', '2026-10-19 12:34:38'),
+(60, 'folder', 52, 'LD Since 2023', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-10-19 12:34:38', '2026-10-19 12:34:38'),
+(61, 'folder', 52, 'Jeri\'s Meats', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-10-19 12:34:38', '2026-10-19 12:34:38'),
+(62, 'folder', 52, 'KMP Car Rental', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-10-19 12:34:38', '2026-10-19 12:34:38'),
+(63, 'folder', 52, 'Clothina Online Shop', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-10-19 12:34:38', '2026-10-19 12:34:38'),
+(64, 'folder', 52, 'ArmAnn Pharma and Medical Supplies Distribution', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-10-19 12:34:38', '2026-10-19 12:34:38'),
+(65, 'folder', 52, 'Eternity', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-10-19 12:34:38', '2026-10-19 12:34:38'),
+(66, 'folder', 52, '8Talk Custom Apparel', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-10-19 12:34:38', '2026-10-19 12:34:38'),
+(67, 'folder', 52, 'CampusTop QQ English', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-10-19 12:34:38', '2026-10-19 12:34:38'),
+(68, 'folder', 52, 'R&R Designers Shop', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-10-19 12:34:38', '2026-10-19 12:34:38'),
+(69, 'folder', 52, 'Fry Avenue', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-10-19 12:34:38', '2026-10-19 12:34:38'),
+(70, 'folder', 52, 'Kamrynne Paddle Park (KPP)', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-10-19 12:34:38', '2026-10-19 12:34:38'),
+(71, 'folder', 52, 'Keystone Credit Cooperative', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-10-19 12:34:38', '2026-10-19 12:34:38'),
+(72, 'folder', 52, 'Office of the Barangay Council, Brgy. Tampakan', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-10-19 12:34:38', '2026-10-19 12:34:38'),
+(73, 'folder', 52, 'Remegio E. Magan, MD Ophthalmologist', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-10-19 12:34:38', '2026-10-19 12:34:38'),
+(74, 'folder', 52, 'eBenta', NULL, NULL, NULL, NULL, 0, NULL, 2, 'admin', '2026-10-19 12:34:38', '2026-10-19 12:34:38'),
+(77, 'file', 66, 'Consultancy_Services_Agreement_KMP-2.docx', NULL, NULL, 'Consultancy_Services_Agreement_KMP-2.docx', 'repository/doc_6ada1ae40b2b78.50092788_Consultancy_Services_Agreement_KMP-2.docx', 39621, 'docx', 2, 'admin', '2026-10-22 14:17:08', '2026-10-22 14:17:08'),
+(78, 'file', 66, 'Profile.jpg', NULL, NULL, '9a34803572876920a0d6254bbc0d0346.jpg', 'repository/doc_6ada1b9bcd9b16.66412103_9a34803572876920a0d6254bbc0d0346.jpg', 55026, 'jpg', 2, 'admin', '2026-10-22 14:20:11', '2026-10-22 14:20:29'),
+(79, 'file', 66, 'contract.docx', NULL, NULL, 'contract (1).docx', 'repository/doc_6ada1c874c2f57.56593499_contract__1_.docx', 41017, 'docx', 2, 'admin', '2026-10-22 14:24:07', '2026-10-22 14:24:16'),
+(80, 'file', 66, 'NDA_Template.pdf', NULL, NULL, 'NDA_Template.pdf', 'repository/doc_6ada1ca620c085.73720262_NDA_Template.pdf', 3165, 'pdf', 2, 'admin', '2026-10-22 14:24:38', '2026-10-22 14:24:38'),
+(81, 'file', 66, 'Consultant-Proposal-Template.docx', NULL, NULL, 'Consultant-Proposal-Template.docx', 'repository/doc_6ada1cb58b6d10.18830371_Consultant-Proposal-Template.docx', 36668, 'docx', 2, 'admin', '2026-10-22 14:24:53', '2026-10-22 14:24:53');
 
 -- --------------------------------------------------------
 
@@ -178,18 +223,33 @@ CREATE TABLE `quotations` (
   `valid_until` date DEFAULT NULL,
   `prepared_by` int(10) UNSIGNED DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `revert_count` int(11) NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `quotations`
 --
 
-INSERT INTO `quotations` (`quotation_id`, `quotation_number`, `request_id`, `client_id`, `project_scope`, `status`, `subtotal`, `tax_rate`, `tax_amount`, `total_amount`, `valid_until`, `prepared_by`, `created_at`, `updated_at`) VALUES
-(15, 'QT-2026-0001', 42, 36, 'Conduct a comprehensive fleet risk assessment covering vehicle operations, safety practices, operational risks, and existing risk controls. The project will include risk identification, assessment of current controls, and preparation of a report with recommended improvements.', 'Approved', 10000.00, 12.00, 1200.00, 11200.00, '2026-09-23', 1, '2026-09-22 05:55:00', '2026-09-22 05:55:00'),
-(16, 'QT-2026-0002', 44, 37, 'Assistance with business registration filing', 'Revert', 6000.00, 12.00, 720.00, 6720.00, '2026-09-30', 1, '2026-09-29 01:34:29', '2026-10-06 04:12:09'),
-(17, 'QT-2026-0003', 45, 36, 'Revert\r\nRevert', 'Revert', 101.00, 12.00, 12.12, 113.12, NULL, 2, '2026-10-04 01:48:28', '2026-10-06 04:11:31'),
-(18, 'QT-2026-0004', 46, 37, 'Hello sample revert', 'Approved', 90.00, 12.00, 10.80, 100.80, '2026-10-08', 4, '2026-10-04 03:33:39', '2026-10-06 21:49:44');
+INSERT INTO `quotations` (`quotation_id`, `quotation_number`, `request_id`, `client_id`, `project_scope`, `status`, `subtotal`, `tax_rate`, `tax_amount`, `total_amount`, `valid_until`, `prepared_by`, `created_at`, `updated_at`, `revert_count`) VALUES
+(50, 'QT-2026-0001', 63, 41, 'Assistance with DTI Business Name Registration, including document preparation, submission, and follow-up.', 'Approved', 3000.00, 12.00, 360.00, 3360.00, '2026-11-19', 1, '2026-10-20 06:31:00', '2026-10-21 06:26:42', 0),
+(51, 'QT-2026-0002', 64, 42, 'Assistance with Mayor\'s Permit Renewal, including document preparation, submission, and follow-up.', 'Approved', 4500.00, 12.00, 540.00, 5040.00, '2026-11-19', 1, '2026-10-19 07:42:00', '2026-10-21 06:26:42', 0),
+(52, 'QT-2026-0003', 65, 43, 'Assistance with BIR Registration (Certificate of Registration), including document preparation, submission, and follow-up.', 'Approved', 5500.00, 12.00, 660.00, 6160.00, '2026-11-19', 1, '2026-10-20 08:53:00', '2026-10-21 06:26:42', 0),
+(53, 'QT-2026-0004', 66, 44, 'Assistance with Barangay Business Clearance Application, including document preparation, submission, and follow-up.', 'Approved', 1700.00, 12.00, 204.00, 1904.00, '2026-11-19', 1, '2026-10-19 09:04:00', '2026-10-21 06:26:42', 0),
+(54, 'QT-2026-0005', 67, 45, 'Assistance with Sanitary Permit Application, including document preparation, submission, and follow-up.', 'Approved', 3100.00, 12.00, 372.00, 3472.00, '2026-11-19', 1, '2026-10-20 01:15:00', '2026-10-21 06:26:42', 0),
+(55, 'QT-2026-0006', 68, 46, 'Assistance with Business Name Renewal (DTI), including document preparation, submission, and follow-up.', 'Approved', 2000.00, 12.00, 240.00, 2240.00, '2026-11-19', 1, '2026-10-19 02:26:00', '2026-10-21 06:26:42', 0),
+(56, 'QT-2026-0007', 69, 47, 'Assistance with Fire Safety Inspection Certificate (FSIC) Assistance, including document preparation, submission, and follow-up.', 'Approved', 4300.00, 12.00, 516.00, 4816.00, '2026-11-19', 3, '2026-10-20 03:37:00', '2026-10-21 06:26:42', 0),
+(57, 'QT-2026-0008', 70, 48, 'Assistance with SEC Registration Basic Guidance, including document preparation, submission, and follow-up.', 'Approved', 3500.00, 12.00, 420.00, 3920.00, '2026-11-19', 3, '2026-10-19 04:48:00', '2026-10-21 06:26:42', 0),
+(58, 'QT-2026-0009', 71, 49, 'Assistance with Cooperative Registration Requirements Guidance, including document preparation, submission, and follow-up.', 'Approved', 4500.00, 12.00, 540.00, 5040.00, '2026-11-19', 3, '2026-10-20 05:59:00', '2026-10-21 06:26:42', 0),
+(59, 'QT-2026-0010', 72, 50, 'Assistance with BIR Books of Accounts Registration, including document preparation, submission, and follow-up.', 'Approved', 4500.00, 12.00, 540.00, 5040.00, '2026-11-19', 3, '2026-10-19 06:10:00', '2026-10-21 06:26:42', 0),
+(60, 'QT-2026-0011', 73, 51, 'Assistance with Business Permit Requirements Checklist, including document preparation, submission, and follow-up.', 'Draft', 1800.00, 12.00, 216.00, 2016.00, '2026-11-19', 3, '2026-10-20 07:21:00', '2026-10-21 06:26:42', 0),
+(61, 'QT-2026-0012', 74, 52, 'Assistance with Employee SSS, PhilHealth, and Pag-IBIG Registration, including document preparation, submission, and follow-up.', 'Draft', 4500.00, 12.00, 540.00, 5040.00, '2026-11-19', 3, '2026-10-19 08:32:00', '2026-10-21 06:26:42', 0),
+(62, 'QT-2026-0013', 75, 53, 'Assistance with Annual BIR Tax Filing Assistance, including document preparation, submission, and follow-up.', 'Draft', 5500.00, 12.00, 660.00, 6160.00, '2026-11-19', 5, '2026-10-20 09:43:00', '2026-10-21 06:26:42', 0),
+(63, 'QT-2026-0014', 76, 54, 'Assistance with Business Closure Process Guidance, including document preparation, submission, and follow-up.', 'Draft', 6500.00, 12.00, 780.00, 7280.00, '2026-11-19', 5, '2026-10-19 01:54:00', '2026-10-21 06:26:42', 0),
+(64, 'QT-2026-0015', 77, 55, 'Assistance with Occupancy Permit Application Guidance, including document preparation, submission, and follow-up.', 'Approved', 3500.00, 12.00, 420.00, 3920.00, '2026-11-19', 5, '2026-10-20 02:05:00', '2026-10-22 14:25:11', 0),
+(65, 'QT-2026-0016', 78, 56, 'Assistance with Basic Business Plan Consultation, including document preparation, submission, and follow-up.', 'Draft', 6500.00, 12.00, 780.00, 7280.00, '2026-11-19', 5, '2026-10-19 03:16:00', '2026-10-21 06:26:42', 0),
+(66, 'QT-2026-0017', 79, 57, 'Assistance with Mayor\'s Permit Application, including document preparation, submission, and follow-up.', 'Draft', 4500.00, 12.00, 540.00, 5040.00, '2026-11-19', 5, '2026-10-20 04:27:00', '2026-10-21 06:26:42', 0),
+(67, 'QT-2026-0018', 80, 58, 'Assistance with DTI Business Name Registration, including document preparation, submission, and follow-up.', 'Draft', 3000.00, 12.00, 360.00, 3360.00, '2026-11-19', 5, '2026-10-19 05:38:00', '2026-10-21 06:26:42', 0);
 
 -- --------------------------------------------------------
 
@@ -212,11 +272,73 @@ CREATE TABLE `quotation_items` (
 --
 
 INSERT INTO `quotation_items` (`item_id`, `quotation_id`, `description`, `quantity`, `unit_price`, `line_total`, `sort_order`) VALUES
-(20, 15, 'Prepare a detailed report containing findings and recommended risk controls', 1.00, 10000.00, 10000.00, 0),
-(27, 17, 's', 1.00, 101.00, 101.00, 0),
-(28, 16, 'Assistance with business registration filing', 1.00, 3000.00, 3000.00, 0),
-(29, 16, 'Business registration consultation', 1.00, 3000.00, 3000.00, 1),
-(31, 18, 's', 1.00, 90.00, 90.00, 0);
+(99, 50, 'DTI business name registration fee', 1.00, 500.00, 500.00, 0),
+(100, 50, 'Document preparation and processing', 1.00, 1500.00, 1500.00, 1),
+(101, 50, 'Business consultation', 1.00, 1000.00, 1000.00, 2),
+(102, 51, 'Document review and requirements checklist', 1.00, 800.00, 800.00, 0),
+(103, 51, 'Mayor\'s permit renewal processing', 1.00, 2500.00, 2500.00, 1),
+(104, 51, 'LGU follow-up', 1.00, 1200.00, 1200.00, 2),
+(105, 52, 'BIR form preparation', 1.00, 1500.00, 1500.00, 0),
+(106, 52, 'BIR registration processing', 1.00, 3000.00, 3000.00, 1),
+(107, 52, 'Business consultation', 1.00, 1000.00, 1000.00, 2),
+(108, 53, 'Requirements checklist', 1.00, 500.00, 500.00, 0),
+(109, 53, 'Barangay clearance processing', 1.00, 1200.00, 1200.00, 1),
+(110, 54, 'Requirements guidance', 1.00, 600.00, 600.00, 0),
+(111, 54, 'Sanitary permit application filing', 1.00, 1500.00, 1500.00, 1),
+(112, 54, 'Inspection coordination', 1.00, 1000.00, 1000.00, 2),
+(113, 55, 'Renewal document preparation', 1.00, 700.00, 700.00, 0),
+(114, 55, 'DTI renewal processing', 1.00, 1300.00, 1300.00, 1),
+(115, 56, 'Requirements guidance', 1.00, 800.00, 800.00, 0),
+(116, 56, 'FSIC application filing', 1.00, 2000.00, 2000.00, 1),
+(117, 56, 'Inspection coordination', 1.00, 1500.00, 1500.00, 2),
+(118, 57, 'Consultation (per hour)', 2.00, 1000.00, 2000.00, 0),
+(119, 57, 'SEC document checklist', 1.00, 1500.00, 1500.00, 1),
+(120, 58, 'Consultation (per hour)', 3.00, 1000.00, 3000.00, 0),
+(121, 58, 'Cooperative requirements checklist', 1.00, 1500.00, 1500.00, 1),
+(122, 59, 'Books of accounts preparation', 1.00, 2000.00, 2000.00, 0),
+(123, 59, 'BIR books registration processing', 1.00, 2500.00, 2500.00, 1),
+(124, 60, 'Business consultation', 1.00, 1000.00, 1000.00, 0),
+(125, 60, 'Permit requirements checklist preparation', 1.00, 800.00, 800.00, 1),
+(126, 61, 'SSS employer registration', 1.00, 1500.00, 1500.00, 0),
+(127, 61, 'PhilHealth employer registration', 1.00, 1500.00, 1500.00, 1),
+(128, 61, 'Pag-IBIG employer registration', 1.00, 1500.00, 1500.00, 2),
+(129, 62, 'Tax computation', 1.00, 3000.00, 3000.00, 0),
+(130, 62, 'Annual filing assistance', 1.00, 2500.00, 2500.00, 1),
+(131, 63, 'Business consultation', 1.00, 1000.00, 1000.00, 0),
+(132, 63, 'Closure document preparation', 1.00, 3000.00, 3000.00, 1),
+(133, 63, 'BIR and LGU clearance follow-up', 1.00, 2500.00, 2500.00, 2),
+(134, 64, 'Requirements guidance', 1.00, 1000.00, 1000.00, 0),
+(135, 64, 'Occupancy permit application filing', 1.00, 2500.00, 2500.00, 1),
+(136, 65, 'Consultation (per hour)', 3.00, 1000.00, 3000.00, 0),
+(137, 65, 'Business plan outline preparation', 1.00, 3500.00, 3500.00, 1),
+(138, 66, 'Requirements checklist', 1.00, 800.00, 800.00, 0),
+(139, 66, 'Mayor\'s permit application processing', 1.00, 2500.00, 2500.00, 1),
+(140, 66, 'LGU follow-up', 1.00, 1200.00, 1200.00, 2),
+(141, 67, 'DTI business name registration fee', 1.00, 500.00, 500.00, 0),
+(142, 67, 'Document preparation and processing', 1.00, 1500.00, 1500.00, 1),
+(143, 67, 'Business consultation', 1.00, 1000.00, 1000.00, 2);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `quotation_revisions`
+--
+
+CREATE TABLE `quotation_revisions` (
+  `revision_id` int(11) NOT NULL,
+  `quotation_id` int(11) NOT NULL,
+  `revision_note` text DEFAULT NULL,
+  `revised_by` int(11) DEFAULT NULL,
+  `created_at` datetime NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `quotation_revisions`
+--
+
+INSERT INTO `quotation_revisions` (`revision_id`, `quotation_id`, `revision_note`, `revised_by`, `created_at`) VALUES
+(1, 16, 'Quotation reverted.', 2, '2026-10-13 08:56:40'),
+(2, 18, 'Quotation reverted.', 2, '2026-10-13 08:56:44');
 
 -- --------------------------------------------------------
 
@@ -241,10 +363,24 @@ CREATE TABLE `service_requests` (
 --
 
 INSERT INTO `service_requests` (`request_id`, `client_id`, `request_title`, `required_skill`, `status`, `assigned_to`, `assigned_by`, `created_at`, `updated_at`) VALUES
-(42, 36, 'Fleet Risk Assessment', 'Risk Assessment', 'Completed', 1, 2, '2026-09-22 05:51:22', '2026-09-27 07:28:40'),
-(44, 37, 'Business Registration', 'Business Registration', 'New', NULL, NULL, '2026-09-29 01:19:48', '2026-09-29 01:19:48'),
-(45, 36, 's', 'Quality Assurance', 'New', NULL, NULL, '2026-10-04 01:48:05', '2026-10-04 01:48:05'),
-(46, 37, 'test', 'Risk Assessment', 'In Progress', 1, 2, '2026-10-04 03:33:09', '2026-10-09 03:55:17');
+(63, 41, 'DTI Business Name Registration', 'Business Registration', 'New', NULL, NULL, '2026-10-20 05:47:00', '2026-10-20 05:47:00'),
+(64, 42, 'Mayor\'s Permit Renewal', 'Permit Processing', 'New', NULL, NULL, '2026-10-19 06:54:00', '2026-10-19 06:54:00'),
+(65, 43, 'BIR Registration (Certificate of Registration)', 'BIR Processing', 'New', NULL, NULL, '2026-10-20 07:01:00', '2026-10-20 07:01:00'),
+(66, 44, 'Barangay Business Clearance Application', 'Permit Processing', 'New', NULL, NULL, '2026-10-19 08:08:00', '2026-10-19 08:08:00'),
+(67, 45, 'Sanitary Permit Application', 'Permit Processing', 'New', NULL, NULL, '2026-10-20 00:15:00', '2026-10-20 00:15:00'),
+(68, 46, 'Business Name Renewal (DTI)', 'Business Registration', 'Completed', 1, 2, '2026-10-19 01:22:00', '2026-10-19 12:46:21'),
+(69, 47, 'Fire Safety Inspection Certificate (FSIC) Assistance', 'Permit Processing', 'New', NULL, NULL, '2026-10-20 02:29:00', '2026-10-20 02:29:00'),
+(70, 48, 'SEC Registration Basic Guidance', 'Business Registration', 'New', NULL, NULL, '2026-10-19 03:36:00', '2026-10-19 03:36:00'),
+(71, 49, 'Cooperative Registration Requirements Guidance', 'Business Registration', 'New', NULL, NULL, '2026-10-20 04:43:00', '2026-10-20 04:43:00'),
+(72, 50, 'BIR Books of Accounts Registration', 'BIR Processing', 'New', NULL, NULL, '2026-10-19 05:50:00', '2026-10-19 05:50:00'),
+(73, 51, 'Business Permit Requirements Checklist', 'Business Consultation', 'New', NULL, NULL, '2026-10-20 06:57:00', '2026-10-20 06:57:00'),
+(74, 52, 'Employee SSS, PhilHealth, and Pag-IBIG Registration', 'Government Compliance', 'New', NULL, NULL, '2026-10-19 07:04:00', '2026-10-19 07:04:00'),
+(75, 53, 'Annual BIR Tax Filing Assistance', 'BIR Processing', 'New', NULL, NULL, '2026-10-20 08:11:00', '2026-10-20 08:11:00'),
+(76, 54, 'Business Closure Process Guidance', 'Business Consultation', 'New', NULL, NULL, '2026-10-19 00:18:00', '2026-10-19 00:18:00'),
+(77, 55, 'Occupancy Permit Application Guidance', 'Permit Processing', 'New', NULL, NULL, '2026-10-20 01:25:00', '2026-10-20 01:25:00'),
+(78, 56, 'Basic Business Plan Consultation', 'Business Consultation', 'New', NULL, NULL, '2026-10-19 02:32:00', '2026-10-19 02:32:00'),
+(79, 57, 'Mayor\'s Permit Application', 'Permit Processing', 'New', NULL, NULL, '2026-10-20 03:39:00', '2026-10-20 03:39:00'),
+(80, 58, 'DTI Business Name Registration', 'Business Registration', 'New', NULL, NULL, '2026-10-19 04:46:00', '2026-10-19 04:46:00');
 
 -- --------------------------------------------------------
 
@@ -379,6 +515,13 @@ ALTER TABLE `quotation_items`
   ADD KEY `fk_quotation_items_quotation` (`quotation_id`);
 
 --
+-- Indexes for table `quotation_revisions`
+--
+ALTER TABLE `quotation_revisions`
+  ADD PRIMARY KEY (`revision_id`),
+  ADD KEY `quotation_id` (`quotation_id`);
+
+--
 -- Indexes for table `service_requests`
 --
 ALTER TABLE `service_requests`
@@ -415,43 +558,49 @@ ALTER TABLE `administrator`
 -- AUTO_INCREMENT for table `clients`
 --
 ALTER TABLE `clients`
-  MODIFY `client_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=41;
+  MODIFY `client_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=59;
 
 --
 -- AUTO_INCREMENT for table `contracts`
 --
 ALTER TABLE `contracts`
-  MODIFY `contract_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
+  MODIFY `contract_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
 
 --
 -- AUTO_INCREMENT for table `contract_revisions`
 --
 ALTER TABLE `contract_revisions`
-  MODIFY `revision_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `revision_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `knowledge_documents`
 --
 ALTER TABLE `knowledge_documents`
-  MODIFY `document_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=57;
+  MODIFY `document_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=82;
 
 --
 -- AUTO_INCREMENT for table `quotations`
 --
 ALTER TABLE `quotations`
-  MODIFY `quotation_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+  MODIFY `quotation_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=68;
 
 --
 -- AUTO_INCREMENT for table `quotation_items`
 --
 ALTER TABLE `quotation_items`
-  MODIFY `item_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=32;
+  MODIFY `item_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=144;
+
+--
+-- AUTO_INCREMENT for table `quotation_revisions`
+--
+ALTER TABLE `quotation_revisions`
+  MODIFY `revision_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `service_requests`
 --
 ALTER TABLE `service_requests`
-  MODIFY `request_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=47;
+  MODIFY `request_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=81;
 
 --
 -- AUTO_INCREMENT for table `staff_skills`

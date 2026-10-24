@@ -188,18 +188,22 @@ $staffPayload = array_map(function ($staff) use ($skillsByStaff) {
   --slate: #55595C;
   --charcoal: #2B3134;
 
-  --accent: #2F6F6A;
-  --accent-hover: #245853;
-  --accent-soft: #E3EFEC;
-  --accent-text: #245853;
+  --accent: #1F4FBF;
+  --accent-hover: #1A3F9A;
+  --accent-soft: #E8EEFC;
+  --accent-text: #1A3F9A;
+
+  --info-soft: #E8EEFC;
+  --info-text: #1A3F9A;
+  --info-border: #C5D3F5;
 
   --success-soft: #E6F1EA;
   --success-text: #2C5E42;
   --success-border: #C5DDCF;
 
-  --warn-soft: #F8EEDB;
-  --warn-text: #7F5719;
-  --warn-border: #E9D5A6;
+  --warn-soft: #FEF0DC;
+  --warn-text: #B45309;
+  --warn-border: #F5D3A0;
 
   --danger-soft: #F8E9E5;
   --danger-text: #8C3D2E;
@@ -244,42 +248,49 @@ body {
 .form-control:hover, .form-select:hover { border-color: #CFCAC0; }
 .form-control:focus, .form-select:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 .2rem rgba(47, 111, 106, .14);
+  box-shadow: 0 0 0 .2rem rgba(31, 79, 191, .16);
   outline: none;
 }
 
 .stat-card {
-  background-color: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 1rem 1.25rem;
-  box-shadow: 0 1px 2px rgba(42, 45, 47, .04);
   width: 100%;
+  min-height: 104px;
+  padding: .9rem 1.1rem;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  min-height: 84px;
+  align-items: flex-start;
+  justify-content: flex-start;
+  text-align: left;
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  box-shadow: none;
 }
 .stat-label {
-  font-size: .7rem;
-  font-weight: 700;
-  letter-spacing: .05em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
+  font-size: .88rem;
+  font-weight: 500;
+  color: inherit;
+  opacity: .95;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
 }
 .stat-value {
-  font-family: 'Lexend', sans-serif;
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--charcoal);
-  margin-top: .15rem;
+  font-family: 'Inter', sans-serif;
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1.15;
+  margin-top: .25rem;
+  color: inherit !important;
+  font-variant-numeric: tabular-nums;
 }
+.stats-row > div:nth-child(1) .stat-card { background: linear-gradient(135deg, #EA7A0B, #F59E0B); }
+.stats-row > div:nth-child(2) .stat-card { background: linear-gradient(135deg, #1E3A8A, #2849A6); }
+.stats-row > div:nth-child(3) .stat-card { background: linear-gradient(135deg, #15803D, #22A055); }
+.stats-row > div:nth-child(4) .stat-card { background: linear-gradient(135deg, #0E7490, #0891B2); }
+.stats-row > div:nth-child(5) .stat-card { background: linear-gradient(135deg, #2563EB, #3B82F6); }
+.stats-row > div:nth-child(6) .stat-card { background: linear-gradient(135deg, #6D28D9, #8B5CF6); }
 
 .section-label {
   font-size: .7rem;
@@ -335,6 +346,13 @@ body {
   color: var(--success-text);
   border-color: var(--success-border);
 }
+.skill-badge.required {
+  background-color: var(--info-soft);
+  color: var(--info-text);
+  border-color: var(--info-border);
+}
+.avail-ok { color: #15803D; font-weight: 600; }
+.avail-busy { color: #B45309; font-weight: 600; }
 
 .empty-state { color: var(--ink-soft); }
 .empty-state i { color: #CFCAC0; }
@@ -462,7 +480,7 @@ body {
   transition: border-color .15s ease;
 }
 .staff-match-row:hover { border-color: var(--accent); }
-.staff-match-row.is-best { border-color: var(--accent); background-color: #F4F9F8; }
+.staff-match-row.is-best { border-color: #15803D; background-color: #F2F9F4; }
 
 .staff-avatar {
   width: 40px;
@@ -488,7 +506,7 @@ body {
   border: 1px solid transparent;
   white-space: nowrap;
 }
-.match-best { background-color: var(--accent); color: #fff; }
+.match-best { background-color: #15803D; color: #fff; }
 .match-high { background-color: var(--success-soft); color: var(--success-text); border-color: var(--success-border); }
 .match-none { background-color: var(--danger-soft); color: var(--danger-text); border-color: var(--danger-border); }
 .match-neutral { background-color: var(--surface); color: var(--slate); border-color: var(--line); }
@@ -526,7 +544,7 @@ body {
   border: 1px solid transparent;
   white-space: nowrap;
 }
-.status-in-progress { background-color: var(--warn-soft); color: var(--warn-text); border-color: var(--warn-border); }
+.status-in-progress { background-color: var(--info-soft); color: var(--info-text); border-color: var(--info-border); }
 .status-completed { background-color: var(--success-soft); color: var(--success-text); border-color: var(--success-border); }
 .status-default { background-color: var(--surface); color: var(--slate); border-color: var(--line); }
 
@@ -598,8 +616,8 @@ body {
 }
 
 @media (max-width: 991.98px) {
-  .stat-card { padding: .85rem 1rem; min-height: 78px; }
-  .stat-value { font-size: 1.3rem; }
+  .stat-card { padding: .85rem 1rem; min-height: 92px; }
+  .stat-value { font-size: 1.7rem; }
   .request-list { max-height: 55vh; }
 }
 
@@ -607,9 +625,9 @@ body {
   .staff-match-row { flex-wrap: wrap; }
   .request-list { max-height: 45vh; }
 
-  .stat-card { padding: .65rem .5rem; border-radius: 10px; min-height: 64px; }
-  .stat-label { font-size: .54rem; letter-spacing: 0; line-height: 1.15; }
-  .stat-value { font-size: .95rem; margin-top: .08rem; }
+  .stat-card { padding: .7rem .75rem; border-radius: 12px; min-height: 78px; }
+  .stat-label { font-size: .68rem; }
+  .stat-value { font-size: 1.35rem; margin-top: .15rem; }
 
   .card-header { padding: .8rem 1rem; }
   .card-header h2 { font-size: .95rem; }
@@ -661,9 +679,9 @@ body {
   .dashboard-title { font-size: .95rem; }
   .dashboard-subtitle { font-size: .68rem; }
 
-  .stat-card { padding: .5rem .4rem; min-height: 58px; border-radius: 8px; }
-  .stat-value { font-size: .85rem; margin-top: .05rem; }
-  .stat-label { font-size: .48rem; letter-spacing: 0; line-height: 1.15; }
+  .stat-card { padding: .6rem .65rem; min-height: 70px; border-radius: 10px; }
+  .stat-value { font-size: 1.15rem; margin-top: .1rem; }
+  .stat-label { font-size: .6rem; }
 
   .request-summary { padding: .75rem .85rem; }
   .summary-value { font-size: .95rem; }
@@ -701,7 +719,7 @@ body {
 
     <main class="dashboard-content p-3 p-md-4">
 
-      <div class="row g-3 mb-3 align-items-stretch">
+      <div class="row g-3 mb-3 align-items-stretch stats-row">
         <div class="col-4 col-xl-2 d-flex">
           <div class="stat-card">
             <div class="stat-label">Pending Requests</div>
@@ -717,13 +735,13 @@ body {
         <div class="col-4 col-xl-2 d-flex">
           <div class="stat-card">
             <div class="stat-label">Available Staff</div>
-            <div class="stat-value" style="color:var(--success-text);"><?= $availableStaffCount ?></div>
+            <div class="stat-value"><?= $availableStaffCount ?></div>
           </div>
         </div>
         <div class="col-4 col-xl-2 d-flex">
           <div class="stat-card">
             <div class="stat-label">On Assignment</div>
-            <div class="stat-value" style="color:var(--warn-text);"><?= $onAssignmentCount ?></div>
+            <div class="stat-value"><?= $onAssignmentCount ?></div>
           </div>
         </div>
         <div class="col-4 col-xl-2 d-flex">
@@ -783,7 +801,7 @@ body {
                       <div class="d-flex justify-content-between align-items-center mt-2 gap-2">
                         <div>
                           <?php if (!empty($request['required_skill'])): ?>
-                            <span class="skill-badge mb-0"><?= htmlspecialchars($request['required_skill']) ?></span>
+                            <span class="skill-badge required mb-0"><?= htmlspecialchars($request['required_skill']) ?></span>
                           <?php endif; ?>
                         </div>
                         <span class="request-received">Received <?= htmlspecialchars(formatDisplayDate($request['created_at']) ?? '') ?></span>
@@ -1182,7 +1200,7 @@ document.addEventListener('click', function (event) {
 function renderRequiredSkillInto(elementId, requiredSkill) {
   const el = document.getElementById(elementId);
   if (hasText(requiredSkill)) {
-    el.innerHTML = '<span class="skill-badge matched mb-0">' + escapeHtml(requiredSkill) + '</span>';
+    el.innerHTML = '<span class="skill-badge required mb-0">' + escapeHtml(requiredSkill) + '</span>';
   } else {
     el.innerHTML = '<span class="summary-meta">Not specified</span>';
   }
@@ -1319,7 +1337,7 @@ function renderStaffMatchesInto(listElement, countLabelElement, requiredSkill, r
           buildMatchPill(staff, requiredSkill, isBest) +
         '</div>' +
         '<div class="mb-1">' + buildSkillBadges(staff, requiredSkill) + '</div>' +
-        '<div class="staff-meta">' + (staff.workload === 0 ? 'Available &middot; no active tasks' : staff.workload + ' active task(s)') + ' &middot; ' + escapeHtml(staff.status) + '</div>' +
+        '<div class="staff-meta">' + (staff.workload === 0 ? '<span class="avail-ok">Available &middot; no active tasks</span>' : '<span class="avail-busy">' + staff.workload + ' active task(s)</span>') + ' &middot; ' + escapeHtml(staff.status) + '</div>' +
       '</div>' +
       '<button type="button" class="btn btn-assign flex-shrink-0"' + (staff.status !== 'Active' || isCurrent ? ' disabled' : '') + '>' + (isCurrent ? 'Assigned' : 'Assign') + '</button>';
 

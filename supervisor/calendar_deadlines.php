@@ -122,7 +122,7 @@ foreach ($monthRows as $r) {
         'type'    => $r['type'],
         'ref'     => $r['ref'],
         'company' => $r['company_name'],
-        'title'   => $r['request_title'],
+        'title'   => $r['title'],
         'status'  => $r['st'],
         'staff'   => trim((string) $r['staff']),
         'done'    => $done,
