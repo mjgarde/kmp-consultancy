@@ -11,10 +11,8 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'supervisor') 
 
 $pdo = getConnection();
 
-$filterMode = $_GET['filter_mode'] ?? '';
 $dateStart = $_GET['date_start'] ?? '';
 $dateEnd = $_GET['date_end'] ?? '';
-$dateSingle = $_GET['date_single'] ?? '';
 
 $validDate = function (string $d): bool {
     if ($d === '') return false;
@@ -30,22 +28,33 @@ $filterWhereCtAlias = '';
 $filterParams = [];
 $filterLabel = '';
 
-if ($filterMode === 'range' && $validDate($dateStart) && $validDate($dateEnd)) {
+if ($validDate($dateStart) && !$validDate($dateEnd)) {
+    $dateEnd = $dateStart;
+}
+
+if ($validDate($dateStart) && $validDate($dateEnd)) {
+    if ($dateStart > $dateEnd) {
+        [$dateStart, $dateEnd] = [$dateEnd, $dateStart];
+    }
     $hasFilter = true;
-    $filterWhereSr = " AND DATE(sr.created_at) BETWEEN :fstart AND :fend ";
-    $filterWhereQt = " AND DATE(q.created_at) BETWEEN :fstart AND :fend ";
-    $filterWhereCt = " AND DATE(created_at) BETWEEN :fstart AND :fend ";
-    $filterWhereCtAlias = " AND DATE(ct.created_at) BETWEEN :fstart AND :fend ";
-    $filterParams = [':fstart' => $dateStart, ':fend' => $dateEnd];
-    $filterLabel = 'Filtered: ' . date('M d, Y', strtotime($dateStart)) . ' – ' . date('M d, Y', strtotime($dateEnd));
-} elseif ($filterMode === 'single' && $validDate($dateSingle)) {
-    $hasFilter = true;
-    $filterWhereSr = " AND DATE(sr.created_at) = :fsingle ";
-    $filterWhereQt = " AND DATE(q.created_at) = :fsingle ";
-    $filterWhereCt = " AND DATE(created_at) = :fsingle ";
-    $filterWhereCtAlias = " AND DATE(ct.created_at) = :fsingle ";
-    $filterParams = [':fsingle' => $dateSingle];
-    $filterLabel = 'Filtered: ' . date('M d, Y', strtotime($dateSingle));
+
+    if ($dateStart === $dateEnd) {
+        $filterWhereSr = " AND DATE(sr.created_at) = :fsingle ";
+        $filterWhereQt = " AND DATE(q.created_at) = :fsingle ";
+        $filterWhereCt = " AND DATE(created_at) = :fsingle ";
+        $filterWhereCtAlias = " AND DATE(ct.created_at) = :fsingle ";
+        $filterParams = [':fsingle' => $dateStart];
+        $filterLabel = date('M d, Y', strtotime($dateStart));
+    } else {
+        $filterWhereSr = " AND DATE(sr.created_at) BETWEEN :fstart AND :fend ";
+        $filterWhereQt = " AND DATE(q.created_at) BETWEEN :fstart AND :fend ";
+        $filterWhereCt = " AND DATE(created_at) BETWEEN :fstart AND :fend ";
+        $filterWhereCtAlias = " AND DATE(ct.created_at) BETWEEN :fstart AND :fend ";
+        $filterParams = [':fstart' => $dateStart, ':fend' => $dateEnd];
+        $filterLabel = date('M d, Y', strtotime($dateStart)) . ' – ' . date('M d, Y', strtotime($dateEnd));
+    }
+} else {
+    $dateStart = $dateEnd = '';
 }
 
 $totalClients = (int) $pdo->query('SELECT COUNT(*) FROM clients')->fetchColumn();
@@ -152,6 +161,25 @@ $requestSlices = [
 ];
 $requestTotal = array_sum(array_column($requestSlices, 'value'));
 
+$donutRadius = 64;
+$donutCirc = 2 * M_PI * $donutRadius;
+$donutNonZero = count(array_filter(array_column($requestSlices, 'value')));
+$donutSegments = [];
+$donutAcc = 0.0;
+foreach ($requestSlices as $slice) {
+    if ($slice['value'] <= 0 || $requestTotal <= 0) continue;
+    $segLen = ($slice['value'] / $requestTotal) * $donutCirc;
+    $segGap = $donutNonZero > 1 ? 2.0 : 0.0;
+    $segDash = max($segLen - $segGap, 0.5);
+    $donutSegments[] = [
+        'color' => $slice['color'],
+        'dash' => round($segDash, 2),
+        'rest' => round($donutCirc - $segDash, 2),
+        'offset' => round(-$donutAcc, 2),
+    ];
+    $donutAcc += $segLen;
+}
+
 $approvalBars = [
     ['label' => 'Quotations Approved', 'value' => $approvedQuotations, 'color' => '#0B67B8'],
     ['label' => 'Contracts Approved',  'value' => $approvedContracts,  'color' => '#12AEEF'],
@@ -193,6 +221,7 @@ function quotationStatusClass(string $status): string
 <title>Dashboard</title>
 <link rel="stylesheet" href="../assets/vendor/bootstrap-5.3.8/css/bootstrap.min.css">
 <link rel="stylesheet" href="../assets/vendor/fontawesome-free-7.3.1/css/all.min.css">
+<link rel="stylesheet" href="../assets/vendor/flatpickr/flatpickr.min.css">
 <link rel="stylesheet" href="../assets/css/dashboard.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lexend:wght@500;600;700&display=swap" rel="stylesheet">
@@ -346,6 +375,9 @@ body {
 .donut-wrap {
   position: relative;
   height: 175px;
+  width: 100%;
+  max-width: 220px;
+  margin: 0 auto;
 }
 .donut-center {
   position: absolute;
@@ -355,6 +387,7 @@ body {
   align-items: center;
   justify-content: center;
   pointer-events: none;
+  z-index: 1;
 }
 .donut-center .donut-total {
   font-family: 'Lexend', sans-serif;
@@ -368,6 +401,7 @@ body {
   color: var(--ink-soft);
   margin-top: .2rem;
 }
+.donut-print { display: none; }
 .legend-list {
   display: flex;
   flex-wrap: wrap;
@@ -459,39 +493,70 @@ body {
 }
 .btn-view-all:hover { background-color: #D8E8F6; color: var(--blue-text); }
 
-.btn-ghost {
-  background-color: var(--surface);
-  color: var(--ink);
+.date-filter {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background-color: #fff;
   border: 1px solid var(--line);
-  border-radius: 7px;
-  font-weight: 600;
-  font-size: .8rem;
+  border-radius: 10px;
+  height: 44px;
+  padding: 0 .75rem;
+  gap: .55rem;
+  min-width: 270px;
+  transition: border-color .15s, box-shadow .15s, background-color .15s;
 }
-.btn-ghost:hover { background-color: var(--chip); color: var(--ink); }
-
-.btn-print-text {
+.date-filter:hover { border-color: #C5CED8; }
+.date-filter:focus-within { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(11, 103, 184, .15) !important; }
+.date-filter > i.fa-calendar { color: var(--blue); font-size: .95rem; }
+.date-filter input[type="text"] {
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--ink);
+  width: 100%;
+  cursor: pointer;
+  padding: 0;
+}
+.date-filter input::placeholder { color: var(--ink-soft); font-weight: 500; }
+.date-filter.is-active { border-color: var(--blue); background-color: var(--blue-soft); }
+.date-clear {
+  color: var(--ink-soft);
+  width: 22px;
+  height: 22px;
   display: inline-flex;
   align-items: center;
-  gap: .45rem;
-  background-color: transparent;
-  color: var(--ink);
-  border: none;
-  border-radius: 8px;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: .75rem;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+.date-clear:hover { background-color: #fff; color: #B4432F; }
+
+.btn-print {
+  display: inline-flex;
+  align-items: center;
+  gap: .6rem;
+  height: 44px;
+  padding: 0 1.4rem;
+  background-color: var(--blue);
+  color: #fff;
+  border: 1px solid var(--blue);
+  border-radius: 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: .92rem;
   font-weight: 600;
-  font-size: .85rem;
-  padding: .4rem .7rem;
-  transition: background-color .15s ease;
+  letter-spacing: .01em;
+  white-space: nowrap;
+  transition: background-color .15s, transform .05s;
 }
-.btn-print-text:hover,
-.btn-print-text:focus,
-.btn-print-text:active,
-.btn-print-text:focus-visible {
-  background-color: var(--surface);
-  color: var(--ink);
-  outline: none !important;
-  box-shadow: none !important;
-}
-.btn-print-text i { font-size: .95rem; }
+.btn-print i { font-size: 1rem; color: #fff; }
+.btn-print:hover { background-color: var(--blue-dark); border-color: var(--blue-dark); color: #fff; }
+.btn-print:active { transform: translateY(1px); }
 
 button, .btn, .btn:focus, .btn:active, .btn:focus-visible, .btn:active:focus,
 input, input:focus, input:focus-visible,
@@ -503,90 +568,73 @@ button::-moz-focus-inner {
   border: 0 !important;
 }
 
-.filter-bar {
-  background-color: var(--card);
-  border: 1px solid var(--line);
+.flatpickr-calendar {
   border-radius: 14px;
-  padding: .75rem 1.1rem;
-  display: flex;
-  align-items: center;
-  gap: .9rem;
-  flex-wrap: wrap;
-  row-gap: .7rem;
-}
-.filter-bar .filter-mode-toggle {
-  display: flex;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, .15);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  overflow: hidden;
-  flex-shrink: 0;
+  font-family: 'Inter', sans-serif;
 }
-.filter-bar .filter-mode-toggle label {
-  margin: 0;
-  padding: .45rem .8rem;
-  font-size: .78rem;
-  font-weight: 600;
-  color: var(--ink-soft);
-  cursor: pointer;
-  background-color: var(--surface);
+.flatpickr-day.selected,
+.flatpickr-day.startRange,
+.flatpickr-day.endRange { background: var(--blue); border-color: var(--blue); }
+.flatpickr-day.inRange {
+  background: var(--blue-soft);
+  border-color: var(--blue-soft);
+  box-shadow: -5px 0 0 var(--blue-soft), 5px 0 0 var(--blue-soft);
 }
-.filter-bar .filter-mode-toggle input { display: none; }
-.filter-bar .filter-mode-toggle input:checked + label {
-  background-color: var(--blue);
-  color: #fff;
-}
-.filter-bar .filter-fields {
-  display: flex;
-  align-items: center;
-  gap: .6rem;
-  flex-wrap: wrap;
-  row-gap: .5rem;
-}
-.filter-bar label.field-label {
-  font-size: .72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .03em;
-  color: var(--ink-soft);
-  margin: 0 0 0 .2rem;
-}
-.filter-bar input[type="date"] {
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  padding: .4rem .6rem;
-  font-size: .82rem;
-  color: var(--ink);
-}
-.filter-bar .filter-actions {
-  display: flex;
-  gap: .5rem;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-.filter-active-badge {
-  font-size: .72rem;
-  font-weight: 600;
-  color: var(--blue-text);
-  background-color: var(--blue-soft);
-  border: 1px solid #CFE1F3;
-  border-radius: 999px;
-  padding: .3rem .7rem;
-  display: flex;
-  align-items: center;
-  gap: .35rem;
-  white-space: nowrap;
-}
+.flatpickr-day.today { border-color: var(--blue); }
 
 .print-header { display: none; }
 
 @media (max-width: 1199.98px) {
   .kpi-strip { grid-template-columns: repeat(3, 1fr); row-gap: 1.1rem; }
-  .kpi-item:nth-child(4) { border-left: none; }
+  .kpi-item { border-left: 1px solid var(--line); }
+  .kpi-item:nth-child(3n+1) { border-left: none; }
+}
+@media (max-width: 767.98px) {
+  .dashboard-topbar-actions { min-width: 0; flex: 1 1 auto; justify-content: flex-end; }
+  #filterForm { min-width: 0; flex: 1 1 auto; justify-content: flex-end; }
+  .date-filter {
+    min-width: 0;
+    width: 100%;
+    max-width: 190px;
+    height: 38px;
+    padding: 0 .6rem;
+    gap: .4rem;
+    border-radius: 8px;
+  }
+  .date-filter > i.fa-calendar { font-size: .8rem; }
+  .date-filter input[type="text"] { font-size: .74rem; text-overflow: ellipsis; }
+  .date-clear { width: 18px; height: 18px; font-size: .65rem; }
+  .btn-print {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    justify-content: center;
+    gap: 0;
+    border-radius: 8px;
+  }
+  .btn-print span { display: none; }
+  .btn-print i { font-size: .85rem; }
 }
 @media (max-width: 575.98px) {
-  .kpi-strip { grid-template-columns: repeat(2, 1fr); }
-  .kpi-item:nth-child(4) { border-left: 1px solid var(--line); }
-  .kpi-item:nth-child(odd) { border-left: none; }
+  .date-filter { max-width: 150px; height: 34px; }
+  .btn-print { width: 34px; height: 34px; }
+
+  .kpi-strip {
+    grid-template-columns: repeat(3, 1fr);
+    row-gap: .85rem;
+    padding: .8rem 0;
+  }
+  .kpi-item { padding: .1rem .3rem; }
+  .kpi-item:nth-child(n) { border-left: 1px solid var(--line); }
+  .kpi-item:nth-child(3n+1) { border-left: none; }
+  .kpi-icon { width: 46px; height: 28px; margin-bottom: .35rem; }
+  .kpi-icon::before { height: 9px; }
+  .kpi-icon i { font-size: 1.05rem; margin-top: .1rem; }
+  .kpi-value { font-size: .95rem; }
+  .kpi-label { font-size: .62rem; margin-top: .1rem; line-height: 1.2; }
+
   .hbar-row { grid-template-columns: 92px 1fr; }
 }
 
@@ -600,7 +648,9 @@ button::-moz-focus-inner {
     text-align: center;
     margin-bottom: 24px;
     padding-bottom: 14px;
-    border-bottom: 2px solid var(--blue);
+    border-bottom: 2px solid #000000;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
   .print-header img {
     height: 48px;
@@ -611,12 +661,16 @@ button::-moz-focus-inner {
     font-family: 'Lexend', sans-serif;
     font-size: 20px;
     font-weight: 700;
-    color: var(--blue);
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
     margin-bottom: 2px;
   }
   .print-header p {
     font-size: 11px;
-    color: var(--ink-soft);
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
     margin: 0;
   }
   body { background-color: #fff !important; }
@@ -628,6 +682,39 @@ button::-moz-focus-inner {
   .hbar-fill, .legend-dot {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+
+  .status-pill,
+  .status-pill.status-new,
+  .status-pill.status-progress,
+  .status-pill.status-approved,
+  .status-pill.status-rejected {
+    background: none !important;
+    background-color: transparent !important;
+    border: 0 !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    color: #000000 !important;
+    font-weight: 600 !important;
+    font-size: .82rem !important;
+  }
+
+  .donut-wrap { display: none !important; }
+  .donut-print {
+    display: block !important;
+    width: 180px;
+    height: 180px;
+    margin: 0 auto;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .donut-print svg {
+    display: block;
+    width: 180px;
+    height: 180px;
   }
 }
 </style>
@@ -651,9 +738,22 @@ button::-moz-focus-inner {
           <p class="dashboard-subtitle small mb-0 d-none d-sm-block">Welcome back, <?= htmlspecialchars($_SESSION['fullname'] ?? $_SESSION['supervisor_fullname'] ?? 'Supervisor') ?>.</p>
         </div>
       </div>
-      <div class="dashboard-topbar-actions d-flex align-items-center gap-3 gap-md-4">
-        <button type="button" class="btn-print-text" onclick="window.print()">
-          <i class="fa-solid fa-print"></i> <span>Print</span>
+
+      <div class="dashboard-topbar-actions d-flex align-items-center gap-2 gap-md-3">
+        <form method="GET" id="filterForm" class="d-flex align-items-center gap-2 m-0">
+          <div class="date-filter <?= $hasFilter ? 'is-active' : '' ?>">
+            <i class="fa-regular fa-calendar"></i>
+            <input type="text" id="dateRange" placeholder="Select date or range" autocomplete="off">
+            <?php if ($hasFilter): ?>
+              <a href="dashboard.php" class="date-clear" title="Clear filter" aria-label="Clear filter"><i class="fa-solid fa-xmark"></i></a>
+            <?php endif; ?>
+          </div>
+          <input type="hidden" name="date_start" id="date_start" value="<?= htmlspecialchars($dateStart) ?>">
+          <input type="hidden" name="date_end" id="date_end" value="<?= htmlspecialchars($dateEnd) ?>">
+        </form>
+
+        <button type="button" class="btn-print" onclick="window.print()">
+          <i class="fa-solid fa-print"></i><span>Print</span>
         </button>
       </div>
     </header>
@@ -667,38 +767,6 @@ button::-moz-focus-inner {
           <p>Dashboard Summary &middot; Generated <?= date('M d, Y g:i A') ?></p>
         </div>
       </div>
-
-      <form method="GET" class="filter-bar mb-3 no-print" id="filterForm">
-        <div class="filter-mode-toggle">
-          <input type="radio" name="filter_mode" id="mode-range" value="range" <?= $filterMode !== 'single' ? 'checked' : '' ?>>
-          <label for="mode-range"><i class="fa-regular fa-calendar-days me-1"></i>Date Range</label>
-          <input type="radio" name="filter_mode" id="mode-single" value="single" <?= $filterMode === 'single' ? 'checked' : '' ?>>
-          <label for="mode-single"><i class="fa-solid fa-calendar-day me-1"></i>Specific Date</label>
-        </div>
-
-        <div class="filter-fields" id="range-fields" style="<?= $filterMode === 'single' ? 'display:none;' : 'display:flex;' ?>">
-          <label class="field-label" for="date_start">From</label>
-          <input type="date" name="date_start" id="date_start" value="<?= htmlspecialchars($dateStart) ?>" max="<?= date('Y-m-d') ?>">
-          <label class="field-label" for="date_end">To</label>
-          <input type="date" name="date_end" id="date_end" value="<?= htmlspecialchars($dateEnd) ?>" max="<?= date('Y-m-d') ?>">
-        </div>
-
-        <div class="filter-fields" id="single-fields" style="<?= $filterMode === 'single' ? 'display:flex;' : 'display:none;' ?>">
-          <label class="field-label" for="date_single">Date</label>
-          <input type="date" name="date_single" id="date_single" value="<?= htmlspecialchars($dateSingle) ?>" max="<?= date('Y-m-d') ?>">
-        </div>
-
-        <?php if ($hasFilter): ?>
-          <span class="filter-active-badge"><i class="fa-solid fa-filter"></i><?= htmlspecialchars($filterLabel) ?></span>
-        <?php endif; ?>
-
-        <div class="filter-actions">
-          <button type="submit" class="btn btn-ghost btn-sm px-3"><i class="fa-solid fa-magnifying-glass me-1"></i>Apply</button>
-          <?php if ($hasFilter): ?>
-            <a href="dashboard.php" class="btn btn-ghost btn-sm px-3"><i class="fa-solid fa-xmark me-1"></i>Clear</a>
-          <?php endif; ?>
-        </div>
-      </form>
 
       <div class="kpi-strip mb-3">
         <div class="kpi-item">
@@ -739,6 +807,7 @@ button::-moz-focus-inner {
           <section class="panel">
             <h2 class="panel-title">Service Requests</h2>
             <p class="panel-sub">Status distribution</p>
+
             <div class="donut-wrap">
               <canvas id="requestsChart"></canvas>
               <div class="donut-center">
@@ -746,6 +815,21 @@ button::-moz-focus-inner {
                 <span class="donut-caption">Total</span>
               </div>
             </div>
+
+            <div class="donut-print" aria-hidden="true">
+              <svg viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg">
+                <?php if (empty($donutSegments)): ?>
+                  <circle cx="90" cy="90" r="<?= $donutRadius ?>" fill="none" stroke="#E3E8EF" stroke-width="26"/>
+                <?php else: ?>
+                  <?php foreach ($donutSegments as $seg): ?>
+                    <circle cx="90" cy="90" r="<?= $donutRadius ?>" fill="none" stroke="<?= $seg['color'] ?>" stroke-width="26" stroke-dasharray="<?= $seg['dash'] ?> <?= $seg['rest'] ?>" stroke-dashoffset="<?= $seg['offset'] ?>" transform="rotate(-90 90 90)"/>
+                  <?php endforeach; ?>
+                <?php endif; ?>
+                <text x="90" y="91" text-anchor="middle" font-family="Lexend, Inter, Arial, sans-serif" font-size="26" font-weight="700" fill="#1F2933"><?= $requestTotal ?></text>
+                <text x="90" y="107" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="10" fill="#6B7785">Total</text>
+              </svg>
+            </div>
+
             <div class="legend-list">
               <?php foreach ($requestSlices as $slice): ?>
                 <?php $slicePct = $requestTotal > 0 ? round(($slice['value'] / $requestTotal) * 100) : 0; ?>
@@ -944,6 +1028,7 @@ button::-moz-focus-inner {
 
 <script src="../assets/vendor/bootstrap-5.3.8/js/bootstrap.bundle.min.js"></script>
 <script src="../assets/vendor/chartjs/chart.umd.js"></script>
+<script src="../assets/vendor/flatpickr/flatpickr.min.js"></script>
 <script>
 Chart.defaults.font.family = "'Inter', sans-serif";
 Chart.defaults.font.size = 12;
@@ -972,6 +1057,7 @@ if (requestsCanvas) {
       responsive: true,
       maintainAspectRatio: false,
       cutout: '64%',
+      layout: { padding: 0 },
       plugins: {
         legend: { display: false },
         tooltip: { enabled: requestHasData }
@@ -1035,28 +1121,48 @@ if (approvalsCanvas) {
 }
 </script>
 <script>
-const rangeFields = document.getElementById('range-fields');
-const singleFields = document.getElementById('single-fields');
-const modeRange = document.getElementById('mode-range');
-const modeSingle = document.getElementById('mode-single');
+(function () {
+  if (typeof flatpickr === 'undefined') return;
 
-function syncFilterFields() {
-  if (modeSingle && modeSingle.checked) {
-    rangeFields.style.setProperty('display', 'none');
-    singleFields.style.setProperty('display', 'flex');
-  } else {
-    rangeFields.style.setProperty('display', 'flex');
-    singleFields.style.setProperty('display', 'none');
-  }
-}
+  const form = document.getElementById('filterForm');
+  const startEl = document.getElementById('date_start');
+  const endEl = document.getElementById('date_end');
+  const curStart = startEl.value;
+  const curEnd = endEl.value;
 
-if (modeRange && modeSingle && rangeFields && singleFields) {
-  modeRange.addEventListener('change', syncFilterFields);
-  modeSingle.addEventListener('change', syncFilterFields);
-  modeRange.addEventListener('click', syncFilterFields);
-  modeSingle.addEventListener('click', syncFilterFields);
-  syncFilterFields();
-}
+  const preset = [];
+  if (curStart) preset.push(curStart);
+  if (curEnd && curEnd !== curStart) preset.push(curEnd);
+
+  flatpickr('#dateRange', {
+    mode: 'range',
+    showMonths: window.innerWidth < 768 ? 1 : 2,
+    dateFormat: 'Y-m-d',
+    altInput: true,
+    altFormat: 'M j, Y',
+    rangeSeparator: '  –  ',
+    maxDate: 'today',
+    defaultDate: preset,
+    disableMobile: true,
+    onClose: function (selected, str, inst) {
+      if (!selected.length) return;
+      const s = inst.formatDate(selected[0], 'Y-m-d');
+      const e = inst.formatDate(selected[selected.length - 1], 'Y-m-d');
+      if (s === curStart && e === (curEnd || curStart)) return;
+      startEl.value = s;
+      endEl.value = e;
+      form.submit();
+    }
+  });
+})();
+</script>
+<script>
+window.addEventListener('beforeprint', function () {
+  document.querySelectorAll('canvas').forEach(function (canvas) {
+    var chart = Chart.getChart(canvas);
+    if (chart) chart.resize();
+  });
+});
 </script>
 
 </body>

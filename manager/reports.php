@@ -306,39 +306,46 @@ body {
 .card-header p { color: var(--ink-soft) !important; }
 
 .kpi-strip {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: .85rem;
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: .85rem !important;
 }
-@media (min-width: 768px) { .kpi-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (min-width: 1200px) { .kpi-strip { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+@media (min-width: 1200px) {
+  .kpi-strip {
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+  }
+}
 
 .kpi {
-  padding: 1.1rem .75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 96px;
+  padding: 1.1rem .5rem;
   text-align: center;
   border-radius: 14px;
   color: #fff;
   background-color: #2E5272;
 }
 .kpi.k-amber { background-color: #A06B1F; }
-.kpi.k-sky { background-color: #3F6C8F; }
+.kpi.k-sky   { background-color: #3F6C8F; }
 .kpi.k-green { background-color: #3E7D5A; }
-.kpi.k-red { background-color: #B5523F; }
-.kpi.k-navy { background-color: #7B4F7D; }
-.kpi-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.2rem;
-  margin-bottom: .55rem;
-  background-color: rgba(255, 255, 255, .2);
+.kpi.k-red   { background-color: #B5523F; }
+.kpi.k-navy  { background-color: #7B4F7D; }
+
+.kpi-value {
+  font-family: 'Lexend', sans-serif;
+  font-size: clamp(1.15rem, 4.5vw, 1.75rem);
+  font-weight: 700;
   color: #fff;
+  line-height: 1.15;
 }
-.kpi-value { font-family: 'Lexend', sans-serif; font-size: 1.6rem; font-weight: 700; color: #fff; line-height: 1.15; }
-.kpi-label { font-size: .78rem; color: rgba(255, 255, 255, .92); margin-top: .2rem; }
+.kpi-label {
+  font-size: clamp(.7rem, 2vw, .85rem);
+  color: rgba(255, 255, 255, .92);
+  margin-top: .25rem;
+}
 
 .chart-card { height: 100%; }
 .chart-card .card-body { padding: 1rem 1.15rem 1.15rem; }
@@ -653,32 +660,26 @@ body {
 
       <section class="kpi-strip mb-3">
         <div class="kpi">
-          <span class="kpi-icon"><i class="fa-solid fa-layer-group"></i></span>
           <div class="kpi-value"><?= number_format($totRequests) ?></div>
           <div class="kpi-label">Total Requests</div>
         </div>
         <div class="kpi k-amber">
-          <span class="kpi-icon"><i class="fa-solid fa-inbox"></i></span>
           <div class="kpi-value"><?= number_format($totNew) ?></div>
           <div class="kpi-label">New / Pending</div>
         </div>
         <div class="kpi k-sky">
-          <span class="kpi-icon"><i class="fa-solid fa-spinner"></i></span>
           <div class="kpi-value"><?= number_format($totProgress) ?></div>
           <div class="kpi-label">In Progress</div>
         </div>
         <div class="kpi k-green">
-          <span class="kpi-icon"><i class="fa-solid fa-circle-check"></i></span>
           <div class="kpi-value"><?= number_format($totCompleted) ?></div>
           <div class="kpi-label">Completed</div>
         </div>
         <div class="kpi k-red">
-          <span class="kpi-icon"><i class="fa-solid fa-ban"></i></span>
           <div class="kpi-value"><?= number_format($totCancelled) ?></div>
           <div class="kpi-label">Cancelled</div>
         </div>
         <div class="kpi k-navy">
-          <span class="kpi-icon"><i class="fa-solid fa-building"></i></span>
           <div class="kpi-value"><?= number_format($clientsServed) ?></div>
           <div class="kpi-label">Clients Served</div>
         </div>

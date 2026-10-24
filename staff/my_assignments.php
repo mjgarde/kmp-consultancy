@@ -124,6 +124,9 @@ $listStmt = $pdo->prepare(
 $listStmt->execute($params);
 $assignments = $listStmt->fetchAll();
 
+$showFrom = $filteredCount > 0 ? $offset + 1 : 0;
+$showTo   = $filteredCount > 0 ? $offset + count($assignments) : 0;
+
 function statusBadgeClass(string $status): string
 {
     return match ($status) {
@@ -220,6 +223,7 @@ function pageWindow(int $current, int $total): array
   --ink-soft: #667085;
   --line: #E2E5EB;
   --canvas: #FFFFFF;
+  --row-hover: #F6F8FB;
 }
 
 body {
@@ -300,76 +304,27 @@ body {
   color: #fff;
 }
 
-.stat-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  background-color: #FFFFFF;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 1rem 1.15rem;
-}
-
-.stat-item {
-  flex: 1 1 0;
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: .65rem;
-  min-width: 0;
-  text-align: center;
-}
-
-.stat-item .stat-label {
-  font-size: .78rem;
-  font-weight: 700;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  color: var(--stat-color);
-  white-space: nowrap;
-}
-
-.stat-item .stat-value {
-  font-family: 'Lexend', 'Inter', sans-serif;
-  font-size: 1.5rem;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--stat-color);
-}
-
-.stat-divider {
-  width: 1px;
-  align-self: stretch;
-  min-height: 28px;
-  background-color: var(--line);
-  flex-shrink: 0;
-}
-
-.stat-total { --stat-color: #0F172A; }
-.stat-new { --stat-color: #475569; }
-.stat-progress { --stat-color: #8A5A15; }
-.stat-completed { --stat-color: #0F5F49; }
-.stat-cancelled { --stat-color: #93382A; }
-
 .status-filter {
   display: flex;
   flex-wrap: wrap;
-  gap: .5rem;
+  gap: .6rem;
 }
 
 .status-filter .filter-btn {
   --fc: #475569;
   display: inline-flex;
   align-items: center;
-  padding: .45rem 1rem;
-  border-radius: 8px;
-  border: 2px solid var(--fc);
-  background-color: #fff;
-  color: var(--fc);
-  font-size: .82rem;
-  font-weight: 700;
+  gap: .6rem;
+  padding: .5rem .6rem .5rem 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--fc);
+  background-color: var(--fc);
+  color: #fff;
+  font-size: .84rem;
+  font-weight: 600;
   line-height: 1.2;
-  box-shadow: none;
+  letter-spacing: .005em;
+  transition: filter .15s;
 }
 
 .status-filter .filter-btn.fc-all { --fc: #0F172A; }
@@ -378,27 +333,68 @@ body {
 .status-filter .filter-btn.fc-completed { --fc: #157A5F; }
 .status-filter .filter-btn.fc-cancelled { --fc: #B4432F; }
 
-.status-filter .filter-btn.active {
-  background-color: var(--fc);
+.status-filter .filter-btn .fb-count {
+  min-width: 1.75rem;
+  padding: .12rem .5rem;
+  border-radius: 7px;
+  background-color: rgba(255, 255, 255, .2);
   color: #fff;
+  font-family: 'Lexend', 'Inter', sans-serif;
+  font-size: .78rem;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .status-filter .filter-btn:hover,
 .status-filter .filter-btn:focus,
-.status-filter .filter-btn:active {
-  background-color: #fff;
-  color: var(--fc);
-  border-color: var(--fc);
-  box-shadow: none;
-}
-
+.status-filter .filter-btn:active,
+.status-filter .filter-btn.active,
 .status-filter .filter-btn.active:hover,
 .status-filter .filter-btn.active:focus,
 .status-filter .filter-btn.active:active {
   background-color: var(--fc);
+  border-color: var(--fc);
   color: #fff;
+  box-shadow: none !important;
+  outline: none;
 }
 
+.status-filter .filter-btn:hover { filter: brightness(1.08); }
+.status-filter .filter-btn.active:hover { filter: none; }
+
+.status-filter .filter-btn.active .fb-count {
+  background-color: #DDE1EA;
+  color: var(--fc);
+}
+
+.list-card { overflow: hidden; }
+
+.list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: .9rem 1.15rem;
+  border-bottom: 1px solid var(--line);
+  background-color: #fff;
+}
+.list-head-title {
+  font-family: 'Lexend', 'Inter', sans-serif;
+  font-size: .95rem;
+  font-weight: 600;
+  color: var(--navy-deep);
+  margin: 0;
+}
+.list-head-meta {
+  font-size: .78rem;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.list-head-meta strong { color: var(--ink); font-weight: 700; }
+
+.table { margin-bottom: 0; }
 .table > :not(caption) > * > * { background-color: transparent; box-shadow: none; }
 .table-hover > tbody > tr:hover > * { --bs-table-accent-bg: transparent; background-color: transparent; }
 
@@ -406,15 +402,53 @@ body {
   border-bottom: 1px solid var(--line) !important;
   color: var(--ink-soft);
   font-weight: 700;
-  font-size: .7rem;
-  letter-spacing: .05em;
+  font-size: .68rem;
+  letter-spacing: .07em;
   text-transform: uppercase;
-  background-color: #FAFBFD !important;
-  padding-top: .8rem;
-  padding-bottom: .8rem;
+  background-color: #F8FAFC !important;
+  padding: .7rem 1.15rem;
+  white-space: nowrap;
 }
-.table td { border-bottom: 1px solid var(--line); color: var(--ink); vertical-align: middle; padding-top: .8rem; padding-bottom: .8rem; }
+.table td {
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  vertical-align: middle;
+  padding: .95rem 1.15rem;
+}
 .table tbody tr:last-child td { border-bottom: none; }
+
+.assignment-row { cursor: pointer; transition: background-color .12s; }
+.assignment-row:hover { background-color: var(--row-hover); }
+.assignment-row:hover .row-chevron { color: var(--indigo); transform: translateX(2px); }
+
+.req-title {
+  font-size: .88rem;
+  font-weight: 600;
+  color: var(--navy-deep);
+  line-height: 1.35;
+}
+.req-sub {
+  font-size: .74rem;
+  color: var(--ink-soft);
+  margin-top: .15rem;
+}
+
+.client-name { font-size: .84rem; font-weight: 600; color: var(--ink); line-height: 1.3; }
+.client-contact { font-size: .74rem; color: var(--ink-soft); line-height: 1.3; }
+
+.date-main { font-size: .82rem; font-weight: 500; color: var(--ink); white-space: nowrap; }
+.date-sub { font-size: .72rem; color: var(--ink-soft); margin-top: .1rem; white-space: nowrap; }
+
+.skill-tag-static {
+  background-color: var(--indigo-soft);
+  color: var(--indigo-text);
+  font-size: .7rem;
+  font-weight: 600;
+  padding: .22rem .6rem;
+  border-radius: 6px;
+  display: inline-block;
+  white-space: nowrap;
+}
 
 .status-stack {
   display: inline-flex;
@@ -433,32 +467,46 @@ body {
 .status-stack.status-approved { color: var(--success-text); }
 .status-stack.status-rejected { color: var(--danger-text); }
 
-.skill-tag-static {
-  background-color: var(--indigo-soft);
-  color: var(--indigo-text);
-  font-size: .68rem;
-  font-weight: 700;
-  padding: .2rem .55rem;
-  border-radius: 999px;
-  display: inline-block;
+.row-chevron {
+  color: #B6BECB;
+  font-size: .8rem;
+  transition: color .12s, transform .12s;
 }
 
-.assignment-row { cursor: pointer; }
+.list-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: .75rem;
+  padding: .85rem 1.15rem;
+  border-top: 1px solid var(--line);
+  background-color: #F8FAFC;
+}
+.list-foot-info { font-size: .78rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.list-foot-info strong { color: var(--ink); font-weight: 700; }
 
-.pagination { gap: .25rem; flex-wrap: wrap; }
+.pagination { gap: .25rem; flex-wrap: wrap; margin: 0; }
 .pagination .page-link {
   color: var(--indigo-text);
   border: 1px solid var(--line);
   border-radius: 7px !important;
   font-weight: 600;
+  font-size: .78rem;
   min-width: 32px;
   text-align: center;
   font-variant-numeric: tabular-nums;
   background-color: #fff;
+  box-shadow: none;
 }
-.pagination .page-link:hover { background-color: #fff; color: var(--indigo-text); }
+.pagination .page-link:hover { background-color: var(--indigo-soft); color: var(--indigo-text); }
 .pagination .page-item.active .page-link { background-color: var(--indigo); border-color: var(--indigo); color: #fff; }
 .pagination .page-item.disabled .page-link { color: #adb5bd; background-color: transparent; }
+
+.empty-row { padding: 3rem 1rem; text-align: center; color: var(--ink-soft); }
+.empty-row i { font-size: 1.9rem; color: #C5CED8; display: block; margin-bottom: .6rem; }
+.empty-row .empty-title { font-weight: 600; color: var(--ink); font-size: .92rem; }
+.empty-row .empty-text { font-size: .8rem; margin-top: .15rem; }
 
 .modal-content { border-radius: 14px; border: none; }
 .modal-header { border-bottom: 1px solid var(--line); }
@@ -577,21 +625,20 @@ body {
 }
 
 @media (max-width: 767.98px) {
-  .stat-bar { padding: .7rem .3rem; }
-  .stat-item { flex-direction: column; align-items: center; gap: .2rem; }
-  .stat-item .stat-label { font-size: .5rem; letter-spacing: .02em; }
-  .stat-item .stat-value { font-size: 1.05rem; }
-  .stat-divider { min-height: 24px; }
-
   .status-filter { gap: .4rem; }
-  .status-filter .filter-btn { padding: .4rem .75rem; font-size: .76rem; }
+  .status-filter .filter-btn { padding: .4rem .45rem .4rem .75rem; font-size: .76rem; gap: .45rem; }
+  .status-filter .filter-btn .fb-count { min-width: 1.45rem; padding: .08rem .4rem; font-size: .7rem; }
 
   .btn { font-size: .82rem; padding: .4rem .7rem; }
   .form-control, .form-select { font-size: .85rem; padding: .4rem .65rem; }
 
-  .table td, .table th { padding: .55rem .6rem; }
-  .table thead th { font-size: .62rem; }
+  .list-head { padding: .75rem .85rem; }
+  .list-head-title { font-size: .88rem; }
+  .table td { padding: .75rem .85rem; }
+  .table thead th { font-size: .62rem; padding: .6rem .85rem; }
+  .req-title { font-size: .84rem; }
   .status-stack { font-size: .68rem; }
+  .list-foot { padding: .7rem .85rem; justify-content: center; }
 
   .pagination .page-link { padding: .25rem .5rem; font-size: .75rem; min-width: 28px; }
 
@@ -640,33 +687,6 @@ body {
 
     <main class="dashboard-content p-3 p-md-4">
 
-      <section class="stat-bar mb-3">
-        <div class="stat-item stat-total">
-          <span class="stat-label">Total</span>
-          <span class="stat-value"><?= $totalAssignments ?></span>
-        </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item stat-new">
-          <span class="stat-label">New</span>
-          <span class="stat-value"><?= $newCount ?></span>
-        </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item stat-progress">
-          <span class="stat-label">In Progress</span>
-          <span class="stat-value"><?= $inProgressCount ?></span>
-        </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item stat-completed">
-          <span class="stat-label">Completed</span>
-          <span class="stat-value"><?= $completedCount ?></span>
-        </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item stat-cancelled">
-          <span class="stat-label">Cancelled</span>
-          <span class="stat-value"><?= $cancelledCount ?></span>
-        </div>
-      </section>
-
       <section class="card mb-3">
         <div class="card-body p-2 p-md-3">
           <form class="row g-2 align-items-center" method="GET" id="filterForm">
@@ -685,35 +705,60 @@ body {
             </div>
             <div class="col-12 pt-1">
               <div class="status-filter">
-                <button type="submit" name="status" value="" class="btn filter-btn fc-all <?= $statusFilter === '' ? 'active' : '' ?>">All</button>
-                <button type="submit" name="status" value="New" class="btn filter-btn fc-new <?= $statusFilter === 'New' ? 'active' : '' ?>">New</button>
-                <button type="submit" name="status" value="In Progress" class="btn filter-btn fc-progress <?= $statusFilter === 'In Progress' ? 'active' : '' ?>">In Progress</button>
-                <button type="submit" name="status" value="Completed" class="btn filter-btn fc-completed <?= $statusFilter === 'Completed' ? 'active' : '' ?>">Completed</button>
-                <button type="submit" name="status" value="Cancelled" class="btn filter-btn fc-cancelled <?= $statusFilter === 'Cancelled' ? 'active' : '' ?>">Cancelled</button>
+                <button type="submit" name="status" value="" class="btn filter-btn fc-all <?= $statusFilter === '' ? 'active' : '' ?>">
+                  <span class="fb-label">All</span><span class="fb-count"><?= $totalAssignments ?></span>
+                </button>
+                <button type="submit" name="status" value="New" class="btn filter-btn fc-new <?= $statusFilter === 'New' ? 'active' : '' ?>">
+                  <span class="fb-label">New</span><span class="fb-count"><?= $newCount ?></span>
+                </button>
+                <button type="submit" name="status" value="In Progress" class="btn filter-btn fc-progress <?= $statusFilter === 'In Progress' ? 'active' : '' ?>">
+                  <span class="fb-label">In Progress</span><span class="fb-count"><?= $inProgressCount ?></span>
+                </button>
+                <button type="submit" name="status" value="Completed" class="btn filter-btn fc-completed <?= $statusFilter === 'Completed' ? 'active' : '' ?>">
+                  <span class="fb-label">Completed</span><span class="fb-count"><?= $completedCount ?></span>
+                </button>
+                <button type="submit" name="status" value="Cancelled" class="btn filter-btn fc-cancelled <?= $statusFilter === 'Cancelled' ? 'active' : '' ?>">
+                  <span class="fb-label">Cancelled</span><span class="fb-count"><?= $cancelledCount ?></span>
+                </button>
               </div>
             </div>
           </form>
         </div>
       </section>
 
-      <section class="card">
+      <section class="card list-card">
+        <div class="list-head">
+          <h2 class="list-head-title">Assignments</h2>
+          <span class="list-head-meta">
+            <?php if ($filteredCount > 0): ?>
+              Showing <strong><?= $showFrom ?>&ndash;<?= $showTo ?></strong> of <strong><?= $filteredCount ?></strong>
+            <?php else: ?>
+              No results
+            <?php endif; ?>
+          </span>
+        </div>
+
         <div class="table-responsive">
-          <table class="table align-middle mb-0">
+          <table class="table align-middle">
             <thead>
               <tr>
                 <th scope="col">Request</th>
                 <th scope="col" class="d-none d-md-table-cell">Client</th>
                 <th scope="col" class="d-none d-lg-table-cell">Required Skill</th>
-                <th scope="col" class="d-none d-lg-table-cell">Date</th>
+                <th scope="col" class="d-none d-lg-table-cell">Created</th>
                 <th scope="col" class="text-center">Status</th>
+                <th scope="col" class="text-end" style="width:40px;"></th>
               </tr>
             </thead>
             <tbody>
               <?php if (empty($assignments)): ?>
                 <tr>
-                  <td colspan="5" class="text-center py-5" style="color:var(--ink-soft);">
-                    <i class="fa-regular fa-folder-open fs-3 d-block mb-2"></i>
-                    No assignments found.
+                  <td colspan="6">
+                    <div class="empty-row">
+                      <i class="fa-regular fa-folder-open"></i>
+                      <div class="empty-title">No assignments found</div>
+                      <div class="empty-text">Try a different search or status filter.</div>
+                    </div>
                   </td>
                 </tr>
               <?php else: ?>
@@ -732,35 +777,44 @@ body {
                     data-updated="<?= htmlspecialchars(date('M d, Y', strtotime($row['updated_at']))) ?>"
                     data-status="<?= htmlspecialchars($row['status']) ?>">
                     <td>
-                      <div class="fw-semibold small"><?= htmlspecialchars($row['request_title']) ?></div>
-                      <div class="d-md-none" style="font-size:.72rem; color:var(--ink-soft);"><?= htmlspecialchars($row['company_name']) ?></div>
+                      <div class="req-title"><?= htmlspecialchars($row['request_title']) ?></div>
+                      <div class="req-sub d-md-none"><?= htmlspecialchars($row['company_name']) ?></div>
                     </td>
-                    <td class="small d-none d-md-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars($row['company_name']) ?></td>
-                    <td class="small d-none d-lg-table-cell">
+                    <td class="d-none d-md-table-cell">
+                      <div class="client-name"><?= htmlspecialchars($row['company_name']) ?></div>
+                      <div class="client-contact"><?= htmlspecialchars($row['contact_person']) ?></div>
+                    </td>
+                    <td class="d-none d-lg-table-cell">
                       <?php if (!empty($row['required_skill'])): ?>
                         <span class="skill-tag-static"><?= htmlspecialchars($row['required_skill']) ?></span>
                       <?php else: ?>
                         <span style="color:var(--ink-soft);">&mdash;</span>
                       <?php endif; ?>
                     </td>
-                    <td class="small d-none d-lg-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars(date('M d, Y', strtotime($row['created_at']))) ?></td>
+                    <td class="d-none d-lg-table-cell">
+                      <div class="date-main"><?= htmlspecialchars(date('M d, Y', strtotime($row['created_at']))) ?></div>
+                      <div class="date-sub">Updated <?= htmlspecialchars(date('M d', strtotime($row['updated_at']))) ?></div>
+                    </td>
                     <td class="text-center">
                       <span class="status-stack <?= statusBadgeClass($row['status']) ?>">
-                        <span><?= htmlspecialchars($row['status']) ?></span>
                         <i class="fa-solid <?= statusIcon($row['status']) ?>"></i>
+                        <span><?= htmlspecialchars($row['status']) ?></span>
                       </span>
                     </td>
+                    <td class="text-end"><i class="fa-solid fa-chevron-right row-chevron"></i></td>
                   </tr>
                 <?php endforeach; ?>
               <?php endif; ?>
             </tbody>
           </table>
         </div>
-        <?php if ($totalPages > 1): ?>
-        <div class="card-footer bg-white d-flex justify-content-between align-items-center flex-wrap gap-2 py-3" style="border-top:1px solid var(--line);">
-          <span class="small" style="color:var(--ink-soft);">Page <?= $page ?> of <?= $totalPages ?> &middot; <?= $filteredCount ?> total</span>
+
+        <?php if ($filteredCount > 0): ?>
+        <div class="list-foot">
+          <span class="list-foot-info">Page <strong><?= $page ?></strong> of <strong><?= $totalPages ?></strong> &middot; <?= $perPage ?> per page</span>
+          <?php if ($totalPages > 1): ?>
           <nav aria-label="Assignments pagination">
-            <ul class="pagination pagination-sm mb-0">
+            <ul class="pagination pagination-sm">
               <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
                 <a class="page-link" href="<?= buildPageUrl($page - 1, $searchTerm, $sortOrder, $statusFilter) ?>">Previous</a>
               </li>
@@ -778,6 +832,7 @@ body {
               </li>
             </ul>
           </nav>
+          <?php endif; ?>
         </div>
         <?php endif; ?>
       </section>
@@ -916,12 +971,12 @@ document.getElementById('viewAssignmentModal').addEventListener('show.bs.modal',
   const statusEl = document.getElementById('view_status');
   statusEl.className = 'status-stack ' + meta.cls;
   statusEl.innerHTML = '';
-  const statusText = document.createElement('span');
-  statusText.textContent = data.status;
   const statusIconEl = document.createElement('i');
   statusIconEl.className = 'fa-solid ' + meta.icon;
-  statusEl.appendChild(statusText);
+  const statusText = document.createElement('span');
+  statusText.textContent = data.status;
   statusEl.appendChild(statusIconEl);
+  statusEl.appendChild(statusText);
 
   const footer = document.getElementById('statusFooter');
   const btnStart = document.getElementById('btnStart');

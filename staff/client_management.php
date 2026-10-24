@@ -227,10 +227,6 @@ $allClientsForModal = $pdo->query('SELECT client_id, company_name FROM clients O
 $existingSkillsStmt = $pdo->query('SELECT DISTINCT skill_name FROM staff_skills ORDER BY skill_name ASC');
 $existingSkills = $existingSkillsStmt->fetchAll(PDO::FETCH_COLUMN);
 
-$newRequests        = (int) $pdo->query("SELECT COUNT(*) FROM service_requests WHERE status = 'New'")->fetchColumn();
-$inProgressRequests = (int) $pdo->query("SELECT COUNT(*) FROM service_requests WHERE status = 'In Progress'")->fetchColumn();
-$completedRequests  = (int) $pdo->query("SELECT COUNT(*) FROM service_requests WHERE status = 'Completed'")->fetchColumn();
-
 $reportTotalPages = max(1, (int) ceil($totalClientsAll / $perPage));
 $reportPage       = min($page, $reportTotalPages);
 $reportOffset     = ($reportPage - 1) * $perPage;
@@ -392,70 +388,25 @@ body {
 }
 .btn-brand:focus { background-color: var(--indigo-text); color: #fff; }
 
-.summary-bar {
-  display: flex;
-  align-items: center;
-  gap: 1.25rem;
-  background-color: #fff;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: .75rem 1.15rem;
-}
-
-.summary-item {
-  display: flex;
-  align-items: baseline;
-  gap: .65rem;
-  min-width: 0;
-}
-
-.summary-label {
-  font-size: .72rem;
-  font-weight: 700;
-  letter-spacing: .05em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-  white-space: nowrap;
-}
-
-.summary-value {
-  font-family: 'Lexend', 'Inter', sans-serif;
-  font-size: 1.15rem;
-  font-weight: 700;
-  color: var(--navy-deep);
-  word-break: break-word;
-}
-
-.summary-money { color: var(--success-text); }
-
-.summary-divider {
-  width: 2px;
-  align-self: stretch;
-  min-height: 28px;
-  background-color: #B8C0CE;
-  border-radius: 1px;
-  flex-shrink: 0;
-}
-
 .client-management-tabs {
   display: flex;
-  gap: .5rem;
+  gap: .6rem;
   flex-wrap: wrap;
-  padding: 4px;
 }
 
 .client-management-tabs a {
   --tab-color: #3B4E8A;
   display: inline-flex;
   align-items: center;
-  gap: .45rem;
-  padding: .45rem .9rem;
-  border-radius: 8px;
-  border: 2px solid var(--tab-color);
+  gap: .55rem;
+  padding: .45rem .55rem .45rem .95rem;
+  border-radius: 10px;
+  border: 1px solid var(--tab-color);
   background-color: var(--tab-color);
   color: #FFFFFF !important;
-  font-size: .82rem;
+  font-size: .84rem;
   font-weight: 600;
+  line-height: 1.2;
   text-decoration: none;
 }
 
@@ -463,20 +414,32 @@ body {
 .client-management-tabs a.tab-requests { --tab-color: #B7791F; }
 .client-management-tabs a.tab-reports  { --tab-color: #157A5F; }
 
+.client-management-tabs a:hover,
+.client-management-tabs a:focus,
+.client-management-tabs a:focus-visible,
+.client-management-tabs a:active,
 .client-management-tabs a.active {
-  box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--tab-color);
-}
-
-.client-management-tabs a:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--tab-color);
+  box-shadow: none;
 }
 
 .client-management-tabs .tab-count {
-  font-size: .72rem;
-  font-weight: 700;
+  min-width: 1.75rem;
+  padding: .12rem .5rem;
+  border-radius: 7px;
+  background-color: rgba(255, 255, 255, .2);
   color: #FFFFFF;
-  opacity: 1;
+  font-family: 'Lexend', 'Inter', sans-serif;
+  font-size: .76rem;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.client-management-tabs a.active .tab-count {
+  background-color: #DDE1EA;
+  color: var(--tab-color);
 }
 
 .table thead th {
@@ -563,34 +526,18 @@ body {
 .alert-modal-icon.is-warning { background-color: var(--warn-soft); color: var(--warn-text); }
 
 @media (max-width: 767.98px) {
-  .summary-bar {
-    gap: .75rem;
-    padding: .6rem .8rem;
-    flex-wrap: wrap;
-  }
-  .summary-item {
-    flex: 1 1 0;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: .1rem;
-    min-width: 45%;
-  }
-  .summary-label { font-size: .6rem; letter-spacing: .04em; }
-  .summary-value { font-size: .98rem; }
-  .summary-divider { display: none; }
-
   .client-management-tabs { gap: .4rem; }
   .client-management-tabs a {
     flex: 1 1 0;
     justify-content: center;
     text-align: center;
     font-size: .72rem;
-    padding: .5rem .35rem;
+    padding: .45rem .35rem;
     gap: .3rem;
     min-width: 0;
   }
   .client-management-tabs a i { display: none; }
-  .client-management-tabs .tab-count { font-size: .68rem; }
+  .client-management-tabs .tab-count { min-width: 1.45rem; padding: .08rem .4rem; font-size: .68rem; }
 
   .btn { font-size: .82rem; padding: .4rem .7rem; }
 
@@ -609,7 +556,6 @@ body {
 }
 
 @media (max-width: 575.98px) {
-  .summary-value { font-size: .9rem; }
   .dashboard-title { font-size: 1rem; }
 }
 
@@ -774,28 +720,6 @@ body {
     </header>
 
     <main class="dashboard-content p-3 p-md-4">
-
-      <section class="summary-bar mb-3">
-        <div class="summary-item">
-          <span class="summary-label">Total Clients</span>
-          <span class="summary-value"><?= (int) $totalClientsAll ?></span>
-        </div>
-        <div class="summary-divider"></div>
-        <div class="summary-item">
-          <span class="summary-label">Total Requests</span>
-          <span class="summary-value"><?= (int) $totalRequestsAll ?></span>
-        </div>
-        <div class="summary-divider"></div>
-        <div class="summary-item">
-          <span class="summary-label">In Progress</span>
-          <span class="summary-value" style="color:var(--warn-text);"><?= (int) $inProgressRequests ?></span>
-        </div>
-        <div class="summary-divider"></div>
-        <div class="summary-item">
-          <span class="summary-label">Completed</span>
-          <span class="summary-value summary-money"><?= (int) $completedRequests ?></span>
-        </div>
-      </section>
 
       <nav class="client-management-tabs mb-3" aria-label="Client management sections">
         <a href="?tab=clients" class="tab-clients <?= $activeTab === 'clients' ? 'active' : '' ?>" <?= $activeTab === 'clients' ? 'aria-current="page"' : '' ?>>

@@ -161,6 +161,25 @@ $requestSlices = [
 ];
 $requestTotal = array_sum(array_column($requestSlices, 'value'));
 
+$donutRadius = 64;
+$donutCirc = 2 * M_PI * $donutRadius;
+$donutNonZero = count(array_filter(array_column($requestSlices, 'value')));
+$donutSegments = [];
+$donutAcc = 0.0;
+foreach ($requestSlices as $slice) {
+    if ($slice['value'] <= 0 || $requestTotal <= 0) continue;
+    $segLen = ($slice['value'] / $requestTotal) * $donutCirc;
+    $segGap = $donutNonZero > 1 ? 2.0 : 0.0;
+    $segDash = max($segLen - $segGap, 0.5);
+    $donutSegments[] = [
+        'color' => $slice['color'],
+        'dash' => round($segDash, 2),
+        'rest' => round($donutCirc - $segDash, 2),
+        'offset' => round(-$donutAcc, 2),
+    ];
+    $donutAcc += $segLen;
+}
+
 $approvalBars = [
     ['label' => 'Quotations Approved', 'value' => $approvedQuotations, 'color' => '#0B67B8'],
     ['label' => 'Contracts Approved',  'value' => $approvedContracts,  'color' => '#12AEEF'],
@@ -356,6 +375,9 @@ body {
 .donut-wrap {
   position: relative;
   height: 175px;
+  width: 100%;
+  max-width: 220px;
+  margin: 0 auto;
 }
 .donut-center {
   position: absolute;
@@ -365,6 +387,7 @@ body {
   align-items: center;
   justify-content: center;
   pointer-events: none;
+  z-index: 1;
 }
 .donut-center .donut-total {
   font-family: 'Lexend', sans-serif;
@@ -378,6 +401,7 @@ body {
   color: var(--ink-soft);
   margin-top: .2rem;
 }
+.donut-print { display: none; }
 .legend-list {
   display: flex;
   flex-wrap: wrap;
@@ -596,8 +620,7 @@ button::-moz-focus-inner {
 @media (max-width: 575.98px) {
   .date-filter { max-width: 150px; height: 34px; }
   .btn-print { width: 34px; height: 34px; }
-}
-@media (max-width: 575.98px) {
+
   .kpi-strip {
     grid-template-columns: repeat(3, 1fr);
     row-gap: .85rem;
@@ -611,8 +634,7 @@ button::-moz-focus-inner {
   .kpi-icon i { font-size: 1.05rem; margin-top: .1rem; }
   .kpi-value { font-size: .95rem; }
   .kpi-label { font-size: .62rem; margin-top: .1rem; line-height: 1.2; }
-}
-@media (max-width: 575.98px) {
+
   .hbar-row { grid-template-columns: 92px 1fr; }
 }
 
@@ -626,7 +648,9 @@ button::-moz-focus-inner {
     text-align: center;
     margin-bottom: 24px;
     padding-bottom: 14px;
-    border-bottom: 2px solid var(--blue);
+    border-bottom: 2px solid #000000;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
   .print-header img {
     height: 48px;
@@ -637,12 +661,16 @@ button::-moz-focus-inner {
     font-family: 'Lexend', sans-serif;
     font-size: 20px;
     font-weight: 700;
-    color: var(--blue);
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
     margin-bottom: 2px;
   }
   .print-header p {
     font-size: 11px;
-    color: var(--ink-soft);
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
     margin: 0;
   }
   body { background-color: #fff !important; }
@@ -654,6 +682,39 @@ button::-moz-focus-inner {
   .hbar-fill, .legend-dot {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+
+  .status-pill,
+  .status-pill.status-new,
+  .status-pill.status-progress,
+  .status-pill.status-approved,
+  .status-pill.status-rejected {
+    background: none !important;
+    background-color: transparent !important;
+    border: 0 !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    color: #000000 !important;
+    font-weight: 600 !important;
+    font-size: .82rem !important;
+  }
+
+  .donut-wrap { display: none !important; }
+  .donut-print {
+    display: block !important;
+    width: 180px;
+    height: 180px;
+    margin: 0 auto;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .donut-print svg {
+    display: block;
+    width: 180px;
+    height: 180px;
   }
 }
 </style>
@@ -692,7 +753,7 @@ button::-moz-focus-inner {
         </form>
 
         <button type="button" class="btn-print" onclick="window.print()">
-          <i class="fa-solid fa-print"></i><span>Print Report</span>
+          <i class="fa-solid fa-print"></i><span>Print</span>
         </button>
       </div>
     </header>
@@ -746,6 +807,7 @@ button::-moz-focus-inner {
           <section class="panel">
             <h2 class="panel-title">Service Requests</h2>
             <p class="panel-sub">Status distribution</p>
+
             <div class="donut-wrap">
               <canvas id="requestsChart"></canvas>
               <div class="donut-center">
@@ -753,6 +815,21 @@ button::-moz-focus-inner {
                 <span class="donut-caption">Total</span>
               </div>
             </div>
+
+            <div class="donut-print" aria-hidden="true">
+              <svg viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg">
+                <?php if (empty($donutSegments)): ?>
+                  <circle cx="90" cy="90" r="<?= $donutRadius ?>" fill="none" stroke="#E3E8EF" stroke-width="26"/>
+                <?php else: ?>
+                  <?php foreach ($donutSegments as $seg): ?>
+                    <circle cx="90" cy="90" r="<?= $donutRadius ?>" fill="none" stroke="<?= $seg['color'] ?>" stroke-width="26" stroke-dasharray="<?= $seg['dash'] ?> <?= $seg['rest'] ?>" stroke-dashoffset="<?= $seg['offset'] ?>" transform="rotate(-90 90 90)"/>
+                  <?php endforeach; ?>
+                <?php endif; ?>
+                <text x="90" y="91" text-anchor="middle" font-family="Lexend, Inter, Arial, sans-serif" font-size="26" font-weight="700" fill="#1F2933"><?= $requestTotal ?></text>
+                <text x="90" y="107" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="10" fill="#6B7785">Total</text>
+              </svg>
+            </div>
+
             <div class="legend-list">
               <?php foreach ($requestSlices as $slice): ?>
                 <?php $slicePct = $requestTotal > 0 ? round(($slice['value'] / $requestTotal) * 100) : 0; ?>
@@ -980,6 +1057,7 @@ if (requestsCanvas) {
       responsive: true,
       maintainAspectRatio: false,
       cutout: '64%',
+      layout: { padding: 0 },
       plugins: {
         legend: { display: false },
         tooltip: { enabled: requestHasData }
@@ -1077,6 +1155,14 @@ if (approvalsCanvas) {
     }
   });
 })();
+</script>
+<script>
+window.addEventListener('beforeprint', function () {
+  document.querySelectorAll('canvas').forEach(function (canvas) {
+    var chart = Chart.getChart(canvas);
+    if (chart) chart.resize();
+  });
+});
 </script>
 
 </body>
