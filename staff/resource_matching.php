@@ -1,14 +1,7 @@
 <?php
 
-
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
-if (session_status() === PHP_SESSION_NONE) {
-    session_name('STAFF_SESSION');
-    session_start();
-}
+session_name('STAFF_SESSION');
+session_start();
 require_once __DIR__ . '/../config/database.php';
 
 if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'staff') {
@@ -138,7 +131,8 @@ foreach ($skillsByStaffStmt->fetchAll() as $row) {
 }
 
 $assignedStmt = $pdo->query(
-    "SELECT sr.request_id, sr.request_title, sr.status, sr.updated_at,
+    "SELECT sr.request_id, sr.request_title, sr.required_skill, sr.status, sr.updated_at,
+            sr.assigned_to,
             c.company_name,
             u.firstname AS staff_firstname, u.lastname AS staff_lastname,
             ab.firstname AS assigned_by_firstname, ab.lastname AS assigned_by_lastname
@@ -255,8 +249,10 @@ body {
 }
 
 .stat-card {
-  background-color: var(--card);
-  border: 1px solid var(--line);
+  position: relative;
+  overflow: hidden;
+  background-color: var(--stat-bg, var(--card));
+  border: 1px solid var(--stat-border, var(--line));
   border-radius: 12px;
   padding: 1rem 1.25rem;
   box-shadow: 0 1px 2px rgba(42, 45, 47, .04);
@@ -273,7 +269,8 @@ body {
   font-weight: 700;
   letter-spacing: .05em;
   text-transform: uppercase;
-  color: var(--ink-soft);
+  color: var(--stat-color, var(--ink-soft));
+  opacity: .85;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -283,9 +280,16 @@ body {
   font-family: 'Lexend', sans-serif;
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--charcoal);
+  color: var(--stat-color, var(--charcoal));
   margin-top: .15rem;
 }
+
+.stat-pending   { --stat-color: #FFFFFF; --stat-bg: #A06B1F; --stat-border: #A06B1F; }
+.stat-total     { --stat-color: #FFFFFF; --stat-bg: #3F6C8F; --stat-border: #3F6C8F; }
+.stat-available { --stat-color: #FFFFFF; --stat-bg: #3E7D5A; --stat-border: #3E7D5A; }
+.stat-busy      { --stat-color: #FFFFFF; --stat-bg: #7B4F7D; --stat-border: #7B4F7D; }
+.stat-progress  { --stat-color: #FFFFFF; --stat-bg: #2F6F6A; --stat-border: #2F6F6A; }
+.stat-assigned  { --stat-color: #FFFFFF; --stat-bg: #2B3134; --stat-border: #2B3134; }
 
 .section-label {
   font-size: .7rem;
@@ -708,37 +712,37 @@ body {
 
       <div class="row g-3 mb-3 align-items-stretch">
         <div class="col-4 col-xl-2 d-flex">
-          <div class="stat-card">
+          <div class="stat-card stat-pending">
             <div class="stat-label">Pending Requests</div>
             <div class="stat-value"><?= $pendingCount ?></div>
           </div>
         </div>
         <div class="col-4 col-xl-2 d-flex">
-          <div class="stat-card">
+          <div class="stat-card stat-total">
             <div class="stat-label">Total Staff</div>
             <div class="stat-value"><?= $totalStaffCount ?></div>
           </div>
         </div>
         <div class="col-4 col-xl-2 d-flex">
-          <div class="stat-card">
+          <div class="stat-card stat-available">
             <div class="stat-label">Available Staff</div>
-            <div class="stat-value" style="color:var(--success-text);"><?= $availableStaffCount ?></div>
+            <div class="stat-value"><?= $availableStaffCount ?></div>
           </div>
         </div>
         <div class="col-4 col-xl-2 d-flex">
-          <div class="stat-card">
+          <div class="stat-card stat-busy">
             <div class="stat-label">On Assignment</div>
-            <div class="stat-value" style="color:var(--warn-text);"><?= $onAssignmentCount ?></div>
+            <div class="stat-value"><?= $onAssignmentCount ?></div>
           </div>
         </div>
         <div class="col-4 col-xl-2 d-flex">
-          <div class="stat-card">
+          <div class="stat-card stat-progress">
             <div class="stat-label">In Progress</div>
             <div class="stat-value"><?= $inProgressCount ?></div>
           </div>
         </div>
         <div class="col-4 col-xl-2 d-flex">
-          <div class="stat-card">
+          <div class="stat-card stat-assigned">
             <div class="stat-label">Total Assigned</div>
             <div class="stat-value"><?= $totalAssigned ?></div>
           </div>
@@ -902,11 +906,13 @@ body {
                     $statusClass = 'status-default';
                     if ($row['status'] === 'In Progress') { $statusClass = 'status-in-progress'; }
                     if ($row['status'] === 'Completed') { $statusClass = 'status-completed'; }
+
+                    $assignedStaffName = trim(($row['staff_firstname'] ?? '') . ' ' . ($row['staff_lastname'] ?? ''));
                   ?>
                   <tr>
                     <td class="small fw-semibold"><?= htmlspecialchars($row['request_title']) ?></td>
                     <td class="small d-none d-md-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars($row['company_name']) ?></td>
-                    <td class="small"><?= htmlspecialchars(trim(($row['staff_firstname'] ?? '') . ' ' . ($row['staff_lastname'] ?? ''))) ?></td>
+                    <td class="small"><?= htmlspecialchars($assignedStaffName) ?></td>
                     <td class="small d-none d-lg-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars(trim(($row['assigned_by_firstname'] ?? '-') . ' ' . ($row['assigned_by_lastname'] ?? ''))) ?></td>
                     <td class="small d-none d-lg-table-cell" style="color:var(--ink-soft);"><?= htmlspecialchars(formatDisplayDate($row['updated_at']) ?? '') ?></td>
                     <td class="small">
@@ -943,7 +949,6 @@ body {
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-cancel" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn btn-confirm px-4" id="confirm_assign_btn">Confirm Assignment</button>
       </div>
     </div>
@@ -1243,14 +1248,14 @@ function buildSkillBadges(staff, requiredSkill) {
   }).join('');
 }
 
-function renderStaffMatches(requiredSkill) {
+function renderStaffMatchesInto(listElement, countLabelElement, requiredSkill, requestTitle, companyName, requestId, currentAssignedId) {
   const rankedStaff = rankStaff(requiredSkill);
-  staffMatchList.innerHTML = '';
+  listElement.innerHTML = '';
   const busyCount = rankedStaff.filter(function (staff) { return staff.workload > 0; }).length;
-  staffCountLabel.textContent = rankedStaff.length + ' staff member(s) \u00B7 ' + busyCount + ' with active task(s)';
+  countLabelElement.textContent = rankedStaff.length + ' staff member(s) \u00B7 ' + busyCount + ' with active task(s)';
 
   if (rankedStaff.length === 0) {
-    staffMatchList.innerHTML = '<p class="small text-center py-3 mb-0" style="color:var(--ink-soft);">No staff accounts found.</p>';
+    listElement.innerHTML = '<p class="small text-center py-3 mb-0" style="color:var(--ink-soft);">No staff accounts found.</p>';
     return;
   }
 
@@ -1261,6 +1266,7 @@ function renderStaffMatches(requiredSkill) {
 
   rankedStaff.forEach(function (staff) {
     const isBest = bestCandidate && bestCandidate.user_id === staff.user_id;
+    const isCurrent = currentAssignedId && staff.user_id === currentAssignedId;
     const row = document.createElement('div');
     row.className = 'staff-match-row' + (isBest ? ' is-best' : '');
 
@@ -1269,19 +1275,24 @@ function renderStaffMatches(requiredSkill) {
       '<div class="flex-grow-1" style="min-width:0;">' +
         '<div class="d-flex align-items-center flex-wrap gap-2 mb-1">' +
           '<span class="staff-name">' + escapeHtml(staff.name) + '</span>' +
+          (isCurrent ? '<span class="match-pill match-neutral">Currently Assigned</span>' : '') +
           buildMatchPill(staff, requiredSkill, isBest) +
         '</div>' +
         '<div class="mb-1">' + buildSkillBadges(staff, requiredSkill) + '</div>' +
         '<div class="staff-meta">' + (staff.workload === 0 ? 'Available &middot; no active tasks' : staff.workload + ' active task(s)') + ' &middot; ' + escapeHtml(staff.status) + '</div>' +
       '</div>' +
-      '<button type="button" class="btn btn-assign flex-shrink-0"' + (staff.status !== 'Active' ? ' disabled' : '') + '>Assign</button>';
+      '<button type="button" class="btn btn-assign flex-shrink-0"' + (staff.status !== 'Active' || isCurrent ? ' disabled' : '') + '>' + (isCurrent ? 'Assigned' : 'Assign') + '</button>';
 
     row.querySelector('button').addEventListener('click', function () {
-      openConfirmModal(staff, requiredSkill);
+      openConfirmModalFor(requestId, requestTitle, companyName, staff, requiredSkill);
     });
 
-    staffMatchList.appendChild(row);
+    listElement.appendChild(row);
   });
+}
+
+function renderStaffMatches(requiredSkill) {
+  renderStaffMatchesInto(staffMatchList, staffCountLabel, requiredSkill, selectedRequest.request_title, selectedRequest.company, selectedRequest.request_id, null);
 }
 
 function selectRequest(card) {
@@ -1318,14 +1329,14 @@ if (requestSearchInput) {
   });
 }
 
-function openConfirmModal(staff, requiredSkill) {
+function openConfirmModalFor(requestId, requestTitle, companyName, staff, requiredSkill) {
   let skillMatchLabel = 'No skill required';
   if (hasText(requiredSkill)) {
     skillMatchLabel = staff.hasSkill ? 'Matches ' + requiredSkill : 'Does not match ' + requiredSkill;
   }
 
-  document.getElementById('confirm_request_title').textContent = selectedRequest.request_title;
-  document.getElementById('confirm_client_name').textContent = selectedRequest.company;
+  document.getElementById('confirm_request_title').textContent = requestTitle;
+  document.getElementById('confirm_client_name').textContent = companyName;
   document.getElementById('confirm_staff_name').textContent = staff.name;
   document.getElementById('confirm_skill_match').textContent = skillMatchLabel;
 
@@ -1333,10 +1344,14 @@ function openConfirmModal(staff, requiredSkill) {
   modal.show();
 
   document.getElementById('confirm_assign_btn').onclick = function () {
-    document.getElementById('assign_request_id').value = selectedRequest.request_id;
+    document.getElementById('assign_request_id').value = requestId;
     document.getElementById('assign_user_id').value = staff.user_id;
     document.getElementById('assignForm').submit();
   };
+}
+
+function openConfirmModal(staff, requiredSkill) {
+  openConfirmModalFor(selectedRequest.request_id, selectedRequest.request_title, selectedRequest.company, staff, requiredSkill);
 }
 
 <?php if ($alertType && $alertMessage): ?>
